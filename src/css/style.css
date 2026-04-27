@@ -1,0 +1,216 @@
+/* =============================================
+   GLOBAL BODY STYLES
+   ============================================= */
+body {
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 400;
+  font-size: 1rem;
+  background-color: #f1f5f9;
+  color: #64748b;
+  position: relative;
+  z-index: 1;
+}
+
+
+/* =============================================
+   SCROLLBAR UTILITIES
+   ============================================= */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+
+/* =============================================
+   CHAT & INBOX HEIGHT
+   ============================================= */
+.chat-height  { height: calc(100vh - 8.125rem); }
+.inbox-height { height: calc(100vh - 8.125rem); }
+@media (min-width: 992px) {
+  .chat-height  { height: calc(100vh - 5.625rem); }
+  .inbox-height { height: calc(100vh - 5.625rem); }
+}
+
+
+/* =============================================
+   CHECKBOX STYLES
+   ============================================= */
+.tableCheckbox:checked ~ div span { opacity: 1; }
+.tableCheckbox:checked ~ div { background-color: #3c50e0; border-color: #3c50e0; }
+.taskCheckbox:checked ~ .box span { opacity: 1; }
+.taskCheckbox:checked ~ p { text-decoration: line-through; }
+.taskCheckbox:checked ~ .box { background-color: #3c50e0; border-color: #3c50e0; }
+
+
+/* =============================================
+   CUSTOM DATE INPUT ICONS
+   ============================================= */
+.custom-input-date::-webkit-calendar-picker-indicator { background-position: center; background-repeat: no-repeat; background-size: 20px; }
+.custom-input-date-1::-webkit-calendar-picker-indicator { background-image: url(./images/icon/icon-calendar.svg); }
+.custom-input-date-2::-webkit-calendar-picker-indicator { background-image: url(./images/icon/icon-arrow-down.svg); }
+
+
+/* =============================================
+   ALPINE JS
+   ============================================= */
+[x-cloak] { display: none !important; }
+
+
+/* =============================================
+   FLATPICKR
+   ============================================= */
+.flatpickr-wrapper { width: 100%; }
+.flatpickr-months .flatpickr-prev-month:hover svg,
+.flatpickr-months .flatpickr-next-month:hover svg { fill: #3c50e0; }
+.flatpickr-calendar { padding: 1.5rem !important; }
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange,
+.flatpickr-day.selected:hover,
+.flatpickr-day.startRange:hover,
+.flatpickr-day.endRange:hover {
+  background: #3c50e0 !important;
+  border-color: #3c50e0 !important;
+}
+
+
+/* =============================================
+   SIDEBAR LINKS
+   ============================================= */
+.sidebar-link { color: #adb5bd; transition: background-color 0.2s, color 0.2s; }
+.sidebar-link:hover { background-color: #343a40; color: #ffffff; }
+.sidebar-link-active { background-color: #343a40; color: #ffffff !important; }
+.sidebar-sub-link { color: #adb5bd; font-size: 0.9rem; transition: color 0.2s; }
+.sidebar-sub-link:hover { color: #ffffff; }
+
+
+/* =============================================
+   DROPDOWN USER HOVER
+   ============================================= */
+.dropdown-item-custom { transition: color 0.2s; color: #333; }
+.dropdown-item-custom:hover { color: #3c50e0 !important; }
+
+
+/* =============================================
+   BOOTSTRAP PRIMARY COLOR = #3c50e0
+   ============================================= */
+:root {
+  --bs-primary: #3c50e0;
+  --bs-primary-rgb: 60, 80, 224;
+}
+.btn-primary { background-color: #3c50e0; border-color: #3c50e0; }
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active { background-color: #3342c4; border-color: #3342c4; }
+.text-primary { color: #3c50e0 !important; }
+.bg-primary   { background-color: #3c50e0 !important; }
+.border-primary { border-color: #3c50e0 !important; }
+.form-control:focus {
+  border-color: #3c50e0;
+  box-shadow: 0 0 0 0.2rem rgba(60, 80, 224, 0.15);
+}
+.progress-bar.bg-primary { background-color: #3c50e0 !important; }
+
+
+/* =============================================
+   DARK MODE
+   The useColorMode hook adds/removes class="dark"
+   on the <html> element. All dark styles go here.
+   ============================================= */
+
+html.dark body {
+  background-color: #1a222c;
+  color: #adb7be;
+}
+
+/* Cards */
+html.dark .card {
+  background-color: #24303f;
+  border-color: #2e3a47;
+  color: #adb7be;
+}
+html.dark .card-header,
+html.dark .card-footer {
+  background-color: #24303f !important;
+  border-color: #2e3a47 !important;
+  color: #e2e8f0;
+}
+
+/* Text colors */
+html.dark .text-dark   { color: #e2e8f0 !important; }
+html.dark .text-muted  { color: #7d8da6 !important; }
+html.dark .fw-semibold { color: inherit; }
+
+/* Header bar */
+html.dark header {
+  background-color: #24303f !important;
+  border-bottom: 1px solid #2e3a47 !important;
+  box-shadow: none !important;
+}
+
+/* White backgrounds become dark */
+html.dark .bg-white { background-color: #24303f !important; }
+html.dark .bg-light { background-color: #1e2d3d !important; color: #e2e8f0 !important; }
+
+/* Borders */
+html.dark .border,
+html.dark .border-bottom,
+html.dark .border-top { border-color: #2e3a47 !important; }
+
+/* Tables */
+html.dark .table         { color: #adb7be; border-color: #2e3a47; }
+html.dark .table th,
+html.dark .table td       { border-color: #2e3a47; }
+html.dark .table-light,
+html.dark .table-light th { background-color: #1e2d3d !important; color: #e2e8f0 !important; }
+html.dark .table-bordered { border-color: #2e3a47; }
+
+/* Form inputs */
+html.dark .form-control,
+html.dark .form-select {
+  background-color: #1e2d3d;
+  border-color: #2e3a47;
+  color: #e2e8f0;
+}
+html.dark .form-control:focus,
+html.dark .form-select:focus {
+  background-color: #1e2d3d;
+  border-color: #3c50e0;
+  color: #e2e8f0;
+  box-shadow: 0 0 0 0.2rem rgba(60, 80, 224, 0.25);
+}
+html.dark .form-control::placeholder { color: #5a6a7a; }
+
+/* Progress bar track */
+html.dark .progress { background-color: #2e3a47; }
+
+/* Alerts */
+html.dark .alert-success {
+  background-color: rgba(40, 167, 69, 0.15);
+  border-color: rgba(40, 167, 69, 0.3);
+  color: #75c98a;
+}
+html.dark .alert-danger {
+  background-color: rgba(220, 53, 69, 0.15);
+  border-color: rgba(220, 53, 69, 0.3);
+  color: #f08080;
+}
+
+/* Breadcrumb */
+html.dark .breadcrumb-item a { color: #7d8da6; }
+html.dark .breadcrumb-item.active { color: #3c50e0; }
+
+/* Dropdown user panel */
+html.dark .dropdown-item-custom { color: #adb7be; }
+html.dark .dropdown-item-custom:hover { color: #3c50e0 !important; }
+
+/* Shadows */
+html.dark .shadow-sm {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Tab buttons in Tasks */
+html.dark .btn-link { color: #7d8da6; }
+
+/* Calendar table header stays blue in dark mode */
+html.dark .table thead th[style*="3c50e0"] {
+  background-color: #3c50e0 !important;
+}
