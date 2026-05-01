@@ -3,6 +3,8 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './config/db.js';
+import coordinatorRouter from './routes/coordinator.routes.js';
+
 
 // Load environment variables
 dotenv.config();
@@ -21,6 +23,8 @@ app.use(cors());
 app.get('/health', (req, res) => {
     res.json({ message: 'The server is working!' });
 });
+
+app.use('/coordinator', coordinatorRouter)
 
 // Port config (add fallback to avoid undefined)
 const PORT = process.env.PORT || 5000;
