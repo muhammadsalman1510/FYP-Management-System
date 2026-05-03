@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const SignIn = () => {
   const [userType, setUserType] = useState('student');
@@ -11,30 +12,38 @@ const SignIn = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (email && password) {
-      /*
-        TODO (Backend): Replace this with real API call:
-        POST /api/auth/login  →  { email, password, role: userType }
-        If login success → backend returns JWT token + user role
-        Store token in localStorage, then redirect based on role.
+      try {
+        const { data } = await axios.post('http://localhost:4000/api/auth/login', {
+          email,
+          password,
+        });
 
-        For now: simple redirect based on selected role button.
-      */
-      switch (userType) {
-        case 'student':
-          navigate('/dashboard');
-          break;
-        case 'supervisor':
-          navigate('/supervisor/dashboard');
-          break;
-        case 'coordinator':
-          navigate('/coordinator/dashboard');
-          break;
-        default:
-          navigate('/dashboard');
+        // Store token & user info
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+
+        // Navigate based on role from API response
+        switch (data.user.role) {
+          case 'student':
+            navigate('/dashboard');
+            break;
+          case 'supervisor':
+            navigate('/supervisor/dashboard');
+            break;
+          case 'coordinator':
+            navigate('/coordinator/dashboard');
+            break;
+          default:
+            navigate('/dashboard');
+        }
+      } catch (err) {
+        console.error('Login error:', err);
+        const message = err.response?.data?.message || 'Something went wrong. Please try again.';
+        alert(message);
       }
     } else {
       alert('Please enter your email and password.');
@@ -43,9 +52,9 @@ const SignIn = () => {
 
   // Sample credentials for testing each role
   const sampleCredentials = {
-    student:     { email: 'student@university.edu',     password: 'student123'     },
-    supervisor:  { email: 'shoaib@university.edu',      password: 'supervisor123'  },
-    coordinator: { email: 'omer@university.edu',        password: 'coordinator123' },
+    student: { email: 'student@university.edu', password: 'student123' },
+    supervisor: { email: 'shoaib@university.edu', password: 'supervisor123' },
+    coordinator: { email: 'omer@university.edu', password: 'coordinator123' },
   };
 
   const fillSampleCredentials = () => {
@@ -71,40 +80,6 @@ const SignIn = () => {
                   Sign In to FYP System
                 </h2>
 
-                {/* ── Role Selection Buttons ── */}
-                <div className="mb-4">
-                  <label className="form-label fw-medium text-dark small">Login As</label>
-                  <div className="row g-2">
-                    <div className="col-4">
-                      <button
-                        type="button"
-                        onClick={() => setUserType('student')}
-                        className={`btn w-100 ${userType === 'student' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                      >
-                        Student
-                      </button>
-                    </div>
-                    <div className="col-4">
-                      <button
-                        type="button"
-                        onClick={() => setUserType('supervisor')}
-                        className={`btn w-100 ${userType === 'supervisor' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                      >
-                        Supervisor
-                      </button>
-                    </div>
-                    <div className="col-4">
-                      <button
-                        type="button"
-                        onClick={() => setUserType('coordinator')}
-                        className={`btn w-100 ${userType === 'coordinator' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                      >
-                        Coordinator
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
                 {/* ── Login Form ── */}
                 <form onSubmit={handleSubmit}>
 
@@ -123,7 +98,7 @@ const SignIn = () => {
                       {/* Email icon */}
                       <span className="position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style={{ pointerEvents: 'none' }}>
                         <svg width="20" height="20" viewBox="0 0 22 22" fill="currentColor" opacity="0.5">
-                          <path d="M19.2516 3.30005H2.75156C1.58281 3.30005 0.585938 4.26255 0.585938 5.46567V16.6032C0.585938 17.7719 1.54844 18.7688 2.75156 18.7688H19.2516C20.4203 18.7688 21.4172 17.8063 21.4172 16.6032V5.4313C21.4172 4.26255 20.4203 3.30005 19.2516 3.30005ZM19.2516 4.84692L11.0016 10.2094L2.64844 4.84692H19.2516ZM19.2516 17.1532H2.75156C2.40781 17.1532 2.13281 16.8782 2.13281 16.5344V6.35942L10.1766 11.5157C10.4172 11.6875 10.6922 11.7563 10.9672 11.7563C11.2422 11.7563 11.5172 11.6875 11.7578 11.5157L19.8016 6.35942V16.5688C19.8703 16.8782 19.5953 17.1532 19.2516 17.1532Z"/>
+                          <path d="M19.2516 3.30005H2.75156C1.58281 3.30005 0.585938 4.26255 0.585938 5.46567V16.6032C0.585938 17.7719 1.54844 18.7688 2.75156 18.7688H19.2516C20.4203 18.7688 21.4172 17.8063 21.4172 16.6032V5.4313C21.4172 4.26255 20.4203 3.30005 19.2516 3.30005ZM19.2516 4.84692L11.0016 10.2094L2.64844 4.84692H19.2516ZM19.2516 17.1532H2.75156C2.40781 17.1532 2.13281 16.8782 2.13281 16.5344V6.35942L10.1766 11.5157C10.4172 11.6875 10.6922 11.7563 10.9672 11.7563C11.2422 11.7563 11.5172 11.6875 11.7578 11.5157L19.8016 6.35942V16.5688C19.8703 16.8782 19.5953 17.1532 19.2516 17.1532Z" />
                         </svg>
                       </span>
                     </div>
@@ -144,7 +119,7 @@ const SignIn = () => {
                       {/* Lock icon */}
                       <span className="position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style={{ pointerEvents: 'none' }}>
                         <svg width="20" height="20" viewBox="0 0 22 22" fill="currentColor" opacity="0.5">
-                          <path d="M16.1547 6.80626V5.91251C16.1547 3.16251 14.0922 0.825009 11.4797 0.618759C10.0359 0.481259 8.59219 0.996884 7.52656 1.95938C6.46094 2.92188 5.84219 4.29688 5.84219 5.70626V6.80626C3.84844 7.18438 2.33594 8.93751 2.33594 11.0688V17.2906C2.33594 19.5594 4.19219 21.3813 6.42656 21.3813H15.5016C17.7703 21.3813 19.6266 19.525 19.6266 17.2563V11C19.6609 8.93751 18.1484 7.21876 16.1547 6.80626Z"/>
+                          <path d="M16.1547 6.80626V5.91251C16.1547 3.16251 14.0922 0.825009 11.4797 0.618759C10.0359 0.481259 8.59219 0.996884 7.52656 1.95938C6.46094 2.92188 5.84219 4.29688 5.84219 5.70626V6.80626C3.84844 7.18438 2.33594 8.93751 2.33594 11.0688V17.2906C2.33594 19.5594 4.19219 21.3813 6.42656 21.3813H15.5016C17.7703 21.3813 19.6266 19.525 19.6266 17.2563V11C19.6609 8.93751 18.1484 7.21876 16.1547 6.80626Z" />
                         </svg>
                       </span>
                     </div>
