@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const SignUp = () => {
   const [userType, setUserType] = useState('student');
@@ -8,12 +9,13 @@ const SignUp = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    rollNumber: '',
-    department: '',
   });
+  const [rollNumber, setRollNumber] = useState(null);
+  const [maxProjects, setMaxProjects] = useState(null);
+
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (formData.password !== formData.confirmPassword) {
@@ -21,9 +23,44 @@ const SignUp = () => {
       return;
     }
 
-    // In real app, this would send data to backend
-    alert('Account created successfully! Please sign in.');
-    navigate('/login');
+    try {
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        role: userType,
+      };
+
+      // Only include rollNumber if signing up as a student
+      if (userType === 'student') {
+        payload.rollNumber = rollNumber;
+      }
+
+      // Only include maxProjects if signing up as a supervisor
+      if (userType === 'supervisor') {
+        if (!maxProjects || maxProjects < 1 || maxProjects > 5) {
+          alert('Maximum projects must be between 1 and 5.');
+          return;
+        }
+        payload.maxProjects = maxProjects;
+      }
+
+      const token = localStorage.getItem('token');
+
+      const { data } = await axios.post('http://localhost:4000/api/users', payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      alert(data.message);
+      navigate('/login');
+
+    } catch (err) {
+      console.error('Signup error:', err);
+      const message = err.response?.data?.message || 'Something went wrong. Please try again.';
+      alert(message);
+    }
   };
 
   const handleInputChange = (e) => {
@@ -66,43 +103,28 @@ const SignUp = () => {
                     Register As
                   </label>
                   <div className="row g-2">
-                    <div className="col-4">
+                    <div className="col-6">
                       <button
                         type="button"
                         onClick={() => setUserType('student')}
-                        className={`btn w-100 ${
-                          userType === 'student'
-                            ? 'btn-primary'
-                            : 'btn-outline-secondary'
-                        }`}
+                        className={`btn w-100 ${userType === 'student'
+                          ? 'btn-primary'
+                          : 'btn-outline-secondary'
+                          }`}
                       >
                         Student
                       </button>
                     </div>
-                    <div className="col-4">
+                    <div className="col-6">
                       <button
                         type="button"
                         onClick={() => setUserType('supervisor')}
-                        className={`btn w-100 ${
-                          userType === 'supervisor'
-                            ? 'btn-primary'
-                            : 'btn-outline-secondary'
-                        }`}
+                        className={`btn w-100 ${userType === 'supervisor'
+                          ? 'btn-primary'
+                          : 'btn-outline-secondary'
+                          }`}
                       >
                         Supervisor
-                      </button>
-                    </div>
-                    <div className="col-4">
-                      <button
-                        type="button"
-                        onClick={() => setUserType('coordinator')}
-                        className={`btn w-100 ${
-                          userType === 'coordinator'
-                            ? 'btn-primary'
-                            : 'btn-outline-secondary'
-                        }`}
-                      >
-                        Coordinator
                       </button>
                     </div>
                   </div>
@@ -157,9 +179,32 @@ const SignUp = () => {
                         type="text"
                         name="rollNumber"
                         placeholder="Enter your roll number"
-                        value={formData.rollNumber}
-                        onChange={handleInputChange}
+                        value={rollNumber}
+                        onChange={(e) => setRollNumber(e.target.value)}
                         className="form-control form-control-lg"
+                      />
+                    </div>
+                  )}
+
+                  {/*
+                    Maximum Projects Field
+                    Only shown if userType is 'supervisor'
+                  */}
+                  {userType === 'supervisor' && (
+                    <div className="mb-3">
+                      <label className="form-label fw-medium text-dark">
+                        Maximum Projects
+                      </label>
+                      <input
+                        type="number"
+                        name="maxProjects"
+                        placeholder="Enter maximum number of projects (1-5)"
+                        value={maxProjects}
+                        onChange={(e) => setMaxProjects(e.target.value)}
+                        className="form-control form-control-lg"
+                        min={1}
+                        max={5}
+                        step={1}
                       />
                     </div>
                   )}

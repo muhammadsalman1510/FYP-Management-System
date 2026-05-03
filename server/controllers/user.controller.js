@@ -1,9 +1,10 @@
 import bcrypt from 'bcryptjs'
 import mongoose from 'mongoose'
 import User from '../models/user.model.js'
-import SupervisorProfile from '../models/supervisor-profile.model.js'
 import Group from '../models/group.model.js'
 import Project from '../models/project.model.js'
+import SupervisorProfile from '../models/supervisor-profile.model.js'
+import StudentProfile from '../models/student-profile.model.js'
 
 /**
  * POST /api/users
@@ -11,7 +12,7 @@ import Project from '../models/project.model.js'
  */
 export const createUser = async (req, res) => {
     try {
-        const { name, email, password, role, maxProjects } = req.body
+        const { name, email, password, role, maxProjects, rollNumber } = req.body
 
         // 1. Basic validation
         if (!name || !email || !password || !role) {
@@ -30,6 +31,12 @@ export const createUser = async (req, res) => {
         if (role === 'supervisor' && maxProjects === undefined) {
             return res.status(400).json({
                 message: 'maxProjects is required for supervisors'
+            })
+        }
+
+        if (role === 'student' && rollNumber === undefined) {
+            return res.status(400).json({
+                message: 'rollNumber is required for students'
             })
         }
 
@@ -56,11 +63,21 @@ export const createUser = async (req, res) => {
                 role
             }], { session })
 
-            // 5. Create supervisor profile if needed
+            let profile = null;
+
+            // Create supervisor profile if needed
             if (role === 'supervisor') {
-                await SupervisorProfile.create([{
+                profile = await SupervisorProfile.create([{
                     userId: user[0]._id,
                     maxProjects,
+                }], { session })
+            }
+
+            // Create student profile if needed
+            if (role === 'student') {
+                profile = await StudentProfile.create([{
+                    userId: user[0]._id,
+                    rollNumber,
                 }], { session })
             }
 
@@ -74,7 +91,8 @@ export const createUser = async (req, res) => {
                     name: user[0].name,
                     email: user[0].email,
                     role: user[0].role
-                }
+                },
+                profile: profile ? profile[0] : null,
             })
 
         } catch (err) {
