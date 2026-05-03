@@ -1,3 +1,6 @@
+// 📁 FILE: src/pages/Authentication/SignIn.jsx
+// Replace your entire existing SignIn.jsx with this file
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -11,9 +14,15 @@ const SignIn = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Simple authentication logic (in real app, this would connect to backend)
     if (email && password) {
-      // Redirect based on user type
+      /*
+        TODO (Backend): Replace this with real API call:
+        POST /api/auth/login  →  { email, password, role: userType }
+        If login success → backend returns JWT token + user role
+        Store token in localStorage, then redirect based on role.
+
+        For now: simple redirect based on selected role button.
+      */
       switch (userType) {
         case 'student':
           navigate('/dashboard');
@@ -28,15 +37,15 @@ const SignIn = () => {
           navigate('/dashboard');
       }
     } else {
-      alert('Please enter email and password');
+      alert('Please enter your email and password.');
     }
   };
 
-  // Sample login credentials for demo
+  // Sample credentials for testing each role
   const sampleCredentials = {
-    student: { email: 'student@university.edu', password: 'student123' },
-    supervisor: { email: 'shoaib@university.edu', password: 'supervisor123' },
-    coordinator: { email: 'omer@university.edu', password: 'coordinator123' },
+    student:     { email: 'student@university.edu',     password: 'student123'     },
+    supervisor:  { email: 'shoaib@university.edu',      password: 'supervisor123'  },
+    coordinator: { email: 'omer@university.edu',        password: 'coordinator123' },
   };
 
   const fillSampleCredentials = () => {
@@ -46,50 +55,31 @@ const SignIn = () => {
 
   return (
     /*
-      min-vh-100: full screen height
-      d-flex align-items-center justify-content-center: center the card on screen
+      Full screen centered layout.
+      min-vh-100: takes full screen height
       bg-light: light gray background
     */
     <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light py-4">
       <div className="container">
         <div className="row justify-content-center">
-
-          {/*
-            The main white card
-            col-12: full width on mobile
-            col-md-8: 8 columns on medium screens
-            col-lg-6: 6 columns on large screens
-            col-xl-5: 5 columns on extra large screens
-          */}
           <div className="col-12 col-md-8 col-lg-6 col-xl-5">
             <div className="card shadow border-0 rounded-3">
               <div className="card-body p-4 p-md-5">
 
-                {/* ===== Page Title ===== */}
+                {/* Page Title */}
                 <h2 className="fw-bold text-dark mb-4 fs-4">
                   Sign In to FYP System
                 </h2>
 
-                {/* ===== User Type Selection Buttons ===== */}
+                {/* ── Role Selection Buttons ── */}
                 <div className="mb-4">
-                  <label className="form-label fw-medium text-dark small">
-                    Login As
-                  </label>
-                  {/*
-                    d-grid: makes the buttons fill the row
-                    gap-2: space between buttons
-                    3 columns using Bootstrap grid inside the button group
-                  */}
+                  <label className="form-label fw-medium text-dark small">Login As</label>
                   <div className="row g-2">
                     <div className="col-4">
                       <button
                         type="button"
                         onClick={() => setUserType('student')}
-                        className={`btn w-100 ${
-                          userType === 'student'
-                            ? 'btn-primary'
-                            : 'btn-outline-secondary'
-                        }`}
+                        className={`btn w-100 ${userType === 'student' ? 'btn-primary' : 'btn-outline-secondary'}`}
                       >
                         Student
                       </button>
@@ -98,11 +88,7 @@ const SignIn = () => {
                       <button
                         type="button"
                         onClick={() => setUserType('supervisor')}
-                        className={`btn w-100 ${
-                          userType === 'supervisor'
-                            ? 'btn-primary'
-                            : 'btn-outline-secondary'
-                        }`}
+                        className={`btn w-100 ${userType === 'supervisor' ? 'btn-primary' : 'btn-outline-secondary'}`}
                       >
                         Supervisor
                       </button>
@@ -111,27 +97,20 @@ const SignIn = () => {
                       <button
                         type="button"
                         onClick={() => setUserType('coordinator')}
-                        className={`btn w-100 ${
-                          userType === 'coordinator'
-                            ? 'btn-primary'
-                            : 'btn-outline-secondary'
-                        }`}
+                        className={`btn w-100 ${userType === 'coordinator' ? 'btn-primary' : 'btn-outline-secondary'}`}
                       >
                         Coordinator
                       </button>
                     </div>
                   </div>
                 </div>
-                {/* ===== End User Type Selection ===== */}
 
-                {/* ===== Login Form ===== */}
+                {/* ── Login Form ── */}
                 <form onSubmit={handleSubmit}>
 
-                  {/* Email Field */}
+                  {/* Email */}
                   <div className="mb-3">
-                    <label className="form-label fw-medium text-dark">
-                      Email
-                    </label>
+                    <label className="form-label fw-medium text-dark">Email</label>
                     <div className="position-relative">
                       <input
                         type="email"
@@ -141,23 +120,18 @@ const SignIn = () => {
                         className="form-control form-control-lg pe-5"
                         required
                       />
-                      {/* Email icon inside the input */}
-                      <span
-                        className="position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
-                        style={{ pointerEvents: 'none' }}
-                      >
-                        <svg width="20" height="20" viewBox="0 0 22 22" fill="currentColor" xmlns="http://www.w3.org/2000/svg" opacity="0.5">
-                          <path d="M19.2516 3.30005H2.75156C1.58281 3.30005 0.585938 4.26255 0.585938 5.46567V16.6032C0.585938 17.7719 1.54844 18.7688 2.75156 18.7688H19.2516C20.4203 18.7688 21.4172 17.8063 21.4172 16.6032V5.4313C21.4172 4.26255 20.4203 3.30005 19.2516 3.30005ZM19.2516 4.84692L11.0016 10.2094L2.64844 4.84692H19.2516ZM19.2516 17.1532H2.75156C2.40781 17.1532 2.13281 16.8782 2.13281 16.5344V6.35942L10.1766 11.5157C10.4172 11.6875 10.6922 11.7563 10.9672 11.7563C11.2422 11.7563 11.5172 11.6875 11.7578 11.5157L19.8016 6.35942V16.5688C19.8703 16.8782 19.5953 17.1532 19.2516 17.1532Z" />
+                      {/* Email icon */}
+                      <span className="position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style={{ pointerEvents: 'none' }}>
+                        <svg width="20" height="20" viewBox="0 0 22 22" fill="currentColor" opacity="0.5">
+                          <path d="M19.2516 3.30005H2.75156C1.58281 3.30005 0.585938 4.26255 0.585938 5.46567V16.6032C0.585938 17.7719 1.54844 18.7688 2.75156 18.7688H19.2516C20.4203 18.7688 21.4172 17.8063 21.4172 16.6032V5.4313C21.4172 4.26255 20.4203 3.30005 19.2516 3.30005ZM19.2516 4.84692L11.0016 10.2094L2.64844 4.84692H19.2516ZM19.2516 17.1532H2.75156C2.40781 17.1532 2.13281 16.8782 2.13281 16.5344V6.35942L10.1766 11.5157C10.4172 11.6875 10.6922 11.7563 10.9672 11.7563C11.2422 11.7563 11.5172 11.6875 11.7578 11.5157L19.8016 6.35942V16.5688C19.8703 16.8782 19.5953 17.1532 19.2516 17.1532Z"/>
                         </svg>
                       </span>
                     </div>
                   </div>
 
-                  {/* Password Field */}
+                  {/* Password */}
                   <div className="mb-3">
-                    <label className="form-label fw-medium text-dark">
-                      Password
-                    </label>
+                    <label className="form-label fw-medium text-dark">Password</label>
                     <div className="position-relative">
                       <input
                         type="password"
@@ -167,42 +141,35 @@ const SignIn = () => {
                         className="form-control form-control-lg pe-5"
                         required
                       />
-                      {/* Lock icon inside the input */}
-                      <span
-                        className="position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
-                        style={{ pointerEvents: 'none' }}
-                      >
-                        <svg width="20" height="20" viewBox="0 0 22 22" fill="currentColor" xmlns="http://www.w3.org/2000/svg" opacity="0.5">
-                          <path d="M16.1547 6.80626V5.91251C16.1547 3.16251 14.0922 0.825009 11.4797 0.618759C10.0359 0.481259 8.59219 0.996884 7.52656 1.95938C6.46094 2.92188 5.84219 4.29688 5.84219 5.70626V6.80626C3.84844 7.18438 2.33594 8.93751 2.33594 11.0688V17.2906C2.33594 19.5594 4.19219 21.3813 6.42656 21.3813H15.5016C17.7703 21.3813 19.6266 19.525 19.6266 17.2563V11C19.6609 8.93751 18.1484 7.21876 16.1547 6.80626Z" />
+                      {/* Lock icon */}
+                      <span className="position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style={{ pointerEvents: 'none' }}>
+                        <svg width="20" height="20" viewBox="0 0 22 22" fill="currentColor" opacity="0.5">
+                          <path d="M16.1547 6.80626V5.91251C16.1547 3.16251 14.0922 0.825009 11.4797 0.618759C10.0359 0.481259 8.59219 0.996884 7.52656 1.95938C6.46094 2.92188 5.84219 4.29688 5.84219 5.70626V6.80626C3.84844 7.18438 2.33594 8.93751 2.33594 11.0688V17.2906C2.33594 19.5594 4.19219 21.3813 6.42656 21.3813H15.5016C17.7703 21.3813 19.6266 19.525 19.6266 17.2563V11C19.6609 8.93751 18.1484 7.21876 16.1547 6.80626Z"/>
                         </svg>
                       </span>
                     </div>
                   </div>
 
-                  {/* Remember Me + Fill Sample Credentials row */}
+                  {/* Remember Me + Fill Sample Credentials */}
                   <div className="d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-2 mb-4">
 
-                    {/* Remember Me Checkbox */}
+                    {/* Remember Me checkbox */}
                     <label className="d-flex align-items-center gap-2 mb-0" style={{ cursor: 'pointer' }}>
                       <div className="position-relative">
-                        {/* Hidden real checkbox */}
                         <input
                           type="checkbox"
                           checked={rememberMe}
                           onChange={() => setRememberMe(!rememberMe)}
                           className="visually-hidden"
                         />
-                        {/* Custom checkbox box */}
                         <div
-                          className={`d-flex align-items-center justify-content-center rounded border`}
+                          className="d-flex align-items-center justify-content-center rounded border"
                           style={{
-                            width: '20px',
-                            height: '20px',
+                            width: '20px', height: '20px',
                             backgroundColor: rememberMe ? '#3c50e0' : 'transparent',
                             borderColor: rememberMe ? '#3c50e0' : '#ced4da',
                           }}
                         >
-                          {/* Checkmark - only shows when checked */}
                           {rememberMe && (
                             <svg className="text-white" height="12" width="12" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="3">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -213,7 +180,7 @@ const SignIn = () => {
                       <span className="small">Remember me</span>
                     </label>
 
-                    {/* Fill Sample Credentials Button */}
+                    {/* Fill Sample Credentials button */}
                     <button
                       type="button"
                       onClick={fillSampleCredentials}
@@ -223,33 +190,26 @@ const SignIn = () => {
                     </button>
                   </div>
 
-                  {/* Submit Button */}
+                  {/* Submit button */}
                   <div className="mb-3">
-                    <button
-                      type="submit"
-                      className="btn btn-primary w-100 py-3 fw-medium"
-                    >
+                    <button type="submit" className="btn btn-primary w-100 py-3 fw-medium">
                       Sign In
                     </button>
                   </div>
 
-                  {/* Sign Up Link */}
+                  {/* Sign Up link */}
                   <div className="text-center mt-3">
                     <p className="mb-0 small">
                       Don't have an account?{' '}
-                      <Link to="/signup" className="text-primary fw-medium">
-                        Sign Up
-                      </Link>
+                      <Link to="/signup" className="text-primary fw-medium">Sign Up</Link>
                     </p>
                   </div>
 
                 </form>
-                {/* ===== End Form ===== */}
 
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>

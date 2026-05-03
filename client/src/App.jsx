@@ -3,265 +3,154 @@ import { Route, Routes, useLocation } from 'react-router-dom';
 
 import Loader from './common/Loader';
 import PageTitle from './components/PageTitle';
+
+// Layouts 
+import DefaultLayout from './layout/DefaultLayout';
+import CoordinatorLayout from './layout/CoordinatorLayout';
+
+// Auth Pages 
 import SignIn from './pages/Authentication/SignIn';
 import SignUp from './pages/Authentication/SignUp';
-import Calendar from './pages/Calendar';
-import Chart from './pages/Chart';
+
+//  Student Pages
 import Dashboard from './pages/Dashboard/Dashboard';
-import FormElements from './pages/Form/FormElements';
-import FormLayout from './pages/Form/FormLayout';
+import Calendar from './pages/Calendar';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Tables from './pages/Tables';
+import Chart from './pages/Chart';
+import FormElements from './pages/Form/FormElements';
+import FormLayout from './pages/Form/FormLayout';
 import Alerts from './pages/UiElements/Alerts';
 import Buttons from './pages/UiElements/Buttons';
-import DefaultLayout from './layout/DefaultLayout';
-
-// Import the project pages
 import Proposal from './pages/Project/Proposal';
 import Documents from './pages/Project/Documents';
 import Status from './pages/Project/Status';
-
-// Import the meetings pages
-import MeetingRequests from './pages/MeetingRequests';
-
-// Import the tasks page
+import StudentMeetingRequests from './pages/MeetingRequests';
 import Tasks from './pages/Tasks/Tasks';
+
+// Coordinator Pages 
+import CoordinatorDashboard        from './pages/Coordinator/Dashboard';
+import CoordinatorStudents         from './pages/Coordinator/Students';
+import CoordinatorSupervisors      from './pages/Coordinator/Supervisors';
+import CoordinatorAssignSupervisor from './pages/Coordinator/AssignSupervisor';
+import CoordinatorProposals        from './pages/Coordinator/Proposals';
+import CoordinatorTasks            from './pages/Coordinator/Tasks';
+import CoordinatorMeetingCalendar  from './pages/Coordinator/MeetingCalendar';
+import CoordinatorScheduleMeeting  from './pages/Coordinator/ScheduleMeeting';
+import CoordinatorMeetingRequests  from './pages/Coordinator/MeetingRequests';
+import CoordinatorAnnouncements    from './pages/Coordinator/Announcements';
+import CoordinatorProfile          from './pages/Coordinator/Profile';
 
 function App() {
   const [loading, setLoading] = useState(true);
   const { pathname } = useLocation();
 
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  useEffect(() => { setTimeout(() => setLoading(false), 1000); }, []);
 
-  useEffect(() => {
-    setTimeout(() => setLoading(false), 1000);
-  }, []);
+  return loading ? <Loader /> : (
+    <Routes>
 
-  return loading ? (
-    <Loader />
-  ) : (
-    <>
-      <Routes>
-        {/* ========== AUTHENTICATION ROUTES (No Layout) ========== */}
-        <Route
-          index
-          element={
-            <>
-              <PageTitle title="Signin | FYP Management System" />
-              <SignIn />
-            </>
-          }
-        />
-        <Route
-          path="/login"
-          element={
-            <>
-              <PageTitle title="Signin | FYP Management System" />
-              <SignIn />
-            </>
-          }
-        />
-        <Route
-          path="/signup"
-          element={
-            <>
-              <PageTitle title="Signup | FYP Management System" />
-              <SignUp />
-            </>
-          }
-        />
+      {/*
+          AUTH ROUTES — No layout
+        */}
+      <Route index element={<><PageTitle title="Sign In | FYP Management System" /><SignIn /></>} />
+      <Route path="/login"  element={<><PageTitle title="Sign In | FYP Management System" /><SignIn /></>} />
+      <Route path="/signup" element={<><PageTitle title="Sign Up | FYP Management System" /><SignUp /></>} />
 
-        {/* ========== PROTECTED ROUTES (With Layout) ========== */}
-        <Route
-          path="/dashboard"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Dashboard | FYP Management System" />
-              <Dashboard />
-            </DefaultLayout>
-          }
-        />
 
-        {/* ========== PROJECT ROUTES ========== */}
-        <Route
-          path="/project/proposal"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Project Proposal | FYP Management System" />
-              <Proposal />
-            </DefaultLayout>
-          }
-        />
-        <Route
-          path="/project/documents"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Project Documents | FYP Management System" />
-              <Documents />
-            </DefaultLayout>
-          }
-        />
-        <Route
-          path="/project/status"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Project Status | FYP Management System" />
-              <Status />
-            </DefaultLayout>
-          }
-        />
+      {/*
+          STUDENT ROUTES — DefaultLayout
+         */}
+      <Route path="/dashboard" element={
+        <DefaultLayout><PageTitle title="Dashboard | FYP Management System" /><Dashboard /></DefaultLayout>
+      } />
+      <Route path="/project/proposal" element={
+        <DefaultLayout><PageTitle title="Project Proposal | FYP Management System" /><Proposal /></DefaultLayout>
+      } />
+      <Route path="/project/documents" element={
+        <DefaultLayout><PageTitle title="Project Documents | FYP Management System" /><Documents /></DefaultLayout>
+      } />
+      <Route path="/project/status" element={
+        <DefaultLayout><PageTitle title="Project Status | FYP Management System" /><Status /></DefaultLayout>
+      } />
+      <Route path="/tasks" element={
+        <DefaultLayout><PageTitle title="Tasks | FYP Management System" /><Tasks /></DefaultLayout>
+      } />
+      <Route path="/meetings/calendar" element={
+        <DefaultLayout><PageTitle title="Meeting Calendar | FYP Management System" /><Calendar /></DefaultLayout>
+      } />
+      <Route path="/meetings/requests" element={
+        <DefaultLayout><PageTitle title="Meeting Requests | FYP Management System" /><StudentMeetingRequests /></DefaultLayout>
+      } />
+      <Route path="/calendar" element={
+        <DefaultLayout><PageTitle title="Calendar | FYP Management System" /><Calendar /></DefaultLayout>
+      } />
+      <Route path="/profile" element={
+        <DefaultLayout><PageTitle title="Profile | FYP Management System" /><Profile /></DefaultLayout>
+      } />
+      <Route path="/settings" element={
+        <DefaultLayout><PageTitle title="Settings | FYP Management System" /><Settings /></DefaultLayout>
+      } />
+      <Route path="/tables" element={
+        <DefaultLayout><PageTitle title="Tables | FYP Management System" /><Tables /></DefaultLayout>
+      } />
+      <Route path="/chart" element={
+        <DefaultLayout><PageTitle title="Chart | FYP Management System" /><Chart /></DefaultLayout>
+      } />
+      <Route path="/forms/form-elements" element={
+        <DefaultLayout><PageTitle title="Form Elements | FYP Management System" /><FormElements /></DefaultLayout>
+      } />
+      <Route path="/forms/form-layout" element={
+        <DefaultLayout><PageTitle title="Form Layout | FYP Management System" /><FormLayout /></DefaultLayout>
+      } />
+      <Route path="/ui/alerts" element={
+        <DefaultLayout><PageTitle title="Alerts | FYP Management System" /><Alerts /></DefaultLayout>
+      } />
+      <Route path="/ui/buttons" element={
+        <DefaultLayout><PageTitle title="Buttons | FYP Management System" /><Buttons /></DefaultLayout>
+      } />
 
-        {/* ========== TASKS ROUTE ========== */}
-        <Route
-          path="/tasks"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Tasks | FYP Management System" />
-              <Tasks />
-            </DefaultLayout>
-          }
-        />
 
-        {/* ========== MEETINGS ROUTES ========== */}
-        <Route
-          path="/meetings/calendar"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Meeting Calendar | FYP Management System" />
-              <Calendar />
-            </DefaultLayout>
-          }
-        />
-        <Route
-          path="/meetings/requests"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Meeting Requests | FYP Management System" />
-              <MeetingRequests />
-            </DefaultLayout>
-          }
-        />
+      {/*
+          COORDINATOR ROUTES — CoordinatorLayout
+         */}
+      <Route path="/coordinator/dashboard" element={
+        <CoordinatorLayout><PageTitle title="Coordinator Dashboard | FYP Management System" /><CoordinatorDashboard /></CoordinatorLayout>
+      } />
+      <Route path="/coordinator/accounts/students" element={
+        <CoordinatorLayout><PageTitle title="Manage Students | FYP Management System" /><CoordinatorStudents /></CoordinatorLayout>
+      } />
+      <Route path="/coordinator/accounts/supervisors" element={
+        <CoordinatorLayout><PageTitle title="Manage Supervisors | FYP Management System" /><CoordinatorSupervisors /></CoordinatorLayout>
+      } />
+      <Route path="/coordinator/accounts/assign-supervisor" element={
+        <CoordinatorLayout><PageTitle title="Assign Supervisor | FYP Management System" /><CoordinatorAssignSupervisor /></CoordinatorLayout>
+      } />
+      <Route path="/coordinator/proposals" element={
+        <CoordinatorLayout><PageTitle title="Proposals | FYP Management System" /><CoordinatorProposals /></CoordinatorLayout>
+      } />
+      <Route path="/coordinator/tasks" element={
+        <CoordinatorLayout><PageTitle title="Tasks | FYP Management System" /><CoordinatorTasks /></CoordinatorLayout>
+      } />
+      <Route path="/coordinator/meetings/calendar" element={
+        <CoordinatorLayout><PageTitle title="Meeting Calendar | FYP Management System" /><CoordinatorMeetingCalendar /></CoordinatorLayout>
+      } />
+      <Route path="/coordinator/meetings/schedule" element={
+        <CoordinatorLayout><PageTitle title="Schedule Meeting | FYP Management System" /><CoordinatorScheduleMeeting /></CoordinatorLayout>
+      } />
+      <Route path="/coordinator/meetings/requests" element={
+        <CoordinatorLayout><PageTitle title="Meeting Requests | FYP Management System" /><CoordinatorMeetingRequests /></CoordinatorLayout>
+      } />
+      <Route path="/coordinator/announcements" element={
+        <CoordinatorLayout><PageTitle title="Announcements | FYP Management System" /><CoordinatorAnnouncements /></CoordinatorLayout>
+      } />
+      <Route path="/coordinator/profile" element={
+        <CoordinatorLayout><PageTitle title="Coordinator Profile | FYP Management System" /><CoordinatorProfile /></CoordinatorLayout>
+      } />
 
-        {/* ========== SUPERVISOR & COORDINATOR ROUTES ========== */}
-        <Route
-          path="/supervisor/dashboard"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Supervisor Dashboard | FYP Management System" />
-              <div className="p-4">
-                <h1 className="fs-4 fw-bold text-dark">
-                  Supervisor Dashboard - Coming Soon
-                </h1>
-                <p className="text-muted mt-2">
-                  Welcome Mr. Shoaib! Supervisor dashboard is under development.
-                </p>
-              </div>
-            </DefaultLayout>
-          }
-        />
-        <Route
-          path="/coordinator/dashboard"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Coordinator Dashboard | FYP Management System" />
-              <div className="p-4">
-                <h1 className="fs-4 fw-bold text-dark">
-                  Coordinator Dashboard - Coming Soon
-                </h1>
-                <p className="text-muted mt-2">
-                  Welcome Mr. Omer! Coordinator dashboard is under development.
-                </p>
-              </div>
-            </DefaultLayout>
-          }
-        />
-
-        <Route
-          path="/calendar"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Calendar | FYP Management System" />
-              <Calendar />
-            </DefaultLayout>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Profile | FYP Management System" />
-              <Profile />
-            </DefaultLayout>
-          }
-        />
-        <Route
-          path="/forms/form-elements"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Form Elements | FYP Management System" />
-              <FormElements />
-            </DefaultLayout>
-          }
-        />
-        <Route
-          path="/forms/form-layout"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Form Layout | FYP Management System" />
-              <FormLayout />
-            </DefaultLayout>
-          }
-        />
-        <Route
-          path="/tables"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Tables | FYP Management System" />
-              <Tables />
-            </DefaultLayout>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Settings | FYP Management System" />
-              <Settings />
-            </DefaultLayout>
-          }
-        />
-        <Route
-          path="/chart"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Basic Chart | FYP Management System" />
-              <Chart />
-            </DefaultLayout>
-          }
-        />
-        <Route
-          path="/ui/alerts"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Alerts | FYP Management System" />
-              <Alerts />
-            </DefaultLayout>
-          }
-        />
-        <Route
-          path="/ui/buttons"
-          element={
-            <DefaultLayout>
-              <PageTitle title="Buttons | FYP Management System" />
-              <Buttons />
-            </DefaultLayout>
-          }
-        />
-      </Routes>
-    </>
+    </Routes>
   );
 }
 
