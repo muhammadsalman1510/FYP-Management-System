@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 
 /*
   COORDINATOR — MANAGE STUDENTS
@@ -17,19 +18,19 @@ const CoordinatorStudents = () => {
 
   const [students, setStudents] = useState([
     { id: 1, name: 'Muhammad Salman', rollNumber: 'F2021001001', email: 'salman@university.edu', program: 'BSCS', semester: '7th', section: 'A', batch: '2021-2025', supervisor: 'Mr. Shoaib', password: 'student123' },
-    { id: 2, name: 'Ali Hassan',       rollNumber: 'F2021001002', email: 'ali@university.edu',    program: 'BSCS', semester: '7th', section: 'A', batch: '2021-2025', supervisor: 'Mr. Shoaib', password: 'student123' },
-    { id: 3, name: 'Sara Khan',        rollNumber: 'F2021001003', email: 'sara@university.edu',   program: 'BSSE', semester: '7th', section: 'B', batch: '2021-2025', supervisor: 'Mr. Omer',   password: 'student123' },
-    { id: 4, name: 'Usman Ahmed',      rollNumber: 'F2021001004', email: 'usman@university.edu',  program: 'BSIT', semester: '7th', section: 'A', batch: '2021-2025', supervisor: 'Unassigned', password: 'student123' },
+    { id: 2, name: 'Ali Hassan', rollNumber: 'F2021001002', email: 'ali@university.edu', program: 'BSCS', semester: '7th', section: 'A', batch: '2021-2025', supervisor: 'Mr. Shoaib', password: 'student123' },
+    { id: 3, name: 'Sara Khan', rollNumber: 'F2021001003', email: 'sara@university.edu', program: 'BSSE', semester: '7th', section: 'B', batch: '2021-2025', supervisor: 'Mr. Omer', password: 'student123' },
+    { id: 4, name: 'Usman Ahmed', rollNumber: 'F2021001004', email: 'usman@university.edu', program: 'BSIT', semester: '7th', section: 'A', batch: '2021-2025', supervisor: 'Unassigned', password: 'student123' },
   ]);
 
-  const [showModal, setShowModal]             = useState(false);
-  const [isEditing, setIsEditing]             = useState(false);
-  const [editingId, setEditingId]             = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deletingId, setDeletingId]           = useState(null);
-  const [searchQuery, setSearchQuery]         = useState('');
+  const [deletingId, setDeletingId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const emptyForm = { name:'', rollNumber:'', email:'', program:'BSCS', semester:'7th', section:'A', batch:'', password:'' };
+  const emptyForm = { name: '', rollNumber: '', email: '', program: 'BSCS', semester: '7th', section: 'A', batch: '', password: '' };
   const [form, setForm] = useState(emptyForm);
 
   const handleInputChange = (e) => {
@@ -45,25 +46,48 @@ const CoordinatorStudents = () => {
   };
 
   const openEditModal = (student) => {
-    setForm({ name:student.name, rollNumber:student.rollNumber, email:student.email, program:student.program, semester:student.semester, section:student.section, batch:student.batch, password:student.password });
+    setForm({ name: student.name, rollNumber: student.rollNumber, email: student.email, program: student.program, semester: student.semester, section: student.section, batch: student.batch, password: student.password });
     setIsEditing(true);
     setEditingId(student.id);
     setShowModal(true);
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
+
     if (isEditing) {
       setStudents(prev => prev.map(s => s.id === editingId ? { ...s, ...form } : s));
-    } else {
-      setStudents(prev => [...prev, { id: Date.now(), ...form, supervisor: 'Unassigned' }]);
+      setShowModal(false);
+      setForm(emptyForm);
+      return;
     }
-    setShowModal(false);
-    setForm(emptyForm);
+
+    try {
+      const token = localStorage.getItem('token');
+
+      const { data } = await axios.post('http://localhost:4000/api/users', {
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        role: 'student',
+        rollNumber: form.rollNumber,
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setStudents(prev => [...prev, { id: data.user._id, ...data.user, ...data.profile }]);
+      setShowModal(false);
+      setForm(emptyForm);
+
+    } catch (err) {
+      console.error('Create student error:', err);
+      const message = err.response?.data?.message || 'Something went wrong. Please try again.';
+      alert(message);
+    }
   };
 
   const confirmDelete = (id) => { setDeletingId(id); setShowDeleteConfirm(true); };
-  const handleDelete  = () => { setStudents(prev => prev.filter(s => s.id !== deletingId)); setShowDeleteConfirm(false); setDeletingId(null); };
+  const handleDelete = () => { setStudents(prev => prev.filter(s => s.id !== deletingId)); setShowDeleteConfirm(false); setDeletingId(null); };
 
   const filteredStudents = students.filter(s =>
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -92,7 +116,7 @@ const CoordinatorStudents = () => {
             <span className="badge bg-primary ms-2 rounded-pill">{students.length}</span>
           </h6>
           <input type="text" className="form-control form-control-sm" placeholder="Search name, roll number, email..."
-            style={{ maxWidth:'300px' }} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            style={{ maxWidth: '300px' }} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
 
         <div className="card-body p-0">
@@ -119,12 +143,12 @@ const CoordinatorStudents = () => {
                     <td className="px-4 py-3">
                       <div className="d-flex align-items-center gap-2">
                         <div className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
-                          style={{ width:'36px', height:'36px', minWidth:'36px', backgroundColor:'#3c50e0', fontSize:'0.8rem' }}>
-                          {student.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
+                          style={{ width: '36px', height: '36px', minWidth: '36px', backgroundColor: '#3c50e0', fontSize: '0.8rem' }}>
+                          {student.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                         </div>
                         <div>
                           <p className="fw-medium text-dark mb-0 small">{student.name}</p>
-                          <p className="text-muted mb-0" style={{ fontSize:'0.72rem' }}>Sem {student.semester} • Sec {student.section}</p>
+                          <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>Sem {student.semester} • Sec {student.section}</p>
                         </div>
                       </div>
                     </td>
@@ -155,9 +179,9 @@ const CoordinatorStudents = () => {
       {/* ADD / EDIT MODAL */}
       {showModal && (
         <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-          style={{ backgroundColor:'rgba(0,0,0,0.5)', zIndex:9999 }}
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999 }}
           onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}>
-          <div className="bg-white rounded shadow-lg p-4" style={{ width:'100%', maxWidth:'560px', maxHeight:'90vh', overflowY:'auto' }}>
+          <div className="bg-white rounded shadow-lg p-4" style={{ width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto' }}>
 
             <div className="d-flex align-items-center justify-content-between mb-4">
               <h5 className="fw-bold text-dark mb-0">{isEditing ? 'Edit Student Account' : 'Add New Student'}</h5>
@@ -181,19 +205,19 @@ const CoordinatorStudents = () => {
                 <div className="col-12 col-sm-6">
                   <label className="form-label fw-medium text-dark small">Program *</label>
                   <select name="program" value={form.program} onChange={handleInputChange} className="form-select" required>
-                    {['BSCS','BSSE','BSIT','BSAI'].map(p => <option key={p} value={p}>{p}</option>)}
+                    {['BSCS', 'BSSE', 'BSIT', 'BSAI'].map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
                 <div className="col-12 col-sm-6">
                   <label className="form-label fw-medium text-dark small">Semester *</label>
                   <select name="semester" value={form.semester} onChange={handleInputChange} className="form-select" required>
-                    {['1st','2nd','3rd','4th','5th','6th','7th','8th'].map(s => <option key={s} value={s}>{s} Semester</option>)}
+                    {['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'].map(s => <option key={s} value={s}>{s} Semester</option>)}
                   </select>
                 </div>
                 <div className="col-12 col-sm-6">
                   <label className="form-label fw-medium text-dark small">Section *</label>
                   <select name="section" value={form.section} onChange={handleInputChange} className="form-select" required>
-                    {['A','B','C','D'].map(s => <option key={s} value={s}>Section {s}</option>)}
+                    {['A', 'B', 'C', 'D'].map(s => <option key={s} value={s}>Section {s}</option>)}
                   </select>
                 </div>
                 <div className="col-12 col-sm-6">
@@ -206,7 +230,7 @@ const CoordinatorStudents = () => {
                   </label>
                   <input type="password" name="password" value={form.password} onChange={handleInputChange}
                     className="form-control" placeholder="Set a password for the student" required={!isEditing} />
-                  <p className="text-muted mt-1 mb-0" style={{ fontSize:'0.75rem' }}>
+                  <p className="text-muted mt-1 mb-0" style={{ fontSize: '0.75rem' }}>
                     Share this password with the student manually. They can change it after logging in.
                   </p>
                 </div>
@@ -223,8 +247,8 @@ const CoordinatorStudents = () => {
       {/* DELETE CONFIRM MODAL */}
       {showDeleteConfirm && (
         <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-          style={{ backgroundColor:'rgba(0,0,0,0.5)', zIndex:9999 }}>
-          <div className="bg-white rounded shadow-lg p-4" style={{ width:'100%', maxWidth:'400px' }}>
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999 }}>
+          <div className="bg-white rounded shadow-lg p-4" style={{ width: '100%', maxWidth: '400px' }}>
             <h5 className="fw-bold text-dark mb-2">Delete Student?</h5>
             <p className="text-muted small mb-4">This will permanently delete the student account and all their data. This cannot be undone.</p>
             <div className="d-flex justify-content-end gap-3">
