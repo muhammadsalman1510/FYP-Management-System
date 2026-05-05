@@ -24,6 +24,32 @@ const studentProfileSchema = new mongoose.Schema(
             unique: true,
             trim: true,
         },
+        program: {
+            type: String,
+            required: [true, "Program is required"],
+            trim: true,
+        },
+        batch: {
+            type: String,
+            required: [true, "Batch is required"],
+            trim: true,
+        },
+        semester: {
+            type: Number,
+            required: [true, "Semester is required"],
+            min: [7, "Semester must be at least 7"],
+            max: [8, "Semester cannot exceed 8"],
+        },
+        section: {
+            type: String,
+            required: [true, "Section is required"],
+            trim: true,
+        },
+        supervisorId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "SupervisorProfile",
+            default: null, // assigned later, not at registration
+        },
     },
     {
         timestamps: true,

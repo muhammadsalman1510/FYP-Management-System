@@ -13,7 +13,7 @@ const DefaultLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const location = useLocation();
-  const excludedRoutes = ['/login', '/signup'];
+  const excludedRoutes = ['/login'];
   const isExcludedRoute = excludedRoutes.includes(location.pathname);
 
   return (

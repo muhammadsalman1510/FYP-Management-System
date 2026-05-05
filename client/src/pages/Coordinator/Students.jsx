@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import axios from 'axios';
+import { useEffect } from 'react';
 
 /*
   COORDINATOR — MANAGE STUDENTS
@@ -16,12 +17,14 @@ import axios from 'axios';
 
 const CoordinatorStudents = () => {
 
-  const [students, setStudents] = useState([
-    { id: 1, name: 'Muhammad Salman', rollNumber: 'F2021001001', email: 'salman@university.edu', program: 'BSCS', semester: '7th', section: 'A', batch: '2021-2025', supervisor: 'Mr. Shoaib', password: 'student123' },
-    { id: 2, name: 'Ali Hassan', rollNumber: 'F2021001002', email: 'ali@university.edu', program: 'BSCS', semester: '7th', section: 'A', batch: '2021-2025', supervisor: 'Mr. Shoaib', password: 'student123' },
-    { id: 3, name: 'Sara Khan', rollNumber: 'F2021001003', email: 'sara@university.edu', program: 'BSSE', semester: '7th', section: 'B', batch: '2021-2025', supervisor: 'Mr. Omer', password: 'student123' },
-    { id: 4, name: 'Usman Ahmed', rollNumber: 'F2021001004', email: 'usman@university.edu', program: 'BSIT', semester: '7th', section: 'A', batch: '2021-2025', supervisor: 'Unassigned', password: 'student123' },
-  ]);
+  // const [students, setStudents] = useState([
+  //   { id: 1, name: 'Muhammad Salman', rollNumber: 'F2021001001', email: 'salman@university.edu', program: 'BSCS', semester: '7th', section: 'A', batch: '2021-2025', supervisor: 'Mr. Shoaib', password: 'student123' },
+  //   { id: 2, name: 'Ali Hassan', rollNumber: 'F2021001002', email: 'ali@university.edu', program: 'BSCS', semester: '7th', section: 'A', batch: '2021-2025', supervisor: 'Mr. Shoaib', password: 'student123' },
+  //   { id: 3, name: 'Sara Khan', rollNumber: 'F2021001003', email: 'sara@university.edu', program: 'BSSE', semester: '7th', section: 'B', batch: '2021-2025', supervisor: 'Mr. Omer', password: 'student123' },
+  //   { id: 4, name: 'Usman Ahmed', rollNumber: 'F2021001004', email: 'usman@university.edu', program: 'BSIT', semester: '7th', section: 'A', batch: '2021-2025', supervisor: 'Unassigned', password: 'student123' },
+  // ]);
+
+  const [students, setStudents] = useState([]);
 
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -30,7 +33,7 @@ const CoordinatorStudents = () => {
   const [deletingId, setDeletingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const emptyForm = { name: '', rollNumber: '', email: '', program: 'BSCS', semester: '7th', section: 'A', batch: '', password: '' };
+  const emptyForm = { name: '', rollNumber: '', email: '', program: 'BSCS', semester: 7, section: 'A', batch: '', password: '' };
   const [form, setForm] = useState(emptyForm);
 
   const handleInputChange = (e) => {
@@ -45,25 +48,65 @@ const CoordinatorStudents = () => {
     setShowModal(true);
   };
 
-  const openEditModal = (student) => {
-    setForm({ name: student.name, rollNumber: student.rollNumber, email: student.email, program: student.program, semester: student.semester, section: student.section, batch: student.batch, password: student.password });
-    setIsEditing(true);
-    setEditingId(student.id);
-    setShowModal(true);
+  const openEditModal = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+
+      const { data } = await axios.get(`http://localhost:4000/api/users/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const u = data.user;
+
+      setForm({
+        name: u.name,
+        email: u.email,
+        rollNumber: u.rollNumber,
+        program: u.program,
+        semester: u.semester,
+        section: u.section,
+        batch: u.batch,
+        password: '',
+      });
+
+      setIsEditing(true);
+      setEditingId(u._id);
+      setShowModal(true);
+    } catch (err) {
+      console.error('Fetch student error:', err);
+      const message = err.response?.data?.message || 'Failed to load student data.';
+      alert(message);
+    }
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
 
-    if (isEditing) {
-      setStudents(prev => prev.map(s => s.id === editingId ? { ...s, ...form } : s));
-      setShowModal(false);
-      setForm(emptyForm);
-      return;
-    }
+    const token = localStorage.getItem('token');
 
     try {
-      const token = localStorage.getItem('token');
+      if (isEditing) {
+        const { data } = await axios.put(`http://localhost:4000/api/users/${editingId}`, {
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          role: 'student',
+          rollNumber: form.rollNumber,
+          program: form.program,
+          batch: form.batch,
+          semester: form.semester,
+          section: form.section
+        }, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        alert(data.message);
+
+        getStudents();
+        setShowModal(false);
+        setForm(emptyForm);
+        return;
+      }
 
       const { data } = await axios.post('http://localhost:4000/api/users', {
         name: form.name,
@@ -71,11 +114,15 @@ const CoordinatorStudents = () => {
         password: form.password,
         role: 'student',
         rollNumber: form.rollNumber,
+        program: form.program,
+        batch: form.batch,
+        semester: form.semester,
+        section: form.section
       }, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      setStudents(prev => [...prev, { id: data.user._id, ...data.user, ...data.profile }]);
+      getStudents();
       setShowModal(false);
       setForm(emptyForm);
 
@@ -87,13 +134,64 @@ const CoordinatorStudents = () => {
   };
 
   const confirmDelete = (id) => { setDeletingId(id); setShowDeleteConfirm(true); };
-  const handleDelete = () => { setStudents(prev => prev.filter(s => s.id !== deletingId)); setShowDeleteConfirm(false); setDeletingId(null); };
+  const handleDelete = async () => {
+    try {
+      const token = localStorage.getItem('token');
+
+      await axios.delete(`http://localhost:4000/api/users/${deletingId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      await getStudents();
+      setShowDeleteConfirm(false);
+      setDeletingId(null);
+
+    } catch (err) {
+      console.error('Delete student error:', err);
+      const message = err.response?.data?.message || 'Something went wrong. Please try again.';
+      alert(message);
+    }
+  };
 
   const filteredStudents = students.filter(s =>
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.rollNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const getStudents = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      const response = await axios.get(
+        "http://localhost:4000/api/users",
+        {
+          params: {
+            role: 'student',
+          },
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+        }
+      );
+      setStudents(response.data.users);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  useEffect(() => {
+    getStudents();
+  }, []);
+
+  // const handleSubmit = (e) => {
+  //   e.preventDefault();
+
+  //   if (isEditing) {
+  //     handleSave(e, student);
+  //   } else {
+  //     handleSave(e);
+  //   }
+  // };
 
   return (
     <>
@@ -138,7 +236,7 @@ const CoordinatorStudents = () => {
                 {filteredStudents.length === 0 ? (
                   <tr><td colSpan="8" className="text-center text-muted py-5">No students found.</td></tr>
                 ) : filteredStudents.map((student, index) => (
-                  <tr key={student.id}>
+                  <tr key={student._id}>
                     <td className="px-4 py-3 text-muted small">{index + 1}</td>
                     <td className="px-4 py-3">
                       <div className="d-flex align-items-center gap-2">
@@ -164,8 +262,8 @@ const CoordinatorStudents = () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="d-flex gap-2">
-                        <button className="btn btn-outline-primary btn-sm px-3" onClick={() => openEditModal(student)}>Edit</button>
-                        <button className="btn btn-outline-danger btn-sm px-3" onClick={() => confirmDelete(student.id)}>Delete</button>
+                        <button className="btn btn-outline-primary btn-sm px-3" onClick={() => openEditModal(student._id)}>Edit</button>
+                        <button className="btn btn-outline-danger btn-sm px-3" onClick={() => confirmDelete(student._id)}>Delete</button>
                       </div>
                     </td>
                   </tr>
@@ -211,7 +309,7 @@ const CoordinatorStudents = () => {
                 <div className="col-12 col-sm-6">
                   <label className="form-label fw-medium text-dark small">Semester *</label>
                   <select name="semester" value={form.semester} onChange={handleInputChange} className="form-select" required>
-                    {['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'].map(s => <option key={s} value={s}>{s} Semester</option>)}
+                    {[7, 8].map(s => <option key={s} value={s}>{s}th</option>)}
                   </select>
                 </div>
                 <div className="col-12 col-sm-6">

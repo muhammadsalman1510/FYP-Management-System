@@ -10,7 +10,6 @@ import CoordinatorLayout from './layout/CoordinatorLayout';
 
 // Auth Pages 
 import SignIn from './pages/Authentication/SignIn';
-import SignUp from './pages/Authentication/SignUp';
 
 //  Student Pages
 import Dashboard from './pages/Dashboard/Dashboard';
@@ -57,7 +56,6 @@ function App() {
         */}
       <Route index element={<><PageTitle title="Sign In | FYP Management System" /><SignIn /></>} />
       <Route path="/login"  element={<><PageTitle title="Sign In | FYP Management System" /><SignIn /></>} />
-      <Route path="/signup" element={<><PageTitle title="Sign Up | FYP Management System" /><SignUp /></>} />
 
 
       {/*

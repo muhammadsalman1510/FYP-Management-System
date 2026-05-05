@@ -172,14 +172,6 @@ const SignIn = () => {
                     </button>
                   </div>
 
-                  {/* Sign Up link */}
-                  <div className="text-center mt-3">
-                    <p className="mb-0 small">
-                      Don't have an account?{' '}
-                      <Link to="/signup" className="text-primary fw-medium">Sign Up</Link>
-                    </p>
-                  </div>
-
                 </form>
 
               </div>
