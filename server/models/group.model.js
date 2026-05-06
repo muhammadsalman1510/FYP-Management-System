@@ -46,6 +46,5 @@ const groupSchema = new mongoose.Schema(
 
 // A project should only have one non-rejected group (optional unique guard)
 groupSchema.index({ projectId: 1, status: 1 });
-groupSchema.index({ supervisorId: 1 });
 
 export default mongoose.model("Group", groupSchema);
