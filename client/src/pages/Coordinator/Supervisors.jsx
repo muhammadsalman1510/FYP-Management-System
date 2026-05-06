@@ -22,9 +22,9 @@ const CoordinatorSupervisors = () => {
 
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('create');
-  const [selectedSupervisor, setSelectedSupervisor] = useState(null);
+  const [selectedSupervisorId, setSelectedSupervisorId] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [supervisorToDelete, setSupervisorToDelete] = useState(null);
+  const [supervisorToDeleteId, setSupervisorToDeleteId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   const emptyForm = { name: '', email: '', password: '', department: 'Computer Science', designation: '', maxProjects: '' };
@@ -44,7 +44,6 @@ const CoordinatorSupervisors = () => {
           },
         }
       );
-      console.log(response.data.users);
       setSupervisors(response.data.users);
     } catch (error) {
       console.error(error);
@@ -61,16 +60,24 @@ const CoordinatorSupervisors = () => {
     setShowModal(true);
   };
 
-  const openEditModal = (supervisor) => {
-    setForm({ ...supervisor, password: '' });
-    setSelectedSupervisor(supervisor);
-    setModalMode('edit');
-    setShowModal(true);
-  };
+  const openEditModal = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
 
-  const openDeleteConfirm = (supervisor) => {
-    setSupervisorToDelete(supervisor);
-    setShowDeleteConfirm(true);
+      const { data } = await axios.get(`http://localhost:4000/api/users/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setForm({ ...data.user, password: '' });
+      setSelectedSupervisorId(id);
+      setModalMode('edit');
+      setShowModal(true);
+
+    } catch (err) {
+      console.error('Fetch supervisor error:', err);
+      const message = err.response?.data?.message || 'Failed to load supervisor data.';
+      alert(message);
+    }
   };
 
   const handleFormChange = (e) => {
@@ -100,10 +107,7 @@ const CoordinatorSupervisors = () => {
           }
         );
 
-        setSupervisors(prev => [...prev, {
-          ...response.data.user,
-          ...response.data.profile,
-        }]);
+        fetchSupervisors();
 
       } catch (error) {
         console.error(error);
@@ -124,16 +128,14 @@ const CoordinatorSupervisors = () => {
         }
 
         const response = await axios.put(
-          `http://localhost:4000/api/users/${selectedSupervisor._id}`,
+          `http://localhost:4000/api/users/${selectedSupervisorId}`,
           body,
           {
             headers: { Authorization: `Bearer ${token}` }
           }
         );
 
-        setSupervisors(prev =>
-          prev.map(s => s._id === selectedSupervisor._id ? { ...s, ...response.data.user } : s)
-        );
+        fetchSupervisors();
 
       } catch (error) {
         console.error(error);
@@ -144,27 +146,30 @@ const CoordinatorSupervisors = () => {
     setForm(emptyForm);
   };
 
+  // Just opens the modal
+  const openDeleteConfirm = (id) => {
+    setSupervisorToDeleteId(id);
+    setShowDeleteConfirm(true);
+  };
+
+  // Actually deletes
   const handleDelete = async () => {
-    const token = localStorage.getItem('token');
-
     try {
-      await axios.delete(
-        `http://localhost:4000/api/users/${supervisorToDelete._id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
+      const token = localStorage.getItem('token');
 
-      fetchSupervisors();
+      await axios.delete(`http://localhost:4000/api/users/${supervisorToDeleteId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    } catch (error) {
-      console.error(error);
+      await fetchSupervisors();
+      setShowDeleteConfirm(false);
+      setSupervisorToDeleteId(null);
+
+    } catch (err) {
+      console.error('Delete supervisor error:', err);
+      const message = err.response?.data?.message || 'Something went wrong. Please try again.';
+      alert(message);
     }
-
-    setShowDeleteConfirm(false);
-    setSupervisorToDelete(null);
   };
 
   const filteredSupervisors = supervisors.filter(s =>
@@ -247,10 +252,10 @@ const CoordinatorSupervisors = () => {
                           <div className="progress flex-grow-1" style={{ height: '8px' }}>
                             <div
                               className={`progress-bar ${supervisor.currentProjects >= supervisor.maxProjects
-                                  ? 'bg-danger'
-                                  : supervisor.currentProjects >= supervisor.maxProjects * 0.7
-                                    ? 'bg-warning'
-                                    : 'bg-success'
+                                ? 'bg-danger'
+                                : supervisor.currentProjects >= supervisor.maxProjects * 0.7
+                                  ? 'bg-warning'
+                                  : 'bg-success'
                                 }`}
                               style={{
                                 width: `${(supervisor.currentProjects / supervisor.maxProjects) * 100}%`
@@ -264,8 +269,8 @@ const CoordinatorSupervisors = () => {
                       </td>
                       <td className="px-4 py-3">
                         <div className="d-flex gap-2">
-                          <button className="btn btn-outline-primary btn-sm px-3" onClick={() => openEditModal(supervisor)}>Edit</button>
-                          <button className="btn btn-outline-danger btn-sm px-3" onClick={() => openDeleteConfirm(supervisor)}>Delete</button>
+                          <button className="btn btn-outline-primary btn-sm px-3" onClick={() => openEditModal(supervisor._id)}>Edit</button>
+                          <button className="btn btn-outline-danger btn-sm px-3" onClick={() => openDeleteConfirm(supervisor._id)}>Delete</button>
                         </div>
                       </td>
                     </tr>
@@ -367,7 +372,7 @@ const CoordinatorSupervisors = () => {
                 </div>
                 <h6 className="fw-semibold text-dark mb-2">Delete Supervisor Account</h6>
                 <p className="text-muted small mb-0">
-                  Are you sure you want to delete <strong>{supervisorToDelete?.name}</strong>'s account? This cannot be undone.
+                  This will permanently delete the supervisor account and all their data. This cannot be undone.
                 </p>
               </div>
               <div className="modal-footer border-top px-4 py-3 justify-content-center gap-3">
