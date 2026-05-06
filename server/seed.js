@@ -1,25 +1,26 @@
 // seed.js
-import mongoose from 'mongoose'
-import bcrypt from 'bcryptjs'
-import User from './models/user.model.js'
-import dotenv from 'dotenv'
+import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
+import User from './models/user.model.js';
+import dotenv from 'dotenv';
 
-dotenv.config()
+dotenv.config();
 
-await mongoose.connect(process.env.MONGO_URI)
+await mongoose.connect(process.env.MONGO_URI);
 
-const existing = await User.findOne({ email: 'coordinator@example.com' })
+const existing = await User.findOne({ email: process.env.ADMIN_EMAIL });
 if (existing) {
-    console.log('Coordinator already exists, skipping.')
+    console.log('Coordinator already exists, skipping.');
 } else {
-    const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10)
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
     await User.create({
         name: 'Asadullah Ehsan',
-        email: 'yitisof898@lohinja.com',
+        email: process.env.ADMIN_EMAIL,
         password: hashedPassword,
         role: 'coordinator'
-    })
-    console.log('Coordinator seeded successfully.')
+    });
+    console.log('Coordinator seeded successfully.');
 }
 
-await mongoose.disconnect()
+await mongoose.disconnect();
