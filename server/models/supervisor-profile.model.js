@@ -32,6 +32,16 @@ const supervisorProfileSchema = new mongoose.Schema(
                 message: "userId must reference a user with role 'supervisor'"
             },
         },
+        department: {
+            type: String,
+            required: [true, "Department is required"],
+            trim: true,
+        },
+        designation: {
+            type: String,
+            required: [true, "Designation is required"],
+            trim: true,
+        },
         maxProjects: {
             type: Number,
             required: [true, "maxProjects is required"],

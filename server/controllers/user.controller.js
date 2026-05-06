@@ -12,7 +12,7 @@ import StudentProfile from '../models/student-profile.model.js'
  */
 export const createUser = async (req, res) => {
     try {
-        const { name, email, password, role, program, batch, semester, section, rollNumber, maxProjects } = req.body;
+        const { name, email, password, role, program, batch, semester, section, rollNumber, maxProjects, department, designation } = req.body;
 
         // 1. Basic validation
         if (!name || !email || !password || !role) {
@@ -35,6 +35,9 @@ export const createUser = async (req, res) => {
             }
             if (isNaN(Number(maxProjects)) || Number(maxProjects) < 0) {
                 return res.status(400).json({ message: 'maxProjects must be a non-negative number' })
+            }
+            if (!department || !designation) {
+                return res.status(400).json({ message: 'department and designation are required for supervisors' })
             }
         }
 
@@ -76,6 +79,8 @@ export const createUser = async (req, res) => {
                 profile = await SupervisorProfile.create([{
                     userId: user[0]._id,
                     maxProjects: Number(maxProjects),
+                    department: department.trim(),
+                    designation: designation.trim(),
                 }], { session })
             }
 
@@ -181,6 +186,8 @@ export const getUsers = async (req, res) => {
                     name: user.name,
                     email: user.email,
                     role: user.role,
+                    department: profile?.department ?? null,
+                    designation: profile?.designation ?? null,
                     maxProjects: profile?.maxProjects ?? null,
                     currentProjects: profile?.currentProjects ?? null,
                 }
@@ -204,7 +211,6 @@ export const getUserById = async (req, res) => {
         const user = await User.findById(req.params.id).select('-password').lean()
         if (!user) return res.status(404).json({ message: 'User not found' })
 
-        const id = user._id.toString()
         let profile = {}
 
         if (user.role === 'student') {
@@ -232,6 +238,8 @@ export const getUserById = async (req, res) => {
             const supervisorProfile = await SupervisorProfile.findOne({ userId: user._id }).lean()
 
             profile = {
+                department: supervisorProfile?.department ?? null,
+                designation: supervisorProfile?.designation ?? null,
                 maxProjects: supervisorProfile?.maxProjects ?? null,
                 currentProjects: supervisorProfile?.currentProjects ?? null,
             }
@@ -259,7 +267,7 @@ export const getUserById = async (req, res) => {
  */
 export const updateUser = async (req, res) => {
     try {
-        const { name, email, password, role, program, batch, semester, section, rollNumber, maxProjects } = req.body;
+        const { name, email, password, role, program, batch, semester, section, rollNumber, maxProjects, department, designation } = req.body;
 
         // 1. Fetch user FIRST
         const existingUser = await User.findById(req.params.id)
@@ -330,6 +338,8 @@ export const updateUser = async (req, res) => {
             if (existingUser.role === 'supervisor') {
                 const profileUpdates = {}
                 if (maxProjects !== undefined) profileUpdates.maxProjects = maxProjects
+                if (department) profileUpdates.department = department.trim()
+                if (designation) profileUpdates.designation = designation.trim()
 
                 await SupervisorProfile.findOneAndUpdate(
                     { userId: existingUser._id },
@@ -369,6 +379,8 @@ export const updateUser = async (req, res) => {
                 const supervisorProfile = await SupervisorProfile.findOne({ userId: updatedUser._id }).lean()
 
                 profile = {
+                    department: supervisorProfile?.department ?? null,
+                    designation: supervisorProfile?.designation ?? null,
                     maxProjects: supervisorProfile?.maxProjects ?? null,
                     currentProjects: supervisorProfile?.currentProjects ?? null,
                 }

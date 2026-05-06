@@ -1,6 +1,7 @@
 // 📁 FILE: src/pages/Coordinator/Supervisors.jsx
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 
 /*
@@ -17,21 +18,42 @@ import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 
 const CoordinatorSupervisors = () => {
 
-  const [supervisors, setSupervisors] = useState([
-    { id: 1, name: 'Mr. Shoaib Ahmed', email: 'shoaib@university.edu', department: 'Computer Science',    designation: 'Assistant Professor', studentsCount: 5 },
-    { id: 2, name: 'Mr. Omer Khan',    email: 'omer@university.edu',   department: 'Computer Science',    designation: 'Associate Professor', studentsCount: 4 },
-    { id: 3, name: 'Ms. Ayesha Tariq', email: 'ayesha@university.edu', department: 'Software Engineering',designation: 'Lecturer',            studentsCount: 3 },
-  ]);
+  const [supervisors, setSupervisors] = useState([]);
 
-  const [showModal, setShowModal]                   = useState(false);
-  const [modalMode, setModalMode]                   = useState('create');
+  const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState('create');
   const [selectedSupervisor, setSelectedSupervisor] = useState(null);
-  const [showDeleteConfirm, setShowDeleteConfirm]   = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [supervisorToDelete, setSupervisorToDelete] = useState(null);
-  const [searchQuery, setSearchQuery]               = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const emptyForm = { name: '', email: '', password: '', department: 'Computer Science', designation: '' };
+  const emptyForm = { name: '', email: '', password: '', department: 'Computer Science', designation: '', maxProjects: '' };
   const [form, setForm] = useState(emptyForm);
+
+  const fetchSupervisors = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      const response = await axios.get(
+        "http://localhost:4000/api/users",
+        {
+          params: {
+            role: 'supervisor',
+          },
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+        }
+      );
+      console.log(response.data.users);
+      setSupervisors(response.data.users);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  useEffect(() => {
+    fetchSupervisors();
+  }, []);
 
   const openCreateModal = () => {
     setForm(emptyForm);
@@ -56,22 +78,91 @@ const CoordinatorSupervisors = () => {
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
+    const token = localStorage.getItem('token');
+
     if (modalMode === 'create') {
-      // TODO (Backend): POST /api/coordinator/supervisors
-      setSupervisors(prev => [...prev, { ...form, id: Date.now(), studentsCount: 0 }]);
+      try {
+        const response = await axios.post(
+          "http://localhost:4000/api/users",
+          {
+            name: form.name,
+            email: form.email,
+            password: form.password,
+            role: 'supervisor',
+            department: form.department,
+            designation: form.designation,
+            maxProjects: Number(form.maxProjects),
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        );
+
+        setSupervisors(prev => [...prev, {
+          ...response.data.user,
+          ...response.data.profile,
+        }]);
+
+      } catch (error) {
+        console.error(error);
+      }
+
     } else {
-      // TODO (Backend): PUT /api/coordinator/supervisors/:id
-      setSupervisors(prev => prev.map(s => s.id === selectedSupervisor.id ? { ...s, ...form } : s));
+      try {
+        const body = {
+          name: form.name,
+          email: form.email,
+          department: form.department,
+          designation: form.designation,
+          maxProjects: Number(form.maxProjects),
+        };
+
+        if (form.password) {
+          body.password = form.password;
+        }
+
+        const response = await axios.put(
+          `http://localhost:4000/api/users/${selectedSupervisor._id}`,
+          body,
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        );
+
+        setSupervisors(prev =>
+          prev.map(s => s._id === selectedSupervisor._id ? { ...s, ...response.data.user } : s)
+        );
+
+      } catch (error) {
+        console.error(error);
+      }
     }
+
     setShowModal(false);
     setForm(emptyForm);
   };
 
-  const handleDelete = () => {
-    // TODO (Backend): DELETE /api/coordinator/supervisors/:id
-    setSupervisors(prev => prev.filter(s => s.id !== supervisorToDelete.id));
+  const handleDelete = async () => {
+    const token = localStorage.getItem('token');
+
+    try {
+      await axios.delete(
+        `http://localhost:4000/api/users/${supervisorToDelete._id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      fetchSupervisors();
+
+    } catch (error) {
+      console.error(error);
+    }
+
     setShowDeleteConfirm(false);
     setSupervisorToDelete(null);
   };
@@ -124,7 +215,7 @@ const CoordinatorSupervisors = () => {
                   <th className="px-4 py-3 fw-semibold small text-dark">Email</th>
                   <th className="px-4 py-3 fw-semibold small text-dark">Department</th>
                   <th className="px-4 py-3 fw-semibold small text-dark">Designation</th>
-                  <th className="px-4 py-3 fw-semibold small text-dark">Students</th>
+                  <th className="px-4 py-3 fw-semibold small text-dark">Assigned Projects</th>
                   <th className="px-4 py-3 fw-semibold small text-dark">Actions</th>
                 </tr>
               </thead>
@@ -152,7 +243,24 @@ const CoordinatorSupervisors = () => {
                       <td className="px-4 py-3 text-muted small">{supervisor.department}</td>
                       <td className="px-4 py-3 text-muted small">{supervisor.designation}</td>
                       <td className="px-4 py-3">
-                        <span className="badge bg-primary rounded-pill px-3">{supervisor.studentsCount}</span>
+                        <div className="d-flex align-items-center gap-2">
+                          <div className="progress flex-grow-1" style={{ height: '8px' }}>
+                            <div
+                              className={`progress-bar ${supervisor.currentProjects >= supervisor.maxProjects
+                                  ? 'bg-danger'
+                                  : supervisor.currentProjects >= supervisor.maxProjects * 0.7
+                                    ? 'bg-warning'
+                                    : 'bg-success'
+                                }`}
+                              style={{
+                                width: `${(supervisor.currentProjects / supervisor.maxProjects) * 100}%`
+                              }}
+                            />
+                          </div>
+                          <small className="text-muted text-nowrap">
+                            {supervisor.currentProjects} / {supervisor.maxProjects}
+                          </small>
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="d-flex gap-2">
@@ -215,6 +323,20 @@ const CoordinatorSupervisors = () => {
                         <option>Professor</option>
                       </select>
                     </div>
+                    <div className="col-12 col-md-6">
+                      <label className="form-label fw-medium text-dark small">Max Projects *</label>
+                      <input
+                        type="number"
+                        name="maxProjects"
+                        value={form.maxProjects}
+                        onChange={handleFormChange}
+                        className="form-control"
+                        placeholder="Between 1 - 4"
+                        min="1"
+                        max="4"
+                        required
+                      />
+                    </div>
                   </div>
                 </form>
               </div>
@@ -240,7 +362,7 @@ const CoordinatorSupervisors = () => {
                   style={{ width: '56px', height: '56px', backgroundColor: '#dc354520' }}
                 >
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="#dc3545">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
                   </svg>
                 </div>
                 <h6 className="fw-semibold text-dark mb-2">Delete Supervisor Account</h6>
