@@ -6,7 +6,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const SignIn = () => {
-  const [userType, setUserType] = useState('student');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -48,18 +47,6 @@ const SignIn = () => {
     } else {
       alert('Please enter your email and password.');
     }
-  };
-
-  // Sample credentials for testing each role
-  const sampleCredentials = {
-    student: { email: 'student@university.edu', password: 'student123' },
-    supervisor: { email: 'shoaib@university.edu', password: 'supervisor123' },
-    coordinator: { email: 'omer@university.edu', password: 'coordinator123' },
-  };
-
-  const fillSampleCredentials = () => {
-    setEmail(sampleCredentials[userType].email);
-    setPassword(sampleCredentials[userType].password);
   };
 
   return (
@@ -125,7 +112,7 @@ const SignIn = () => {
                     </div>
                   </div>
 
-                  {/* Remember Me + Fill Sample Credentials */}
+                  {/* Remember Me */}
                   <div className="d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-2 mb-4">
 
                     {/* Remember Me checkbox */}
@@ -153,16 +140,7 @@ const SignIn = () => {
                         </div>
                       </div>
                       <span className="small">Remember me</span>
-                    </label>
-
-                    {/* Fill Sample Credentials button */}
-                    <button
-                      type="button"
-                      onClick={fillSampleCredentials}
-                      className="btn btn-link btn-sm p-0 text-primary text-decoration-underline"
-                    >
-                      Fill Sample Credentials
-                    </button>
+                    </label>                   
                   </div>
 
                   {/* Submit button */}

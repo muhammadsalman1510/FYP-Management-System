@@ -260,7 +260,7 @@ export const getUserById = async (req, res) => {
 export const updateUser = async (req, res) => {
     try {
         const { name, email, password, role, program, batch, semester, section, rollNumber, maxProjects } = req.body;
-        console.log(semester)
+
         // 1. Fetch user FIRST
         const existingUser = await User.findById(req.params.id)
         if (!existingUser) {
@@ -278,8 +278,10 @@ export const updateUser = async (req, res) => {
         if (email) updates.email = email
         if (role) updates.role = role
 
-        if (password) {
-            updates.password = await bcrypt.hash(password, 10)
+        const cleanedPassword = typeof password === 'string' ? password.trim() : '';
+
+        if (cleanedPassword) {
+            updates.password = await bcrypt.hash(cleanedPassword, 10);
         }
 
         // 3. Start transaction (CRITICAL)
