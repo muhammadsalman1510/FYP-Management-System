@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import connectDB from './config/db.js';
 import authRoutes from './routes/auth.routes.js'
 import userRoutes from './routes/user.routes.js'
+import projectRoutes from './routes/project.routes.js'
 
 
 // Load environment variables
@@ -27,6 +28,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/auth', authRoutes)
 app.use('/api/users', userRoutes)
+app.use('/api/projects', projectRoutes)
 
 // Port config (add fallback to avoid undefined)
 const PORT = process.env.PORT || 5000;
