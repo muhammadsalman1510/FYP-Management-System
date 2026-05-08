@@ -55,28 +55,33 @@ export const createProject = async (req, res) => {
     try {
         const { title, description, supervisorId, maxStudents } = req.body
 
-        if (!title || !supervisorId || !maxStudents) {
+        if (!title || !maxStudents) {
             return res.status(400).json({
-                message: 'title, supervisorId, and maxStudents are required',
+                message: 'title and maxStudents are required',
             })
         }
 
-        // --- Validate supervisor ---
-        await getSupervisorUser(supervisorId)
-        const profile = await checkSupervisorCapacity(supervisorId)
+        // --- Validate supervisor if assigned ---
+        let profile = null
+        if (supervisorId) {
+            await getSupervisorUser(supervisorId)
+            profile = await checkSupervisorCapacity(supervisorId)
+        }
 
         // --- Create project ---
         const project = await Project.create({
             title,
             description,
-            supervisorId,
+            supervisorId: supervisorId || null,
             maxStudents,
             status: 'available',
         })
 
         // --- Increment supervisor's currentProjects ---
-        profile.currentProjects += 1
-        await profile.save()
+        if (profile) {
+            profile.currentProjects += 1
+            await profile.save()
+        }
 
         return res.status(201).json({
             message: 'Project created successfully',
@@ -141,43 +146,64 @@ export const assignSupervisor = async (req, res) => {
     try {
         const { supervisorId } = req.body
 
-        if (!supervisorId) {
-            return res.status(400).json({ message: 'supervisorId is required' })
-        }
-
-        // --- Find the project ---
         const project = await Project.findById(req.params.id)
+
         if (!project) {
-            return res.status(404).json({ message: 'Project not found' })
+            return res.status(404).json({
+                message: 'Project not found',
+            })
         }
 
         // --- Prevent no-op ---
-        if (project.supervisorId.toString() === supervisorId) {
+        if (
+            project.supervisorId?.toString() === supervisorId
+        ) {
             return res.status(400).json({
                 message: 'This supervisor is already assigned to the project',
             })
         }
 
-        // --- Validate new supervisor and check capacity ---
-        await getSupervisorUser(supervisorId)
-        const newProfile = await checkSupervisorCapacity(supervisorId)
-
-        // --- Release slot from old supervisor ---
-        const oldProfile = await SupervisorProfile.findOne({
-            userId: project.supervisorId,
-        })
-        if (oldProfile && oldProfile.currentProjects > 0) {
-            oldProfile.currentProjects -= 1
-            await oldProfile.save()
+        // --- Optional workflow guard ---
+        // Prevent removing supervisor from assigned project
+        if (
+            supervisorId === null &&
+            project.status === 'assigned'
+        ) {
+            return res.status(400).json({
+                message:
+                    'Cannot unassign supervisor from an assigned project',
+            })
         }
 
-        // --- Assign new supervisor ---
+        let newProfile = null
+
+        // --- Validate new supervisor only if assigning ---
+        if (supervisorId !== null) {
+            await getSupervisorUser(supervisorId)
+            newProfile = await checkSupervisorCapacity(supervisorId)
+        }
+
+        // --- Release old supervisor slot ---
+        if (project.supervisorId) {
+            const oldProfile = await SupervisorProfile.findOne({
+                userId: project.supervisorId,
+            })
+
+            if (oldProfile && oldProfile.currentProjects > 0) {
+                oldProfile.currentProjects -= 1
+                await oldProfile.save()
+            }
+        }
+
+        // --- Assign / unassign supervisor ---
         project.supervisorId = supervisorId
         await project.save()
 
-        // --- Increment new supervisor's currentProjects ---
-        newProfile.currentProjects += 1
-        await newProfile.save()
+        // --- Increment new supervisor count ---
+        if (newProfile) {
+            newProfile.currentProjects += 1
+            await newProfile.save()
+        }
 
         const updated = await Project.findById(project._id).populate(
             'supervisorId',
@@ -185,15 +211,25 @@ export const assignSupervisor = async (req, res) => {
         )
 
         return res.status(200).json({
-            message: 'Supervisor reassigned successfully',
+            message:
+                supervisorId === null
+                    ? 'Supervisor unassigned successfully'
+                    : 'Supervisor assigned successfully',
             project: updated,
         })
+
     } catch (err) {
         if (err.status) {
-            return res.status(err.status).json({ message: err.message })
+            return res.status(err.status).json({
+                message: err.message,
+            })
         }
+
         console.error('assignSupervisor error:', err)
-        return res.status(500).json({ message: 'Internal server error' })
+
+        return res.status(500).json({
+            message: 'Internal server error',
+        })
     }
 }
 
@@ -209,10 +245,12 @@ export const deleteProject = async (req, res) => {
         }
 
         // --- Release supervisor slot ---
-        const profile = await SupervisorProfile.findOne({ userId: project.supervisorId })
-        if (profile && profile.currentProjects > 0) {
-            profile.currentProjects -= 1
-            await profile.save()
+        if (project.supervisorId) {
+            const profile = await SupervisorProfile.findOne({ userId: project.supervisorId })
+            if (profile && profile.currentProjects > 0) {
+                profile.currentProjects -= 1
+                await profile.save()
+            }
         }
 
         await project.deleteOne()

@@ -78,7 +78,7 @@ const CoordinatorAssignSupervisor = () => {
     try {
       const response = await axios.put(
         `http://localhost:4000/api/projects/${projectId}/supervisor`,
-        { supervisorId: newSupervisorId },
+        { supervisorId: (newSupervisorId !== '' ? newSupervisorId : null) },
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -140,7 +140,7 @@ const CoordinatorAssignSupervisor = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ minWidth: '300px' }}
-              />              
+              />
             </div>
           </div>
         </div>
@@ -184,7 +184,7 @@ const CoordinatorAssignSupervisor = () => {
 
                       {/* Current Supervisor */}
                       <td className="px-4 py-3">
-                        {project.supervisorId.name ? (
+                        {project.supervisorId?.name ? (
                           <span className="text-dark small fw-medium">
                             {project.supervisorId.name}
                           </span>
@@ -199,10 +199,10 @@ const CoordinatorAssignSupervisor = () => {
                       <td className="px-4 py-3">
                         <select
                           className="form-select form-select-sm"
-                          value={project.supervisorId._id || ''}
+                          value={project.supervisorId?._id || ''}
                           onChange={(e) => handleSupervisorChange(project._id, e.target.value)}
                         >
-                          <option value="">-- Not Assigned --</option>
+                          <option value=''>-- Not Assigned --</option>
                           {supervisors?.map(sv => (
                             <option key={sv._id} value={sv._id}>{sv.name}</option>
                           ))}

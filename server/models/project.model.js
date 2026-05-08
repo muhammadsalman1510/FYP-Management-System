@@ -15,7 +15,7 @@ const projectSchema = new mongoose.Schema(
         supervisorId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
-            required: [true, "Supervisor is required"],
+            default: null, // assigned later; can be unassigned at any stage
         },
         status: {
             type: String,
