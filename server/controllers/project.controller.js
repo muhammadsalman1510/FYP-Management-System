@@ -53,35 +53,28 @@ const checkSupervisorCapacity = async (supervisorUserId) => {
  */
 export const createProject = async (req, res) => {
     try {
-        const { title, description, supervisorId, maxStudents } = req.body
+        const { title, description, maxStudents } = req.body
 
-        if (!title || !maxStudents) {
+        if (!title || maxStudents == null) {
             return res.status(400).json({
                 message: 'title and maxStudents are required',
             })
         }
 
-        // --- Validate supervisor if assigned ---
-        let profile = null
-        if (supervisorId) {
-            await getSupervisorUser(supervisorId)
-            profile = await checkSupervisorCapacity(supervisorId)
+        if (maxStudents < 1) {
+            return res.status(400).json({
+                message: 'maxStudents must be at least 1'
+            })
         }
 
         // --- Create project ---
         const project = await Project.create({
-            title,
+            title: title.trim(),
             description,
-            supervisorId: supervisorId || null,
             maxStudents,
+            supervisorId: null,
             status: 'available',
         })
-
-        // --- Increment supervisor's currentProjects ---
-        if (profile) {
-            profile.currentProjects += 1
-            await profile.save()
-        }
 
         return res.status(201).json({
             message: 'Project created successfully',

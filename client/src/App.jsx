@@ -32,7 +32,7 @@ import Tasks from './pages/Tasks/Tasks';
 import CoordinatorDashboard        from './pages/Coordinator/Dashboard';
 import CoordinatorStudents         from './pages/Coordinator/Students';
 import CoordinatorSupervisors      from './pages/Coordinator/Supervisors';
-import CoordinatorAssignSupervisor from './pages/Coordinator/AssignSupervisor';
+import Projects                    from './pages/Coordinator/Projects';
 import CoordinatorProposals        from './pages/Coordinator/Proposals';
 import CoordinatorTasks            from './pages/Coordinator/Tasks';
 import CoordinatorMeetingCalendar  from './pages/Coordinator/MeetingCalendar';
@@ -123,8 +123,8 @@ function App() {
       <Route path="/coordinator/accounts/supervisors" element={
         <CoordinatorLayout><PageTitle title="Manage Supervisors | FYP Management System" /><CoordinatorSupervisors /></CoordinatorLayout>
       } />
-      <Route path="/coordinator/accounts/assign-supervisor" element={
-        <CoordinatorLayout><PageTitle title="Assign Supervisor | FYP Management System" /><CoordinatorAssignSupervisor /></CoordinatorLayout>
+      <Route path="/coordinator/accounts/projects" element={
+        <CoordinatorLayout><PageTitle title="Manage Projects | FYP Management System" /><Projects /></CoordinatorLayout>
       } />
       <Route path="/coordinator/proposals" element={
         <CoordinatorLayout><PageTitle title="Proposals | FYP Management System" /><CoordinatorProposals /></CoordinatorLayout>

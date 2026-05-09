@@ -143,7 +143,7 @@ const CoordinatorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
                       <ul className="list-unstyled ps-4 mt-1 mb-2 d-flex flex-column gap-1">
                         <li><NavLink to="/coordinator/accounts/students" onClick={handleNavClick} className={({ isActive }) => `d-flex align-items-center px-3 py-1 rounded text-decoration-none fw-medium sidebar-sub-link ${isActive ? 'text-white' : ''}`}>Manage Students</NavLink></li>
                         <li><NavLink to="/coordinator/accounts/supervisors" onClick={handleNavClick} className={({ isActive }) => `d-flex align-items-center px-3 py-1 rounded text-decoration-none fw-medium sidebar-sub-link ${isActive ? 'text-white' : ''}`}>Manage Supervisors</NavLink></li>
-                        <li><NavLink to="/coordinator/accounts/assign-supervisor" onClick={handleNavClick} className={({ isActive }) => `d-flex align-items-center px-3 py-1 rounded text-decoration-none fw-medium sidebar-sub-link ${isActive ? 'text-white' : ''}`}>Assign Supervisor</NavLink></li>
+                        <li><NavLink to="/coordinator/accounts/projects" onClick={handleNavClick} className={({ isActive }) => `d-flex align-items-center px-3 py-1 rounded text-decoration-none fw-medium sidebar-sub-link ${isActive ? 'text-white' : ''}`}>Manage Projects</NavLink></li>
                       </ul>
                     </div>
                   </React.Fragment>

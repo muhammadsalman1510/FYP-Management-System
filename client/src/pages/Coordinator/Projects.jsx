@@ -14,7 +14,7 @@ import axios from 'axios'
   TODO (Backend): PUT /api/coordinator/students/:id/assign-supervisor
 */
 
-const CoordinatorAssignSupervisor = () => {
+const Projects = () => {
 
   // Supervisors list for the dropdown
   const [supervisors, setSupervisors] = useState([]);
@@ -25,7 +25,14 @@ const CoordinatorAssignSupervisor = () => {
   const [savedAlert, setSavedAlert] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const getSupervisors = async () => {
+  const emptyForm = { title: '', description: '', maxStudents: '' };
+  const [form, setForm] = useState(emptyForm);
+  const [modalMode, setModalMode] = useState('create');
+  const [showModal, setShowModal] = useState(false);
+
+
+
+  const fetchSupervisors = async () => {
     const token = localStorage.getItem('token');
     try {
       const response = await axios.get(
@@ -45,7 +52,7 @@ const CoordinatorAssignSupervisor = () => {
     }
   }
 
-  const getProjects = async () => {
+  const fetchProjects = async () => {
     const token = localStorage.getItem('token');
     try {
       const { data } = await axios.get(
@@ -62,13 +69,76 @@ const CoordinatorAssignSupervisor = () => {
     }
   }
 
+  const handleSave = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+
+    if (modalMode === 'create') {
+      try {
+        const response = await axios.post(
+          "http://localhost:4000/api/projects",
+          {
+            title: form.title,
+            description: form.description,
+            maxStudents: form.maxStudents
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        );
+
+        fetchProjects();
+
+      } catch (error) {
+        console.error(error);
+      }
+
+    } else {
+      try {
+        const body = {
+          name: form.name,
+          email: form.email,
+          department: form.department,
+          designation: form.designation,
+          maxProjects: Number(form.maxProjects),
+        };
+
+        if (form.password) {
+          body.password = form.password;
+        }
+
+        const response = await axios.put(
+          `http://localhost:4000/api/users/${selectedSupervisorId}`,
+          body,
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        );
+
+        fetchSupervisors();
+
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    setShowModal(false);
+    setForm(emptyForm);
+
+  }
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
+  };
+
   // Get All SUpervisors
   useEffect(() => {
-    getSupervisors()
+    fetchSupervisors()
   }, []);
 
   useEffect(() => {
-    getProjects()
+    fetchProjects()
   }, []);
 
   // Update supervisor for a project
@@ -84,7 +154,7 @@ const CoordinatorAssignSupervisor = () => {
         }
       );
 
-      getProjects()
+      fetchProjects()
 
     } catch (error) {
       console.error(error);
@@ -110,9 +180,15 @@ const CoordinatorAssignSupervisor = () => {
   const assignedCount = projects.filter(s => s.supervisorId).length;
   const unassignedCount = projects.filter(s => !s.supervisorId).length;
 
+  const openCreateModal = () => {
+    setForm(emptyForm);
+    setModalMode('create');
+    setShowModal(true);
+  };
+
   return (
     <>
-      <Breadcrumb pageName="Assign Supervisor" />
+      <Breadcrumb pageName="Manage Projects" />
 
       {/* Success Alert */}
       {savedAlert && (
@@ -127,7 +203,7 @@ const CoordinatorAssignSupervisor = () => {
         <div className="card-header bg-white border-bottom py-3 px-4">
           <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
             <div>
-              <h5 className="fw-semibold text-dark mb-0">Assign Supervisors to Projects</h5>
+              <h5 className="fw-semibold text-dark mb-0">Projects</h5>
               <p className="text-muted small mb-0 mt-1">
                 Use the dropdown in each row to assign or change a projects's supervisor.
               </p>
@@ -141,11 +217,14 @@ const CoordinatorAssignSupervisor = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ minWidth: '300px' }}
               />
+              <button className="btn btn-success btn-sm px-4 fw-medium" onClick={openCreateModal}>
+                + Add Project
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Students Table */}
+        {/* Projects Table */}
         <div className="card-body p-0">
           <div className="table-responsive">
             <table className="table table-hover align-middle mb-0">
@@ -217,6 +296,56 @@ const CoordinatorAssignSupervisor = () => {
           </div>
         </div>
 
+        {/* Create / Edit Modal */}
+        {showModal && (
+          <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}>
+            <div className="modal-dialog modal-lg modal-dialog-centered">
+              <div className="modal-content border-0 shadow">
+                <div className="modal-header border-bottom px-4 py-3">
+                  <h5 className="modal-title fw-semibold text-dark">
+                    {modalMode === 'create' ? 'Add New Project' : 'Edit Project'}
+                  </h5>
+                  <button className="btn-close" onClick={() => setShowModal(false)} />
+                </div>
+                <div className="modal-body px-4 py-4">
+                  <form onSubmit={handleSave} id="projectForm">
+                    <div className="row g-3">
+                      <div className="col-12 col-md-6">
+                        <label className="form-label fw-medium text-dark small">Project Title *</label>
+                        <input type="text" name="title" value={form.title} onChange={handleFormChange} className="form-control" placeholder="Project Title" required />
+                      </div>
+                      <div className="col-12 col-md-6">
+                        <label className="form-label fw-medium text-dark small">Max Students *</label>
+                        <input
+                          type="number"
+                          name="maxStudents"
+                          value={form.maxStudents}
+                          onChange={handleFormChange}
+                          className="form-control"
+                          placeholder="Between 2 - 5"
+                          min="2"
+                          max="5"
+                          required
+                        />
+                      </div>
+                      <div className="col-12 col-md-6">
+                        <label className="form-label fw-medium text-dark small">Description</label>
+                        <textarea type="text" name="description" value={form.description} onChange={handleFormChange} className="form-control" />
+                      </div>
+                    </div>
+                  </form>
+                </div>
+                <div className="modal-footer border-top px-4 py-3">
+                  <button className="btn btn-outline-secondary px-4" onClick={() => setShowModal(false)}>Cancel</button>
+                  <button type="submit" form="projectForm" className="btn btn-success px-4 fw-medium">
+                    {modalMode === 'create' ? 'Create Project' : 'Save Changes'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Footer Stats */}
         <div className="card-footer bg-white border-top px-4 py-3">
           <div className="d-flex flex-wrap gap-4 small">
@@ -237,4 +366,4 @@ const CoordinatorAssignSupervisor = () => {
   );
 };
 
-export default CoordinatorAssignSupervisor;
+export default Projects;
