@@ -7,6 +7,8 @@ import {
     assignSupervisor,
     deleteProject,
     updateProject,
+    assignStudent,
+    removeStudent,
 } from '../controllers/project.controller.js'
 
 const router = express.Router()
@@ -14,11 +16,16 @@ const router = express.Router()
 router.use(authenticate)
 router.use(authorize('coordinator'))
 
-router.post('/', createProject)                        // create project + assign supervisor
-router.get('/', getProjects)                           // list all projects
-router.get('/:id', getProjectById)                     // get one project
-router.put('/:id/supervisor', assignSupervisor)        // reassign supervisor
-router.put('/:id', updateProject)                      // update project
-router.delete('/:id', deleteProject)                   // delete project
+router.post('/', createProject)                             // create project + assign supervisor
+
+router.get('/', getProjects)                                // list all projects
+router.get('/:id', getProjectById)                          // get one project
+
+router.put('/:id/supervisor', assignSupervisor)             // reassign supervisor
+router.put('/:id/students', assignStudent)                  // assign student
+router.put('/:id', updateProject)                           // update project
+
+router.delete('/:id/students/:studentId', removeStudent)    // remove student from project
+router.delete('/:id', deleteProject)                        // delete project
 
 export default router

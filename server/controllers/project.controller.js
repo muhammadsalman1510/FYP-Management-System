@@ -115,10 +115,13 @@ export const getProjects = async (req, res) => {
  */
 export const getProjectById = async (req, res) => {
     try {
-        const project = await Project.findById(req.params.id).populate(
-            'supervisorId',
-            'name email'
-        )
+        const project = await Project.findById(req.params.id)
+            .populate(
+                'supervisorId',
+                'name email'
+            )
+            .populate('students', 'name email')
+
         if (!project) {
             return res.status(404).json({ message: 'Project not found' })
         }
@@ -227,6 +230,64 @@ export const assignSupervisor = async (req, res) => {
 }
 
 /**
+ * PUT /api/projects/:id/students
+ * Coordinator only — assign a student to a project.
+ *
+ * Body: { studentId }
+ */
+export const assignStudent = async (req, res) => {
+    try {
+        const { studentId } = req.body
+
+        if (!studentId) {
+            return res.status(400).json({ message: 'studentId is required' })
+        }
+
+        // --- Validate student ---
+        const user = await User.findById(studentId)
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' })
+        }
+        if (user.role !== 'student') {
+            return res.status(400).json({ message: 'Provided userId does not belong to a student' })
+        }
+
+        // --- Find project ---
+        const project = await Project.findById(req.params.id)
+        if (!project) {
+            return res.status(404).json({ message: 'Project not found' })
+        }
+
+        // --- Check duplicate ---
+        if (project.students.some(id => id.toString() === studentId)) {
+            return res.status(409).json({ message: 'Student is already assigned to this project' })
+        }
+
+        // --- Check capacity ---
+        if (project.students.length >= project.maxStudents) {
+            return res.status(409).json({ message: `Project is full — max ${project.maxStudents} students allowed` })
+        }
+
+        // --- Assign student ---
+        project.students.push(studentId)
+        await project.save()
+
+        const updated = await Project.findById(project._id)
+            .populate('supervisorId', 'name email')
+            .populate('students', 'name email')
+
+        return res.status(200).json({
+            message: 'Student assigned successfully',
+            project: updated,
+        })
+
+    } catch (err) {
+        console.error('assignStudent error:', err)
+        return res.status(500).json({ message: 'Internal server error' })
+    }
+}
+
+/**
  * PUT /api/projects/:id
  * Coordinator only — update a project's title, description, and maxStudents.
  *
@@ -265,6 +326,44 @@ export const updateProject = async (req, res) => {
 
     } catch (err) {
         console.error('updateProject error:', err)
+        return res.status(500).json({ message: 'Internal server error' })
+    }
+}
+
+/**
+ * DELETE /api/projects/:id/students/:studentId
+ * Coordinator only — remove a student from a project.
+ */
+export const removeStudent = async (req, res) => {
+    try {
+        const { studentId } = req.params
+
+        // --- Find project ---
+        const project = await Project.findById(req.params.id)
+        if (!project) {
+            return res.status(404).json({ message: 'Project not found' })
+        }
+
+        // --- Check student exists in project ---
+        if (!project.students.some(id => id.toString() === studentId)) {
+            return res.status(404).json({ message: 'Student is not assigned to this project' })
+        }
+
+        // --- Remove student ---
+        project.students = project.students.filter(id => id.toString() !== studentId)
+        await project.save()
+
+        const updated = await Project.findById(project._id)
+            .populate('supervisorId', 'name email')
+            .populate('students', 'name email')
+
+        return res.status(200).json({
+            message: 'Student removed successfully',
+            project: updated,
+        })
+
+    } catch (err) {
+        console.error('removeStudent error:', err)
         return res.status(500).json({ message: 'Internal server error' })
     }
 }

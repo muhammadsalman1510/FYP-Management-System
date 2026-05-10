@@ -19,6 +19,8 @@ const ProjectDetail = () => {
     const token = localStorage.getItem('token');
 
     const [project, setProject] = useState(null);
+    const [supervisors, setSupervisors] = useState([]);
+    const [students, setStudents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [alert, setAlert] = useState({ show: false, message: '', type: 'success' });
 
@@ -41,8 +43,15 @@ const ProjectDetail = () => {
 
     // ── Fetch project ────────────────────────────────────────
     const fetchProject = async () => {
+        const token = localStorage.getItem('token');
         try {
-            const { data } = await axios.get(`http://localhost:4000/api/projects/${id}`, authHeaders);
+            const { data } = await axios.get(`http://localhost:4000/api/projects/${id}`, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                },
+            }
+            );
+            console.log(data.project);
             setProject(data.project);
         } catch (err) {
             console.error('Fetch project error:', err);
@@ -56,21 +65,76 @@ const ProjectDetail = () => {
         fetchProject();
     }, [id]);
 
-    // ── Change supervisor ────────────────────────────────────
-    const handleChangeSupervisor = async (e) => {
-        e.preventDefault();
+    // Get All SUpervisors
+    useEffect(() => {
+        fetchSupervisors()
+    }, []);
+
+    // Get All Students
+    useEffect(() => {
+        fetchStudents()
+    }, []);
+
+    const fetchSupervisors = async () => {
+        const token = localStorage.getItem('token');
         try {
-            await axios.put(
-                `http://localhost:4000/api/projects/${id}/supervisor`,
-                { supervisorId: supervisorInput },
-                authHeaders
+            const response = await axios.get(
+                "http://localhost:4000/api/users",
+                {
+                    params: {
+                        role: 'supervisor',
+                    },
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    },
+                }
             );
-            showAlert('Supervisor updated successfully.');
-            setShowChangeSupervisor(false);
-            setSupervisorInput('');
-            await fetchProject();
-        } catch (err) {
-            showAlert(err.response?.data?.message || 'Failed to update supervisor.', 'danger');
+            console.log(response.data.users);
+            setSupervisors(response.data.users);
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    const fetchStudents = async () => {
+        const token = localStorage.getItem('token');
+        try {
+            const response = await axios.get(
+                "http://localhost:4000/api/users",
+                {
+                    params: {
+                        role: 'student',
+                    },
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    },
+                }
+            );
+            console.log(response.data.users);
+            setStudents(response.data.users);
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    // ── Change supervisor ────────────────────────────────────
+    // Update supervisor for a project
+    const handleSupervisorChange = async (projectId, newSupervisorId) => {
+        const token = localStorage.getItem('token');
+
+        try {
+            const response = await axios.put(
+                `http://localhost:4000/api/projects/${projectId}/supervisor`,
+                { supervisorId: (newSupervisorId !== '' ? newSupervisorId : null) },
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+
+            fetchProject()
+
+        } catch (error) {
+            console.error(error);
         }
     };
 
@@ -78,16 +142,21 @@ const ProjectDetail = () => {
     const handleAssignStudent = async (e) => {
         e.preventDefault();
         try {
-            await axios.post(
-                `http://localhost:4000/api/projects/${id}/students`,
+            const token = localStorage.getItem('token');
+
+            const { data } = await axios.put(
+                `http://localhost:4000/api/projects/${project._id}/students`,
                 { studentId: studentInput },
-                authHeaders
+                { headers: { Authorization: `Bearer ${token}` } }
             );
-            showAlert('Student assigned successfully.');
+
+            showAlert(data.message);
             setShowAssignStudent(false);
             setStudentInput('');
             await fetchProject();
+
         } catch (err) {
+            console.error('Assign student error:', err);
             showAlert(err.response?.data?.message || 'Failed to assign student.', 'danger');
         }
     };
@@ -97,12 +166,14 @@ const ProjectDetail = () => {
         try {
             await axios.delete(
                 `http://localhost:4000/api/projects/${id}/students/${removingStudentId}`,
-                authHeaders
+                { headers: { Authorization: `Bearer ${token}` } }
             );
             showAlert('Student removed successfully.');
             setShowRemoveConfirm(false);
             setRemovingStudentId(null);
             await fetchProject();
+            await fetchStudents();
+
         } catch (err) {
             showAlert(err.response?.data?.message || 'Failed to remove student.', 'danger');
         }
@@ -161,30 +232,25 @@ const ProjectDetail = () => {
                     {/* ── Project Details Card ── */}
                     <div className="card shadow-sm border-0 mb-4">
                         <div className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between">
-                            <h5 className="fw-semibold text-dark mb-0">Project details</h5>
-                            <span
-                                className="badge rounded-pill px-3"
-                                style={{ fontSize: '0.7rem', backgroundColor: '#e6f1fb', color: '#0c447c' }}
-                            >
-                                {project.status ?? 'Active'}
-                            </span>
+                            {/* <h5 className="fw-semibold text-dark mb-0">Project details</h5> */}
+                            <h5 className="fw-semibold text-dark mb-0">{project.title}</h5>
                         </div>
                         <div className="card-body p-4">
                             <div className="mb-4">
-                                <p className="text-muted small mb-1">Project title</p>
-                                <p className="fw-semibold fs-5 text-dark mb-0">{project.title}</p>
+                                <p className="text-muted small mb-1">Description</p>
+                                <p className="fw-semibold fs-5 text-dark mb-0">{project.description}</p>
                             </div>
                             <div className="row g-3">
                                 <div className="col-12 col-md-6">
                                     <div className="p-3 rounded-3" style={{ background: 'var(--bs-gray-100, #f8f9fa)' }}>
-                                        <p className="text-muted small mb-1">Session</p>
-                                        <p className="fw-medium text-dark mb-0">{project.session ?? '—'}</p>
+                                        <p className="text-muted small mb-1">Status</p>
+                                        <p className="fw-medium text-dark mb-0">{project.status}</p>
                                     </div>
                                 </div>
                                 <div className="col-12 col-md-6">
                                     <div className="p-3 rounded-3" style={{ background: 'var(--bs-gray-100, #f8f9fa)' }}>
-                                        <p className="text-muted small mb-1">Program</p>
-                                        <p className="fw-medium text-dark mb-0">{project.program ?? '—'}</p>
+                                        <p className="text-muted small mb-1">Maximum Students Allowed</p>
+                                        <p className="fw-medium text-dark mb-0">{project.maxStudents}</p>
                                     </div>
                                 </div>
                             </div>
@@ -195,34 +261,41 @@ const ProjectDetail = () => {
                     <div className="card shadow-sm border-0 mb-4">
                         <div className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between">
                             <h5 className="fw-semibold text-dark mb-0">Supervisor</h5>
-                            <button
-                                className="btn btn-sm btn-outline-secondary"
-                                onClick={() => setShowChangeSupervisor(true)}
-                            >
-                                <i className="ti ti-refresh me-1" style={{ fontSize: '14px' }} />
-                                Change
-                            </button>
                         </div>
                         <div className="card-body p-4">
-                            {project.supervisor ? (
-                                <div className="d-flex align-items-center gap-3">
-                                    <div
-                                        className="d-flex align-items-center justify-content-center rounded-circle fw-medium"
-                                        style={{
-                                            width: '44px', height: '44px', minWidth: '44px',
-                                            backgroundColor: '#e6f1fb', color: '#0c447c', fontSize: '14px',
-                                        }}
-                                    >
-                                        {getInitials(project.supervisor.name)}
+                            <div className="d-flex align-items-center justify-content-between gap-3">
+                                {project.supervisorId ? (
+                                    <div className="d-flex align-items-center gap-3">
+                                        <div
+                                            className="d-flex align-items-center justify-content-center rounded-circle fw-medium"
+                                            style={{
+                                                width: '44px', height: '44px', minWidth: '44px',
+                                                backgroundColor: '#e6f1fb', color: '#0c447c', fontSize: '14px',
+                                            }}
+                                        >
+                                            {getInitials(project.supervisorId.name)}
+                                        </div>
+                                        <div>
+                                            <p className="fw-medium text-dark mb-0">{project.supervisorId.name}</p>
+                                            <p className="text-muted small mb-0">{project.supervisorId.email}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="fw-medium text-dark mb-0">{project.supervisor.name}</p>
-                                        <p className="text-muted small mb-0">{project.supervisor.email}</p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <p className="text-muted small mb-0">No supervisor assigned yet.</p>
-                            )}
+                                ) : (
+                                    <p className="text-muted small mb-0">No supervisor assigned yet.</p>
+                                )}
+
+                                <select
+                                    className="form-select form-select-sm"
+                                    style={{ maxWidth: '200px' }}
+                                    value={project.supervisorId?._id || ''}
+                                    onChange={(e) => handleSupervisorChange(project._id, e.target.value)}
+                                >
+                                    <option value=''>-- Not Assigned --</option>
+                                    {supervisors?.map(sv => (
+                                        <option key={sv._id} value={sv._id}>{sv.name}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -306,7 +379,7 @@ const ProjectDetail = () => {
                                 <h5 className="modal-title fw-semibold">Change supervisor</h5>
                                 <button className="btn-close" onClick={() => setShowChangeSupervisor(false)} />
                             </div>
-                            <form onSubmit={handleChangeSupervisor}>
+                            <form onSubmit={handleSupervisorChange}>
                                 <div className="modal-body p-4">
                                     <label className="form-label fw-medium text-dark small">Supervisor ID</label>
                                     <input
@@ -339,15 +412,21 @@ const ProjectDetail = () => {
                             </div>
                             <form onSubmit={handleAssignStudent}>
                                 <div className="modal-body p-4">
-                                    <label className="form-label fw-medium text-dark small">Student ID</label>
-                                    <input
-                                        type="text"
-                                        className="form-control"
-                                        placeholder="Enter student ID"
+                                    <label className="form-label fw-medium text-dark small">Students</label>
+                                    <select
+                                        className="form-select"
                                         value={studentInput}
                                         onChange={(e) => setStudentInput(e.target.value)}
                                         required
-                                    />
+                                    >
+                                        <option value=''>-- Select a student --</option>
+                                        {students
+                                            .filter(s => !project.students.some(ps => ps._id === s._id))
+                                            .map(s => (
+                                                <option key={s._id} value={s._id}>{s.name} — {s.rollNumber}</option>
+                                            ))
+                                        }
+                                    </select>
                                 </div>
                                 <div className="modal-footer border-top">
                                     <button type="button" className="btn btn-outline-secondary" onClick={() => setShowAssignStudent(false)}>Cancel</button>

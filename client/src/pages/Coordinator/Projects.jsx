@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios'
 
 /*
@@ -15,9 +16,6 @@ import axios from 'axios'
 */
 
 const Projects = () => {
-
-  // Supervisors list for the dropdown
-  const [supervisors, setSupervisors] = useState([]);
 
   // Projects list
   const [projects, setProjects] = useState([]);
@@ -35,25 +33,11 @@ const Projects = () => {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const fetchSupervisors = async () => {
-    const token = localStorage.getItem('token');
-    try {
-      const response = await axios.get(
-        "http://localhost:4000/api/users",
-        {
-          params: {
-            role: 'supervisor',
-          },
-          headers: {
-            Authorization: `Bearer ${token}`
-          },
-        }
-      );
-      setSupervisors(response.data.users);
-    } catch (error) {
-      console.error(error);
-    }
-  }
+  const navigate = useNavigate();
+
+  const openProjectDetail = (projectId) => {
+    navigate(`/coordinator/projects/${projectId}`);
+  };
 
   const fetchProjects = async () => {
     const token = localStorage.getItem('token');
@@ -131,34 +115,9 @@ const Projects = () => {
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  // Get All SUpervisors
-  useEffect(() => {
-    fetchSupervisors()
-  }, []);
-
   useEffect(() => {
     fetchProjects()
   }, []);
-
-  // Update supervisor for a project
-  const handleSupervisorChange = async (projectId, newSupervisorId) => {
-    const token = localStorage.getItem('token');
-
-    try {
-      const response = await axios.put(
-        `http://localhost:4000/api/projects/${projectId}/supervisor`,
-        { supervisorId: (newSupervisorId !== '' ? newSupervisorId : null) },
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-
-      fetchProjects()
-
-    } catch (error) {
-      console.error(error);
-    }
-  };
 
   // Get supervisor name by ID
   const getSupervisorName = (id) => {
@@ -170,7 +129,7 @@ const Projects = () => {
   // Filter students by search
   const filteredProjects = projects.filter(p =>
     p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.supervisorId.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.supervisorId?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.status.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -247,9 +206,6 @@ const Projects = () => {
           <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
             <div>
               <h5 className="fw-semibold text-dark mb-0">Projects</h5>
-              <p className="text-muted small mb-0 mt-1">
-                Use the dropdown in each row to assign or change a projects's supervisor.
-              </p>
             </div>
             <div className="d-flex gap-2 flex-wrap align-items-center">
               <input
@@ -278,9 +234,6 @@ const Projects = () => {
                   <th className="px-4 py-3 fw-semibold small text-dark">Status</th>
                   <th className="px-4 py-3 fw-semibold small text-dark">Current Supervisor</th>
                   <th className="px-4 py-3 fw-semibold small text-dark">Actions</th>
-                  {/* <th className="px-4 py-3 fw-semibold small text-dark" style={{ minWidth: '220px' }}>
-                    Assign Supervisor
-                  </th> */}
                 </tr>
               </thead>
               <tbody>
@@ -292,7 +245,7 @@ const Projects = () => {
                   </tr>
                 ) : (
                   filteredProjects?.map((project, index) => (
-                    <tr key={project._id}>
+                    <tr key={project._id} onClick={() => openProjectDetail(project._id)} style={{ cursor: 'pointer' }}>
 
                       {/* # */}
                       <td className="px-4 py-3 text-muted small">{index + 1}</td>
@@ -302,7 +255,7 @@ const Projects = () => {
                         {project.title}
                       </td>
 
-                      {/* Roll Number */}
+                      {/* Status */}
                       <td className="px-4 py-3 text-muted small">{project.status}</td>
 
                       {/* Current Supervisor */}
@@ -320,24 +273,10 @@ const Projects = () => {
 
                       <td className="px-4 py-3">
                         <div className="d-flex gap-2">
-                          <button className="btn btn-outline-primary btn-sm px-3" onClick={() => openEditModal(project._id)}>Edit</button>
-                          <button className="btn btn-outline-danger btn-sm px-3" onClick={() => openDeleteConfirm(project._id)}>Delete</button>
+                          <button className="btn btn-outline-primary btn-sm px-3" onClick={(e) => { e.stopPropagation(); openEditModal(project._id) }}>Edit</button>
+                          <button className="btn btn-outline-danger btn-sm px-3" onClick={(e) => { e.stopPropagation(); openDeleteConfirm(project._id) }}>Delete</button>
                         </div>
                       </td>
-
-                      {/* Assign Supervisor Dropdown */}
-                      {/* <td className="px-4 py-3">
-                        <select
-                          className="form-select form-select-sm"
-                          value={project.supervisorId?._id || ''}
-                          onChange={(e) => handleSupervisorChange(project._id, e.target.value)}
-                        >
-                          <option value=''>-- Not Assigned --</option>
-                          {supervisors?.map(sv => (
-                            <option key={sv._id} value={sv._id}>{sv.name}</option>
-                          ))}
-                        </select>
-                      </td> */}
 
                     </tr>
                   ))
