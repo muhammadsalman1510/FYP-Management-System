@@ -17,6 +17,12 @@ const projectSchema = new mongoose.Schema(
             ref: "User",
             default: null, // assigned later; can be unassigned at any stage
         },
+        students: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User'
+            }
+        ],
         status: {
             type: String,
             enum: {

@@ -1,7 +1,6 @@
 import bcrypt from 'bcryptjs'
 import mongoose from 'mongoose'
 import User from '../models/user.model.js'
-import Group from '../models/group.model.js'
 import Project from '../models/project.model.js'
 import SupervisorProfile from '../models/supervisor-profile.model.js'
 import StudentProfile from '../models/student-profile.model.js'
@@ -430,17 +429,11 @@ export const deleteUser = async (req, res) => {
                     { userId: existingUser._id },
                     { session }
                 )
-                // Optionally: handle or flag orphaned Projects/Groups
             }
 
             if (existingUser.role === 'student') {
                 await StudentProfile.findOneAndDelete(
                     { userId: existingUser._id },
-                    { session }
-                )
-                await Group.updateMany(
-                    { studentIds: existingUser._id },
-                    { $pull: { studentIds: existingUser._id } },
                     { session }
                 )
             }
