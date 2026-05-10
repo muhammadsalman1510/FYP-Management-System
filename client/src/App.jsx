@@ -40,6 +40,7 @@ import CoordinatorScheduleMeeting  from './pages/Coordinator/ScheduleMeeting';
 import CoordinatorMeetingRequests  from './pages/Coordinator/MeetingRequests';
 import CoordinatorAnnouncements    from './pages/Coordinator/Announcements';
 import CoordinatorProfile          from './pages/Coordinator/Profile';
+import ProjectDetail from './pages/Coordinator/ProjectDetail';
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -146,6 +147,9 @@ function App() {
       } />
       <Route path="/coordinator/profile" element={
         <CoordinatorLayout><PageTitle title="Coordinator Profile | FYP Management System" /><CoordinatorProfile /></CoordinatorLayout>
+      } />
+      <Route path="/coordinator/projects/:id" element={
+        <CoordinatorLayout><PageTitle title="Project Details | FYP Management System" /><ProjectDetail /></CoordinatorLayout>
       } />
 
     </Routes>

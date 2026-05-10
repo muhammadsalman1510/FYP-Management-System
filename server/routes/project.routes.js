@@ -6,6 +6,7 @@ import {
     getProjectById,
     assignSupervisor,
     deleteProject,
+    updateProject,
 } from '../controllers/project.controller.js'
 
 const router = express.Router()
@@ -17,6 +18,7 @@ router.post('/', createProject)                        // create project + assig
 router.get('/', getProjects)                           // list all projects
 router.get('/:id', getProjectById)                     // get one project
 router.put('/:id/supervisor', assignSupervisor)        // reassign supervisor
+router.put('/:id', updateProject)                      // update project
 router.delete('/:id', deleteProject)                   // delete project
 
 export default router

@@ -227,6 +227,49 @@ export const assignSupervisor = async (req, res) => {
 }
 
 /**
+ * PUT /api/projects/:id
+ * Coordinator only — update a project's title, description, and maxStudents.
+ *
+ * Body: { title?, description?, maxStudents? }
+ */
+export const updateProject = async (req, res) => {
+    try {
+        const { title, description, maxStudents } = req.body
+
+        const project = await Project.findById(req.params.id)
+        if (!project) {
+            return res.status(404).json({ message: 'Project not found' })
+        }
+
+        if (maxStudents !== undefined) {
+            if (maxStudents < 1) {
+                return res.status(400).json({ message: 'maxStudents must be at least 1' })
+            }
+            if (maxStudents < project.students.length) {
+                return res.status(400).json({
+                    message: `maxStudents cannot be less than current student count (${project.students.length})`
+                })
+            }
+        }
+
+        if (title) project.title = title.trim()
+        if (description !== undefined) project.description = description
+        if (maxStudents !== undefined) project.maxStudents = maxStudents
+
+        await project.save()
+
+        return res.status(200).json({
+            message: 'Project updated successfully',
+            project,
+        })
+
+    } catch (err) {
+        console.error('updateProject error:', err)
+        return res.status(500).json({ message: 'Internal server error' })
+    }
+}
+
+/**
  * DELETE /api/projects/:id
  * Coordinator only — delete a project and release supervisor's slot.
  */

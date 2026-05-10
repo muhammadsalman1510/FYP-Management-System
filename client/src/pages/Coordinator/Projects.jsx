@@ -30,7 +30,10 @@ const Projects = () => {
   const [modalMode, setModalMode] = useState('create');
   const [showModal, setShowModal] = useState(false);
 
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [projectToDeleteId, setProjectToDeleteId] = useState(null);
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const fetchSupervisors = async () => {
     const token = localStorage.getItem('token');
@@ -95,28 +98,24 @@ const Projects = () => {
 
     } else {
       try {
-        const body = {
-          name: form.name,
-          email: form.email,
-          department: form.department,
-          designation: form.designation,
-          maxProjects: Number(form.maxProjects),
-        };
 
-        if (form.password) {
-          body.password = form.password;
+        const body = {
+          title: form.title,
+          description: form.description,
+          maxStudents: form.maxStudents
         }
 
         const response = await axios.put(
-          `http://localhost:4000/api/users/${selectedSupervisorId}`,
+          `http://localhost:4000/api/projects/${selectedProjectId}`,
           body,
           {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
           }
         );
 
-        fetchSupervisors();
-
+        fetchProjects();
       } catch (error) {
         console.error(error);
       }
@@ -164,7 +163,6 @@ const Projects = () => {
   // Get supervisor name by ID
   const getSupervisorName = (id) => {
     if (!id) return null;
-    console.log('getSupervisorName', id)
     const s = supervisors?.find(s => s._id === id);
     return s ? s.name : null;
   };
@@ -184,6 +182,51 @@ const Projects = () => {
     setForm(emptyForm);
     setModalMode('create');
     setShowModal(true);
+  };
+
+  const openEditModal = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      const { data } = await axios.get(`http://localhost:4000/api/projects/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setForm({ ...data.project });
+      setSelectedProjectId(id);
+      setModalMode('edit');
+      setShowModal(true);
+
+    } catch (err) {
+      console.error('Fetch project error:', err);
+      const message = err.response?.data?.message || 'Failed to load project data.';
+      alert(message);
+    }
+  };
+
+  // Just opens the modal
+  const openDeleteConfirm = (id) => {
+    setProjectToDeleteId(id);
+    setShowDeleteConfirm(true);
+  };
+
+  // Actually deletes
+  const handleDelete = async () => {
+    try {
+      const token = localStorage.getItem('token');
+
+      await axios.delete(`http://localhost:4000/api/projects/${projectToDeleteId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      await fetchProjects();
+      setShowDeleteConfirm(false);
+      setProjectToDeleteId(null);
+
+    } catch (err) {
+      console.error('Delete project error:', err);
+      const message = err.response?.data?.message || 'Something went wrong. Please try again.';
+      alert(message);
+    }
   };
 
   return (
@@ -234,9 +277,10 @@ const Projects = () => {
                   <th className="px-4 py-3 fw-semibold small text-dark">Project Title</th>
                   <th className="px-4 py-3 fw-semibold small text-dark">Status</th>
                   <th className="px-4 py-3 fw-semibold small text-dark">Current Supervisor</th>
-                  <th className="px-4 py-3 fw-semibold small text-dark" style={{ minWidth: '220px' }}>
+                  <th className="px-4 py-3 fw-semibold small text-dark">Actions</th>
+                  {/* <th className="px-4 py-3 fw-semibold small text-dark" style={{ minWidth: '220px' }}>
                     Assign Supervisor
-                  </th>
+                  </th> */}
                 </tr>
               </thead>
               <tbody>
@@ -274,8 +318,15 @@ const Projects = () => {
                         )}
                       </td>
 
-                      {/* Assign Supervisor Dropdown */}
                       <td className="px-4 py-3">
+                        <div className="d-flex gap-2">
+                          <button className="btn btn-outline-primary btn-sm px-3" onClick={() => openEditModal(project._id)}>Edit</button>
+                          <button className="btn btn-outline-danger btn-sm px-3" onClick={() => openDeleteConfirm(project._id)}>Delete</button>
+                        </div>
+                      </td>
+
+                      {/* Assign Supervisor Dropdown */}
+                      {/* <td className="px-4 py-3">
                         <select
                           className="form-select form-select-sm"
                           value={project.supervisorId?._id || ''}
@@ -286,7 +337,7 @@ const Projects = () => {
                             <option key={sv._id} value={sv._id}>{sv.name}</option>
                           ))}
                         </select>
-                      </td>
+                      </td> */}
 
                     </tr>
                   ))
@@ -340,6 +391,34 @@ const Projects = () => {
                   <button type="submit" form="projectForm" className="btn btn-success px-4 fw-medium">
                     {modalMode === 'create' ? 'Create Project' : 'Save Changes'}
                   </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}>
+            <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '420px' }}>
+              <div className="modal-content border-0 shadow">
+                <div className="modal-body px-4 py-4 text-center">
+                  <div
+                    className="d-flex align-items-center justify-content-center rounded-circle mx-auto mb-3"
+                    style={{ width: '56px', height: '56px', backgroundColor: '#dc354520' }}
+                  >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="#dc3545">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                    </svg>
+                  </div>
+                  <h6 className="fw-semibold text-dark mb-2">Delete Project</h6>
+                  <p className="text-muted small mb-0">
+                    This will permanently delete the project. This cannot be undone!
+                  </p>
+                </div>
+                <div className="modal-footer border-top px-4 py-3 justify-content-center gap-3">
+                  <button className="btn btn-outline-secondary px-4" onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
+                  <button className="btn btn-danger px-4 fw-medium" onClick={handleDelete}>Yes, Delete</button>
                 </div>
               </div>
             </div>
