@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { Route, Routes, useLocation, Navigate } from 'react-router-dom';
 
 import Loader from './common/Loader';
 import PageTitle from './components/PageTitle';
@@ -7,6 +7,7 @@ import PageTitle from './components/PageTitle';
 // Layouts 
 import DefaultLayout from './layout/DefaultLayout';
 import CoordinatorLayout from './layout/CoordinatorLayout';
+import SupervisorLayout from './layout/SupervisorLayout';
 
 // Auth Pages 
 import SignIn from './pages/Authentication/SignIn';
@@ -27,20 +28,34 @@ import Documents from './pages/Project/Documents';
 import Status from './pages/Project/Status';
 import StudentMeetingRequests from './pages/MeetingRequests';
 import Tasks from './pages/Tasks/Tasks';
+import Announcements from './pages/Announcements';
+import SupervisorView from './pages/SupervisorView';
+import CoordinatorView from './pages/CoordinatorView';
 
 // Coordinator Pages 
-import CoordinatorDashboard        from './pages/Coordinator/Dashboard';
-import CoordinatorStudents         from './pages/Coordinator/Students';
-import CoordinatorSupervisors      from './pages/Coordinator/Supervisors';
-import Projects                    from './pages/Coordinator/Projects';
-import CoordinatorProposals        from './pages/Coordinator/Proposals';
-import CoordinatorTasks            from './pages/Coordinator/Tasks';
-import CoordinatorMeetingCalendar  from './pages/Coordinator/MeetingCalendar';
-import CoordinatorScheduleMeeting  from './pages/Coordinator/ScheduleMeeting';
-import CoordinatorMeetingRequests  from './pages/Coordinator/MeetingRequests';
-import CoordinatorAnnouncements    from './pages/Coordinator/Announcements';
-import CoordinatorProfile          from './pages/Coordinator/Profile';
+import CoordinatorDashboard from './pages/Coordinator/Dashboard';
+import CoordinatorStudents from './pages/Coordinator/Students';
+import CoordinatorSupervisors from './pages/Coordinator/Supervisors';
+import Projects from './pages/Coordinator/Projects';
+import CoordinatorProposals from './pages/Coordinator/Proposals';
+import CoordinatorTasks from './pages/Coordinator/Tasks';
+import CoordinatorMeetingCalendar from './pages/Coordinator/MeetingCalendar';
+import CoordinatorScheduleMeeting from './pages/Coordinator/ScheduleMeeting';
+import CoordinatorMeetingRequests from './pages/Coordinator/MeetingRequests';
+import CoordinatorAnnouncements from './pages/Coordinator/Announcements';
+import CoordinatorProfile from './pages/Coordinator/Profile';
 import ProjectDetail from './pages/Coordinator/ProjectDetail';
+
+// Supervisor Pages
+import SupervisorDashboard from './pages/Supervisor/Dashboard';
+import SupervisorStudents from './pages/Supervisor/Students';
+import SupervisorStudentDetail from './pages/Supervisor/StudentDetail';
+import SupervisorProposals from './pages/Supervisor/Proposals';
+import SupervisorTasks from './pages/Supervisor/Tasks';
+import SupervisorMeetingCalendar from './pages/Supervisor/MeetingCalendar';
+import SupervisorMeetingRequests from './pages/Supervisor/MeetingRequests';
+import SupervisorAnnouncements from './pages/Supervisor/Announcements';
+import SupervisorProfile from './pages/Supervisor/Profile';
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -56,7 +71,7 @@ function App() {
           AUTH ROUTES — No layout
         */}
       <Route index element={<><PageTitle title="Sign In | FYP Management System" /><SignIn /></>} />
-      <Route path="/login"  element={<><PageTitle title="Sign In | FYP Management System" /><SignIn /></>} />
+      <Route path="/login" element={<><PageTitle title="Sign In | FYP Management System" /><SignIn /></>} />
 
 
       {/*
@@ -82,6 +97,15 @@ function App() {
       } />
       <Route path="/meetings/requests" element={
         <DefaultLayout><PageTitle title="Meeting Requests | FYP Management System" /><StudentMeetingRequests /></DefaultLayout>
+      } />
+      <Route path="/announcements" element={
+        <DefaultLayout><PageTitle title="Announcements | FYP Management System" /><Announcements /></DefaultLayout>
+      } />
+      <Route path="/supervisor/view" element={
+        <DefaultLayout><PageTitle title="My Supervisor | FYP Management System" /><SupervisorView /></DefaultLayout>
+      } />
+      <Route path="/coordinator/view" element={
+        <DefaultLayout><PageTitle title="Coordinator | FYP Management System" /><CoordinatorView /></DefaultLayout>
       } />
       <Route path="/calendar" element={
         <DefaultLayout><PageTitle title="Calendar | FYP Management System" /><Calendar /></DefaultLayout>
@@ -151,6 +175,40 @@ function App() {
       <Route path="/coordinator/projects/:id" element={
         <CoordinatorLayout><PageTitle title="Project Details | FYP Management System" /><ProjectDetail /></CoordinatorLayout>
       } />
+
+
+      {/*
+          SUPERVISOR ROUTES — SupervisorLayout
+         */}
+      <Route path="/supervisor/dashboard" element={
+        <SupervisorLayout><PageTitle title="Supervisor Dashboard | FYP Management System" /><SupervisorDashboard /></SupervisorLayout>
+      } />
+      <Route path="/supervisor/students" element={
+        <SupervisorLayout><PageTitle title="My Students | FYP Management System" /><SupervisorStudents /></SupervisorLayout>
+      } />
+      <Route path="/supervisor/students/:id" element={
+        <SupervisorLayout><PageTitle title="Student Detail | FYP Management System" /><SupervisorStudentDetail /></SupervisorLayout>
+      } />
+      <Route path="/supervisor/proposals" element={
+        <SupervisorLayout><PageTitle title="Proposals | FYP Management System" /><SupervisorProposals /></SupervisorLayout>
+      } />
+      <Route path="/supervisor/tasks" element={
+        <SupervisorLayout><PageTitle title="Tasks | FYP Management System" /><SupervisorTasks /></SupervisorLayout>
+      } />
+      <Route path="/supervisor/meetings/calendar" element={
+        <SupervisorLayout><PageTitle title="Meeting Calendar | FYP Management System" /><SupervisorMeetingCalendar /></SupervisorLayout>
+      } />
+      <Route path="/supervisor/meetings/requests" element={
+        <SupervisorLayout><PageTitle title="Meeting Requests | FYP Management System" /><SupervisorMeetingRequests /></SupervisorLayout>
+      } />
+      <Route path="/supervisor/announcements" element={
+        <SupervisorLayout><PageTitle title="Announcements | FYP Management System" /><SupervisorAnnouncements /></SupervisorLayout>
+      } />
+      <Route path="/supervisor/profile" element={
+        <SupervisorLayout><PageTitle title="Supervisor Profile | FYP Management System" /><SupervisorProfile /></SupervisorLayout>
+      } />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
 
     </Routes>
   );
