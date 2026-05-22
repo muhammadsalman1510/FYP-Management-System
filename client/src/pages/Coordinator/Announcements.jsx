@@ -1,8 +1,6 @@
-// 📁 FILE: src/pages/Coordinator/Announcements.jsx
-// PASTE THIS ENTIRE CODE into your empty Announcements.jsx file
-
 import React, { useState } from 'react';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
+import axios from "axios"
 
 /*
   COORDINATOR — ANNOUNCEMENTS
@@ -16,46 +14,38 @@ import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 
 const CoordinatorAnnouncements = () => {
 
-  const [announcements, setAnnouncements] = useState([
-    {
-      id: 1,
-      title: 'FYP Defense Schedule Released',
-      content: 'The final FYP defense schedule has been released. All students are required to check their assigned date and time. Dress code is formal.',
-      postedDate: '2024-04-25',
-      postedTime: '10:30 AM',
-    },
-    {
-      id: 2,
-      title: 'Submission Deadline Reminder',
-      content: 'All project documentation must be submitted by May 15, 2024. Late submissions will not be accepted without prior approval from the coordinator.',
-      postedDate: '2024-04-22',
-      postedTime: '02:15 PM',
-    },
-    {
-      id: 3,
-      title: 'Supervisor Meeting Week',
-      content: 'All students must have at least one supervisor meeting this week and get it logged in the system. Supervisors please update meeting statuses by Friday.',
-      postedDate: '2024-04-18',
-      postedTime: '09:00 AM',
-    },
-  ]);
-
+  const [announcements, setAnnouncements] = useState([]);
   const [showForm, setShowForm]       = useState(false);
   const [form, setForm]               = useState({ title: '', content: '' });
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
-  const handleCreate = (e) => {
+  const handleCreate = async(e) => {
     e.preventDefault();
     // TODO (Backend): POST /api/coordinator/announcements
-    const now = new Date();
-    const newAnnouncement = {
-      id: Date.now(),
+
+    const token = localStorage.getItem('token');
+
+    const response =await axios.post("http://localhost:4000/api/announcements/post-announcement",{
       title: form.title,
-      content: form.content,
-      postedDate: now.toISOString().split('T')[0],
-      postedTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-    };
-    setAnnouncements(prev => [newAnnouncement, ...prev]);
+      content: form.content
+    },
+    {
+     headers: { Authorization: `Bearer ${token}` } 
+    }
+  );
+
+
+    // const now = new Date();
+    // const newAnnouncement = {
+    //   id: Date.now(),
+    //   title: form.title,
+    //   content: form.content,
+    //   postedDate: now.toISOString().split('T')[0],
+    //   postedTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+    // };
+
+    console.log(response.data.data);
+    setAnnouncements(prev => [response.data.data, ...prev]);
     setForm({ title: '', content: '' });
     setShowForm(false);
   };
@@ -150,7 +140,7 @@ const CoordinatorAnnouncements = () => {
       ) : (
         <div className="d-flex flex-column gap-3">
           {announcements.map(ann => (
-            <div key={ann.id} className="card shadow-sm border-0">
+            <div key={ann._id} className="card shadow-sm border-0">
               <div className="card-body p-4">
                 <div className="d-flex justify-content-between align-items-start gap-3">
 
@@ -159,7 +149,7 @@ const CoordinatorAnnouncements = () => {
                     <h6 className="fw-semibold text-dark mb-1">{ann.title}</h6>
 
                     {/* Date + visible to badge */}
-                    <p className="text-muted small mb-2">
+                    {/* <p className="text-muted small mb-2">
                       Posted on {ann.postedDate} at {ann.postedTime}
                       &nbsp;&bull;&nbsp;
                       <span
@@ -168,7 +158,7 @@ const CoordinatorAnnouncements = () => {
                       >
                         All Users
                       </span>
-                    </p>
+                    </p> */}
 
                     {/* Content */}
                     <p className="text-dark small mb-0" style={{ lineHeight: '1.6' }}>

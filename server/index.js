@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Router } from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -6,6 +6,8 @@ import connectDB from './config/db.js';
 import authRoutes from './routes/auth.routes.js'
 import userRoutes from './routes/user.routes.js'
 import projectRoutes from './routes/project.routes.js'
+import { postAnnouncement } from './controllers/announcements.controller.js';
+import announcementsRoutes from './routes/announcements.routes.js';
 
 
 // Load environment variables
@@ -29,6 +31,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/projects', projectRoutes)
+app.use('/api/announcements',announcementsRoutes);
 
 // Port config (add fallback to avoid undefined)
 const PORT = process.env.PORT || 5000;

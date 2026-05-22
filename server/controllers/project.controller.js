@@ -2,7 +2,6 @@ import Project from '../models/project.model.js'
 import User from '../models/user.model.js'
 import SupervisorProfile from '../models/supervisor-profile.model.js'
 
-// ─── helpers ────────────────────────────────────────────────────────────────
 
 /**
  * Verify that a userId exists and has role 'supervisor'.
