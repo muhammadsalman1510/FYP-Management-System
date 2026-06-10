@@ -4,15 +4,15 @@ import { Route, Routes, useLocation, Navigate } from 'react-router-dom';
 import Loader from './common/Loader';
 import PageTitle from './components/PageTitle';
 
-// Layouts 
+// Layouts
 import DefaultLayout from './layout/DefaultLayout';
 import CoordinatorLayout from './layout/CoordinatorLayout';
 import SupervisorLayout from './layout/SupervisorLayout';
 
-// Auth Pages 
+// Auth Pages
 import SignIn from './pages/Authentication/SignIn';
 
-//  Student Pages
+// Student Pages
 import Dashboard from './pages/Dashboard/Dashboard';
 import Calendar from './pages/Calendar';
 import Profile from './pages/Profile';
@@ -32,7 +32,7 @@ import Announcements from './pages/Announcements';
 import SupervisorView from './pages/SupervisorView';
 import CoordinatorView from './pages/CoordinatorView';
 
-// Coordinator Pages 
+// Coordinator Pages
 import CoordinatorDashboard from './pages/Coordinator/Dashboard';
 import CoordinatorStudents from './pages/Coordinator/Students';
 import CoordinatorSupervisors from './pages/Coordinator/Supervisors';
@@ -48,8 +48,8 @@ import ProjectDetail from './pages/Coordinator/ProjectDetail';
 
 // Supervisor Pages
 import SupervisorDashboard from './pages/Supervisor/Dashboard';
-import SupervisorStudents from './pages/Supervisor/Students';
-import SupervisorStudentDetail from './pages/Supervisor/StudentDetail';
+import SupervisorProjects from './pages/Supervisor/Projects';           // NEW
+import SupervisorProjectDetail from './pages/Supervisor/ProjectDetail'; // NEW
 import SupervisorProposals from './pages/Supervisor/Proposals';
 import SupervisorTasks from './pages/Supervisor/Tasks';
 import SupervisorMeetingCalendar from './pages/Supervisor/MeetingCalendar';
@@ -67,16 +67,12 @@ function App() {
   return loading ? <Loader /> : (
     <Routes>
 
-      {/*
-          AUTH ROUTES — No layout
-        */}
+      {/* AUTH ROUTES — No layout */}
       <Route index element={<><PageTitle title="Sign In | FYP Management System" /><SignIn /></>} />
       <Route path="/login" element={<><PageTitle title="Sign In | FYP Management System" /><SignIn /></>} />
 
 
-      {/*
-          STUDENT ROUTES — DefaultLayout
-         */}
+      {/* STUDENT ROUTES — DefaultLayout */}
       <Route path="/dashboard" element={
         <DefaultLayout><PageTitle title="Dashboard | FYP Management System" /><Dashboard /></DefaultLayout>
       } />
@@ -86,8 +82,9 @@ function App() {
       <Route path="/project/documents" element={
         <DefaultLayout><PageTitle title="Project Documents | FYP Management System" /><Documents /></DefaultLayout>
       } />
+      {/* CHANGED: page title updated from "Project Status" to "Project" */}
       <Route path="/project/status" element={
-        <DefaultLayout><PageTitle title="Project Status | FYP Management System" /><Status /></DefaultLayout>
+        <DefaultLayout><PageTitle title="Project | FYP Management System" /><Status /></DefaultLayout>
       } />
       <Route path="/tasks" element={
         <DefaultLayout><PageTitle title="Tasks | FYP Management System" /><Tasks /></DefaultLayout>
@@ -136,9 +133,7 @@ function App() {
       } />
 
 
-      {/*
-          COORDINATOR ROUTES — CoordinatorLayout
-         */}
+      {/* COORDINATOR ROUTES — CoordinatorLayout */}
       <Route path="/coordinator/dashboard" element={
         <CoordinatorLayout><PageTitle title="Coordinator Dashboard | FYP Management System" /><CoordinatorDashboard /></CoordinatorLayout>
       } />
@@ -177,17 +172,17 @@ function App() {
       } />
 
 
-      {/*
-          SUPERVISOR ROUTES — SupervisorLayout
-         */}
+      {/* SUPERVISOR ROUTES — SupervisorLayout */}
       <Route path="/supervisor/dashboard" element={
         <SupervisorLayout><PageTitle title="Supervisor Dashboard | FYP Management System" /><SupervisorDashboard /></SupervisorLayout>
       } />
-      <Route path="/supervisor/students" element={
-        <SupervisorLayout><PageTitle title="My Students | FYP Management System" /><SupervisorStudents /></SupervisorLayout>
+      {/* NEW: Supervisor Projects list */}
+      <Route path="/supervisor/projects" element={
+        <SupervisorLayout><PageTitle title="My Projects | FYP Management System" /><SupervisorProjects /></SupervisorLayout>
       } />
-      <Route path="/supervisor/students/:id" element={
-        <SupervisorLayout><PageTitle title="Student Detail | FYP Management System" /><SupervisorStudentDetail /></SupervisorLayout>
+      {/* NEW: Supervisor Project detail */}
+      <Route path="/supervisor/projects/:id" element={
+        <SupervisorLayout><PageTitle title="Project Details | FYP Management System" /><SupervisorProjectDetail /></SupervisorLayout>
       } />
       <Route path="/supervisor/proposals" element={
         <SupervisorLayout><PageTitle title="Proposals | FYP Management System" /><SupervisorProposals /></SupervisorLayout>

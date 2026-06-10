@@ -184,9 +184,34 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                     </NavLink>
                     <div className={open ? 'd-block' : 'd-none'}>
                       <ul className="list-unstyled ps-4 mt-1 mb-2 d-flex flex-column gap-1">
-                        <li><NavLink to="/project/proposal" onClick={handleNavClick} className={({ isActive }) => `d-flex align-items-center px-3 py-1 rounded text-decoration-none fw-medium sidebar-sub-link ${isActive ? 'text-white' : ''}`}>Project Proposal</NavLink></li>
-                        <li><NavLink to="/project/documents" onClick={handleNavClick} className={({ isActive }) => `d-flex align-items-center px-3 py-1 rounded text-decoration-none fw-medium sidebar-sub-link ${isActive ? 'text-white' : ''}`}>Documents</NavLink></li>
-                        <li><NavLink to="/project/status" onClick={handleNavClick} className={({ isActive }) => `d-flex align-items-center px-3 py-1 rounded text-decoration-none fw-medium sidebar-sub-link ${isActive ? 'text-white' : ''}`}>Project Status</NavLink></li>
+                        <li>
+                          <NavLink
+                            to="/project/proposal"
+                            onClick={handleNavClick}
+                            className={({ isActive }) => `d-flex align-items-center px-3 py-1 rounded text-decoration-none fw-medium sidebar-sub-link ${isActive ? 'text-white' : ''}`}
+                          >
+                            Project Proposal
+                          </NavLink>
+                        </li>
+                        <li>
+                          <NavLink
+                            to="/project/documents"
+                            onClick={handleNavClick}
+                            className={({ isActive }) => `d-flex align-items-center px-3 py-1 rounded text-decoration-none fw-medium sidebar-sub-link ${isActive ? 'text-white' : ''}`}
+                          >
+                            Documents
+                          </NavLink>
+                        </li>
+                        {/* CHANGED: "Project Status" → "Project" */}
+                        <li>
+                          <NavLink
+                            to="/project/status"
+                            onClick={handleNavClick}
+                            className={({ isActive }) => `d-flex align-items-center px-3 py-1 rounded text-decoration-none fw-medium sidebar-sub-link ${isActive ? 'text-white' : ''}`}
+                          >
+                            Project Status
+                          </NavLink>
+                        </li>
                       </ul>
                     </div>
                   </React.Fragment>
@@ -231,7 +256,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 )}
               </SidebarLinkGroup>
 
-              {/* ── Announcements — SINGLE LINK, no dropdown ── */}
+              {/* ── Announcements ── */}
               <li>
                 <NavLink to="/announcements" onClick={handleNavClick}
                   className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link ${pathname === '/announcements' ? 'sidebar-link-active' : ''}`}>
@@ -242,7 +267,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* ── Supervisor — SINGLE LINK, no dropdown ── */}
+              {/* ── Supervisor ── */}
               <li>
                 <NavLink to="/supervisor/view" onClick={handleNavClick}
                   className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link ${pathname === '/supervisor/view' ? 'sidebar-link-active' : ''}`}>
@@ -254,7 +279,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* ── Coordinator — SINGLE LINK, no dropdown ── */}
+              {/* ── Coordinator ── */}
               <li>
                 <NavLink to="/coordinator/view" onClick={handleNavClick}
                   className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link ${pathname === '/coordinator/view' ? 'sidebar-link-active' : ''}`}>

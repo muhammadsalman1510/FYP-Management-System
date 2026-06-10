@@ -1,465 +1,516 @@
-// 📁 FILE: src/pages/Coordinator/ProjectDetail.jsx
-
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 
 /*
   COORDINATOR — PROJECT DETAIL
-  View and manage a single project: supervisor, assigned students, capacity.
-  TODO (Backend): GET  /api/projects/:id
-  TODO (Backend): PUT  /api/projects/:id/supervisor
-  TODO (Backend): POST /api/projects/:id/students
+  View and manage a single project:
+  - Assign/change supervisor
+  - Add/remove students
+  - Mark milestones as complete (buttons 2-5, milestone 1 auto-done on proposal approval)
+
+  MILESTONE LOGIC:
+  - Milestone 1 (Proposal):     AUTO-completed when coordinator approved the proposal
+  - Milestone 2 (Defense):      Coordinator clicks "Mark Complete" after physical defense
+  - Milestone 3 (Implementation): Coordinator clicks "Mark Complete"
+  - Milestone 4 (Documentation): Coordinator clicks "Mark Complete"
+  - Milestone 5 (Final):        Coordinator clicks "Mark Complete"
+
+  TODO (Backend): GET    /api/projects/:id
+  TODO (Backend): PUT    /api/projects/:id/supervisor
+  TODO (Backend): POST   /api/projects/:id/students
   TODO (Backend): DELETE /api/projects/:id/students/:studentId
+  TODO (Backend): PUT    /api/projects/:id/milestones/:milestoneId  { completed: true }
 */
 
 const ProjectDetail = () => {
-    const { id } = useParams();
-    const token = localStorage.getItem('token');
+  const { id }       = useParams();
+  const navigate     = useNavigate();
+  const token        = localStorage.getItem('token');
+  const authHeaders  = { headers: { Authorization: `Bearer ${token}` } };
 
-    const [project, setProject] = useState(null);
-    const [supervisors, setSupervisors] = useState([]);
-    const [students, setStudents] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [alert, setAlert] = useState({ show: false, message: '', type: 'success' });
+  const [project,     setProject]     = useState(null);
+  const [supervisors, setSupervisors] = useState([]);
+  const [students,    setStudents]    = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [alert,       setAlert]       = useState({ show: false, message: '', type: 'success' });
 
-    // ── Modals ──────────────────────────────────────────────
-    const [showChangeSupervisor, setShowChangeSupervisor] = useState(false);
-    const [showAssignStudent, setShowAssignStudent] = useState(false);
-    const [supervisorInput, setSupervisorInput] = useState('');
-    const [studentInput, setStudentInput] = useState('');
+  // Modals
+  const [showChangeSupervisor, setShowChangeSupervisor] = useState(false);
+  const [showAssignStudent,    setShowAssignStudent]    = useState(false);
+  const [supervisorInput,      setSupervisorInput]      = useState('');
+  const [studentInput,         setStudentInput]         = useState('');
 
-    // ── Confirm remove ───────────────────────────────────────
-    const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
-    const [removingStudentId, setRemovingStudentId] = useState(null);
+  // Remove confirm
+  const [showRemoveConfirm,  setShowRemoveConfirm]  = useState(false);
+  const [removingStudentId,  setRemovingStudentId]  = useState(null);
 
-    const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
+  // Milestone confirm
+  const [milestoneConfirm,   setMilestoneConfirm]   = useState(null); // milestone object
 
-    const showAlert = (message, type = 'success') => {
-        setAlert({ show: true, message, type });
-        setTimeout(() => setAlert({ show: false, message: '', type: 'success' }), 3000);
-    };
+  // Local milestones state (synced with project)
+  const [milestones, setMilestones] = useState([
+    { id: 1, name: 'Project Proposal',    completed: false, autoCompleted: true,  description: 'Auto-completed when proposal was approved.' },
+    { id: 2, name: 'Project Defense',     completed: false, autoCompleted: false, description: 'Mark after physical defense is completed.' },
+    { id: 3, name: 'Implementation',      completed: false, autoCompleted: false, description: 'Mark after implementation phase is done.' },
+    { id: 4, name: 'Documentation',       completed: false, autoCompleted: false, description: 'Mark after documentation is submitted.' },
+    { id: 5, name: 'Final Presentation',  completed: false, autoCompleted: false, description: 'Mark after final presentation.' },
+  ]);
 
-    // ── Fetch project ────────────────────────────────────────
-    const fetchProject = async () => {
-        const token = localStorage.getItem('token');
-        try {
-            const { data } = await axios.get(`http://localhost:4000/api/projects/${id}`, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                },
-            }
-            );
-            console.log(data.project);
-            setProject(data.project);
-        } catch (err) {
-            console.error('Fetch project error:', err);
-            showAlert(err.response?.data?.message || 'Failed to load project.', 'danger');
-        } finally {
-            setLoading(false);
-        }
-    };
+  const showAlertMsg = (message, type = 'success') => {
+    setAlert({ show: true, message, type });
+    setTimeout(() => setAlert({ show: false, message: '', type: 'success' }), 3000);
+  };
 
-    useEffect(() => {
-        fetchProject();
-    }, [id]);
-
-    // Get All SUpervisors
-    useEffect(() => {
-        fetchSupervisors()
-    }, []);
-
-    // Get All Students
-    useEffect(() => {
-        fetchStudents()
-    }, []);
-
-    const fetchSupervisors = async () => {
-        const token = localStorage.getItem('token');
-        try {
-            const response = await axios.get(
-                "http://localhost:4000/api/users",
-                {
-                    params: {
-                        role: 'supervisor',
-                    },
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    },
-                }
-            );
-            console.log(response.data.users);
-            setSupervisors(response.data.users);
-        } catch (error) {
-            console.error(error);
-        }
+  // Fetch project
+  const fetchProject = async () => {
+    try {
+      const { data } = await axios.get(`http://localhost:4000/api/projects/${id}`, authHeaders);
+      setProject(data.project);
+      // Sync milestones from project data if available
+      // TODO (Backend): data.project.milestones should return milestone completion state
+      if (data.project.milestones) {
+        setMilestones(data.project.milestones);
+      }
+    } catch (err) {
+      showAlertMsg(err.response?.data?.message || 'Failed to load project.', 'danger');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const fetchStudents = async () => {
-        const token = localStorage.getItem('token');
-        try {
-            const response = await axios.get(
-                "http://localhost:4000/api/users",
-                {
-                    params: {
-                        role: 'student',
-                    },
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    },
-                }
-            );
-            console.log(response.data.users);
-            setStudents(response.data.users);
-        } catch (error) {
-            console.error(error);
-        }
+  const fetchSupervisors = async () => {
+    try {
+      const { data } = await axios.get('http://localhost:4000/api/users?role=supervisor', authHeaders);
+      setSupervisors(data.users || []);
+    } catch (err) { console.error(err); }
+  };
+
+  const fetchStudents = async () => {
+    try {
+      const { data } = await axios.get('http://localhost:4000/api/users?role=student', authHeaders);
+      setStudents(data.users || []);
+    } catch (err) { console.error(err); }
+  };
+
+  useEffect(() => { fetchProject(); fetchSupervisors(); fetchStudents(); }, [id]);
+
+  // Assign supervisor
+  const handleAssignSupervisor = async () => {
+    if (!supervisorInput) { showAlertMsg('Please select a supervisor.', 'warning'); return; }
+    try {
+      await axios.put(`http://localhost:4000/api/projects/${id}/supervisor`,
+        { supervisorId: supervisorInput }, authHeaders);
+      showAlertMsg('Supervisor assigned successfully!');
+      fetchProject();
+      setShowChangeSupervisor(false);
+    } catch (err) {
+      showAlertMsg(err.response?.data?.message || 'Failed to assign supervisor.', 'danger');
     }
+  };
 
-    // ── Change supervisor ────────────────────────────────────
-    // Update supervisor for a project
-    const handleSupervisorChange = async (projectId, newSupervisorId) => {
-        const token = localStorage.getItem('token');
-
-        try {
-            const response = await axios.put(
-                `http://localhost:4000/api/projects/${projectId}/supervisor`,
-                { supervisorId: (newSupervisorId !== '' ? newSupervisorId : null) },
-                {
-                    headers: { Authorization: `Bearer ${token}` }
-                }
-            );
-
-            fetchProject()
-
-        } catch (error) {
-            console.error(error);
-        }
-    };
-
-    // ── Assign student ───────────────────────────────────────
-    const handleAssignStudent = async (e) => {
-        e.preventDefault();
-        try {
-            const token = localStorage.getItem('token');
-
-            const { data } = await axios.put(
-                `http://localhost:4000/api/projects/${project._id}/students`,
-                { studentId: studentInput },
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            showAlert(data.message);
-            setShowAssignStudent(false);
-            setStudentInput('');
-            await fetchProject();
-
-        } catch (err) {
-            console.error('Assign student error:', err);
-            showAlert(err.response?.data?.message || 'Failed to assign student.', 'danger');
-        }
-    };
-
-    // ── Remove student ───────────────────────────────────────
-    const handleRemoveStudent = async () => {
-        try {
-            await axios.delete(
-                `http://localhost:4000/api/projects/${id}/students/${removingStudentId}`,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-            showAlert('Student removed successfully.');
-            setShowRemoveConfirm(false);
-            setRemovingStudentId(null);
-            await fetchProject();
-            await fetchStudents();
-
-        } catch (err) {
-            showAlert(err.response?.data?.message || 'Failed to remove student.', 'danger');
-        }
-    };
-
-    const openRemoveConfirm = (studentId) => {
-        setRemovingStudentId(studentId);
-        setShowRemoveConfirm(true);
-    };
-
-    const getInitials = (name = '') =>
-        name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
-
-    const capacityPercent = project
-        ? Math.round((project.students.length / project.maxStudents) * 100)
-        : 0;
-
-    const capacityColor =
-        capacityPercent >= 100 ? '#dc3545' : capacityPercent >= 70 ? '#ffc107' : '#3c50e0';
-
-    // ── Render ───────────────────────────────────────────────
-    if (loading) {
-        return (
-            <>
-                <Breadcrumb pageName="Project Detail" />
-                <div className="d-flex justify-content-center py-5">
-                    <div className="spinner-border text-primary" role="status" />
-                </div>
-            </>
-        );
+  // Add student
+  const handleAddStudent = async () => {
+    if (!studentInput) { showAlertMsg('Please select a student.', 'warning'); return; }
+    try {
+      await axios.post(`http://localhost:4000/api/projects/${id}/students`,
+        { studentId: studentInput }, authHeaders);
+      showAlertMsg('Student added successfully!');
+      fetchProject();
+      setShowAssignStudent(false);
+    } catch (err) {
+      showAlertMsg(err.response?.data?.message || 'Failed to add student.', 'danger');
     }
+  };
 
-    if (!project) {
-        return (
-            <>
-                <Breadcrumb pageName="Project Detail" />
-                <div className="alert alert-danger border-0">Project not found.</div>
-            </>
-        );
+  // Remove student
+  const handleRemoveStudent = async () => {
+    try {
+      await axios.delete(`http://localhost:4000/api/projects/${id}/students/${removingStudentId}`, authHeaders);
+      showAlertMsg('Student removed.');
+      fetchProject();
+      setShowRemoveConfirm(false);
+    } catch (err) {
+      showAlertMsg(err.response?.data?.message || 'Failed to remove student.', 'danger');
     }
+  };
 
-    return (
-        <>
-            <Breadcrumb pageName="Project Detail" />
+  // Mark milestone complete
+  const handleMarkMilestone = async () => {
+    if (!milestoneConfirm) return;
+    try {
+      // TODO (Backend): PUT /api/projects/:id/milestones/:milestoneId { completed: true }
+      await axios.put(
+        `http://localhost:4000/api/projects/${id}/milestones/${milestoneConfirm.id}`,
+        { completed: true },
+        authHeaders
+      );
+      // Update local state immediately
+      setMilestones(prev =>
+        prev.map(m => m.id === milestoneConfirm.id
+          ? { ...m, completed: true, completedAt: new Date().toISOString().split('T')[0] }
+          : m
+        )
+      );
+      showAlertMsg(`"${milestoneConfirm.name}" marked as complete!`);
+      setMilestoneConfirm(null);
+      fetchProject();
+    } catch (err) {
+      // If backend route not ready, just update locally for now
+      setMilestones(prev =>
+        prev.map(m => m.id === milestoneConfirm.id
+          ? { ...m, completed: true, completedAt: new Date().toISOString().split('T')[0] }
+          : m
+        )
+      );
+      showAlertMsg(`"${milestoneConfirm.name}" marked as complete! (local only - connect backend)`);
+      setMilestoneConfirm(null);
+    }
+  };
 
-            <div className="row justify-content-center">
-                <div className="col-12 col-xl-8">
+  const completedMilestones = milestones.filter(m => m.completed).length;
+  const progressPercent     = (completedMilestones / milestones.length) * 100;
+  const currentMilestoneIdx = milestones.findIndex(m => !m.completed);
 
-                    {/* Alert */}
-                    {alert.show && (
-                        <div className={`alert alert-${alert.type} border-0 mb-4`}>
-                            {alert.message}
-                        </div>
-                    )}
+  if (loading) return (
+    <div className="d-flex align-items-center justify-content-center py-5">
+      <div className="spinner-border text-primary" />
+    </div>
+  );
 
-                    {/* ── Project Details Card ── */}
-                    <div className="card shadow-sm border-0 mb-4">
-                        <div className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between">
-                            {/* <h5 className="fw-semibold text-dark mb-0">Project details</h5> */}
-                            <h5 className="fw-semibold text-dark mb-0">{project.title}</h5>
-                        </div>
-                        <div className="card-body p-4">
-                            <div className="mb-4">
-                                <p className="text-muted small mb-1">Description</p>
-                                <p className="fw-semibold fs-5 text-dark mb-0">{project.description}</p>
-                            </div>
-                            <div className="row g-3">
-                                <div className="col-12 col-md-6">
-                                    <div className="p-3 rounded-3" style={{ background: 'var(--bs-gray-100, #f8f9fa)' }}>
-                                        <p className="text-muted small mb-1">Status</p>
-                                        <p className="fw-medium text-dark mb-0">{project.status}</p>
-                                    </div>
-                                </div>
-                                <div className="col-12 col-md-6">
-                                    <div className="p-3 rounded-3" style={{ background: 'var(--bs-gray-100, #f8f9fa)' }}>
-                                        <p className="text-muted small mb-1">Maximum Students Allowed</p>
-                                        <p className="fw-medium text-dark mb-0">{project.maxStudents}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+  if (!project) return (
+    <div className="card shadow-sm border-0">
+      <div className="card-body text-center py-5">
+        <p className="text-muted mb-2">Project not found.</p>
+        <button className="btn btn-primary px-4" onClick={() => navigate('/coordinator/accounts/projects')}>
+          Back to Projects
+        </button>
+      </div>
+    </div>
+  );
 
-                    {/* ── Supervisor Card ── */}
-                    <div className="card shadow-sm border-0 mb-4">
-                        <div className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between">
-                            <h5 className="fw-semibold text-dark mb-0">Supervisor</h5>
-                        </div>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between gap-3">
-                                {project.supervisorId ? (
-                                    <div className="d-flex align-items-center gap-3">
-                                        <div
-                                            className="d-flex align-items-center justify-content-center rounded-circle fw-medium"
-                                            style={{
-                                                width: '44px', height: '44px', minWidth: '44px',
-                                                backgroundColor: '#e6f1fb', color: '#0c447c', fontSize: '14px',
-                                            }}
-                                        >
-                                            {getInitials(project.supervisorId.name)}
-                                        </div>
-                                        <div>
-                                            <p className="fw-medium text-dark mb-0">{project.supervisorId.name}</p>
-                                            <p className="text-muted small mb-0">{project.supervisorId.email}</p>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <p className="text-muted small mb-0">No supervisor assigned yet.</p>
-                                )}
+  // Students not already in project (for dropdown)
+  const assignedStudentIds = (project.students || []).map(s => s._id);
+  const availableStudents  = students.filter(s => !assignedStudentIds.includes(s._id));
 
-                                <select
-                                    className="form-select form-select-sm"
-                                    style={{ maxWidth: '200px' }}
-                                    value={project.supervisorId?._id || ''}
-                                    onChange={(e) => handleSupervisorChange(project._id, e.target.value)}
-                                >
-                                    <option value=''>-- Not Assigned --</option>
-                                    {supervisors?.map(sv => (
-                                        <option key={sv._id} value={sv._id}>{sv.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
+  return (
+    <>
+      <Breadcrumb pageName="Project Detail" />
 
-                    {/* ── Students Card ── */}
-                    <div className="card shadow-sm border-0 mb-4">
-                        <div className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between">
-                            <h5 className="fw-semibold text-dark mb-0">Students</h5>
-                            <button
-                                className="btn btn-sm btn-primary"
-                                onClick={() => setShowAssignStudent(true)}
-                                disabled={project.students.length >= project.maxStudents}
-                            >
-                                <i className="ti ti-user-plus me-1" style={{ fontSize: '14px' }} />
-                                Assign student
-                            </button>
-                        </div>
-                        <div className="card-body p-4">
+      {/* Back */}
+      <button className="btn btn-outline-secondary btn-sm px-3 mb-4"
+        onClick={() => navigate('/coordinator/accounts/projects')}>
+        ← Back to Projects
+      </button>
 
-                            {project.students.length === 0 ? (
-                                <p className="text-muted small mb-0">No students assigned yet.</p>
-                            ) : (
-                                project.students.map((student) => (
-                                    <div
-                                        key={student._id}
-                                        className="d-flex align-items-center justify-content-between py-2 border-bottom"
-                                    >
-                                        <div className="d-flex align-items-center gap-3">
-                                            <div
-                                                className="d-flex align-items-center justify-content-center rounded-circle text-muted fw-medium"
-                                                style={{
-                                                    width: '34px', height: '34px', minWidth: '34px',
-                                                    backgroundColor: '#f0f0f0', fontSize: '12px',
-                                                }}
-                                            >
-                                                {getInitials(student.name)}
-                                            </div>
-                                            <div>
-                                                <p className="fw-medium text-dark mb-0" style={{ fontSize: '14px' }}>{student.name}</p>
-                                                <p className="text-muted mb-0" style={{ fontSize: '12px' }}>{student.email}</p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            className="btn btn-sm btn-outline-danger"
-                                            onClick={() => openRemoveConfirm(student._id)}
-                                        >
-                                            <i className="ti ti-user-minus me-1" style={{ fontSize: '13px' }} />
-                                            Remove
-                                        </button>
-                                    </div>
-                                ))
-                            )}
+      {/* Alert */}
+      {alert.show && (
+        <div className={`alert alert-${alert.type} border-0 shadow-sm mb-4`}>
+          {alert.message}
+        </div>
+      )}
 
-                            {/* Capacity bar */}
-                            <div className="mt-4 pt-3 border-top">
-                                <div className="d-flex justify-content-between align-items-center mb-2">
-                                    <p className="text-muted small mb-0">Student capacity</p>
-                                    <p className="text-muted small mb-0">
-                                        {project.students.length} / {project.maxStudents}
-                                    </p>
-                                </div>
-                                <div className="progress" style={{ height: '8px' }}>
-                                    <div
-                                        className="progress-bar"
-                                        style={{ width: `${capacityPercent}%`, backgroundColor: capacityColor }}
-                                    />
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-
-                </div>
+      {/* Project Header */}
+      <div className="card shadow-sm border-0 mb-4">
+        <div className="card-body p-4">
+          <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+              <h5 className="fw-semibold text-dark mb-1">{project.title}</h5>
+              <p className="text-muted small mb-0">{project.description}</p>
             </div>
+            <div className="text-end">
+              <span className="badge bg-success rounded-pill px-3 py-2 mb-1">Active</span>
+              <p className="text-muted small mb-0">
+                Capacity: {(project.students || []).length}/{project.maxStudents} students
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-            {/* ── Change Supervisor Modal ── */}
-            {showChangeSupervisor && (
-                <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.45)' }}>
-                    <div className="modal-dialog modal-dialog-centered">
-                        <div className="modal-content border-0 shadow">
-                            <div className="modal-header border-bottom">
-                                <h5 className="modal-title fw-semibold">Change supervisor</h5>
-                                <button className="btn-close" onClick={() => setShowChangeSupervisor(false)} />
-                            </div>
-                            <form onSubmit={handleSupervisorChange}>
-                                <div className="modal-body p-4">
-                                    <label className="form-label fw-medium text-dark small">Supervisor ID</label>
-                                    <input
-                                        type="text"
-                                        className="form-control"
-                                        placeholder="Enter supervisor ID"
-                                        value={supervisorInput}
-                                        onChange={(e) => setSupervisorInput(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                                <div className="modal-footer border-top">
-                                    <button type="button" className="btn btn-outline-secondary" onClick={() => setShowChangeSupervisor(false)}>Cancel</button>
-                                    <button type="submit" className="btn btn-primary px-4">Save</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
+      <div className="row g-4">
 
-            {/* ── Assign Student Modal ── */}
-            {showAssignStudent && (
-                <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.45)' }}>
-                    <div className="modal-dialog modal-dialog-centered">
-                        <div className="modal-content border-0 shadow">
-                            <div className="modal-header border-bottom">
-                                <h5 className="modal-title fw-semibold">Assign student</h5>
-                                <button className="btn-close" onClick={() => setShowAssignStudent(false)} />
-                            </div>
-                            <form onSubmit={handleAssignStudent}>
-                                <div className="modal-body p-4">
-                                    <label className="form-label fw-medium text-dark small">Students</label>
-                                    <select
-                                        className="form-select"
-                                        value={studentInput}
-                                        onChange={(e) => setStudentInput(e.target.value)}
-                                        required
-                                    >
-                                        <option value=''>-- Select a student --</option>
-                                        {students
-                                            .filter(s => !project.students.some(ps => ps._id === s._id))
-                                            .map(s => (
-                                                <option key={s._id} value={s._id}>{s.name} — {s.rollNumber}</option>
-                                            ))
-                                        }
-                                    </select>
-                                </div>
-                                <div className="modal-footer border-top">
-                                    <button type="button" className="btn btn-outline-secondary" onClick={() => setShowAssignStudent(false)}>Cancel</button>
-                                    <button type="submit" className="btn btn-primary px-4">Assign</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
+        {/* LEFT: Supervisor + Students */}
+        <div className="col-12 col-xl-5">
 
-            {/* ── Remove Student Confirm Modal ── */}
-            {showRemoveConfirm && (
-                <div className="modal show d-block" style={{ background: 'rgba(0,0,0,0.45)' }}>
-                    <div className="modal-dialog modal-dialog-centered">
-                        <div className="modal-content border-0 shadow">
-                            <div className="modal-header border-bottom">
-                                <h5 className="modal-title fw-semibold">Remove student</h5>
-                                <button className="btn-close" onClick={() => setShowRemoveConfirm(false)} />
-                            </div>
-                            <div className="modal-body p-4">
-                                <p className="text-muted mb-0">Are you sure you want to remove this student from the project?</p>
-                            </div>
-                            <div className="modal-footer border-top">
-                                <button className="btn btn-outline-secondary" onClick={() => setShowRemoveConfirm(false)}>Cancel</button>
-                                <button className="btn btn-danger px-4" onClick={handleRemoveStudent}>Remove</button>
-                            </div>
-                        </div>
-                    </div>
+          {/* Supervisor */}
+          <div className="card shadow-sm border-0 mb-4">
+            <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3 px-4">
+              <h6 className="fw-semibold text-dark mb-0">Supervisor</h6>
+              <button className="btn btn-outline-primary btn-sm px-3"
+                onClick={() => setShowChangeSupervisor(true)}>
+                {project.supervisor ? 'Change' : 'Assign'}
+              </button>
+            </div>
+            <div className="card-body p-4">
+              {project.supervisor ? (
+                <div className="d-flex align-items-center gap-3">
+                  <div
+                    className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
+                    style={{ width: '44px', height: '44px', minWidth: '44px', backgroundColor: '#28a745', fontSize: '0.9rem' }}
+                  >
+                    {(project.supervisor.name || 'S').split(' ').map(n => n[0]).join('').slice(0, 2)}
+                  </div>
+                  <div>
+                    <p className="fw-semibold text-dark mb-0 small">{project.supervisor.name}</p>
+                    <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>{project.supervisor.email}</p>
+                  </div>
                 </div>
-            )}
-        </>
-    );
+              ) : (
+                <p className="text-muted small mb-0">No supervisor assigned yet.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Students */}
+          <div className="card shadow-sm border-0">
+            <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3 px-4">
+              <h6 className="fw-semibold text-dark mb-0">
+                Students
+                <span className="badge bg-primary ms-2 rounded-pill" style={{ fontSize: '0.7rem' }}>
+                  {(project.students || []).length}/{project.maxStudents}
+                </span>
+              </h6>
+              {(project.students || []).length < project.maxStudents && (
+                <button className="btn btn-outline-primary btn-sm px-3"
+                  onClick={() => setShowAssignStudent(true)}>
+                  + Add
+                </button>
+              )}
+            </div>
+            <div className="card-body p-3">
+              {(project.students || []).length === 0 ? (
+                <p className="text-muted small mb-0 text-center py-3">No students added yet.</p>
+              ) : (
+                <div className="d-flex flex-column gap-2">
+                  {project.students.map(student => (
+                    <div key={student._id}
+                      className="d-flex align-items-center justify-content-between p-2 rounded border">
+                      <div className="d-flex align-items-center gap-2">
+                        <div
+                          className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
+                          style={{ width: '32px', height: '32px', minWidth: '32px', backgroundColor: '#3c50e0', fontSize: '0.72rem' }}
+                        >
+                          {(student.name || 'S').split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </div>
+                        <div>
+                          <p className="fw-medium text-dark mb-0" style={{ fontSize: '0.82rem' }}>{student.name}</p>
+                          <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>{student.email}</p>
+                        </div>
+                      </div>
+                      <button className="btn btn-outline-danger btn-sm px-2"
+                        style={{ fontSize: '0.72rem' }}
+                        onClick={() => { setRemovingStudentId(student._id); setShowRemoveConfirm(true); }}>
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT: Milestones */}
+        <div className="col-12 col-xl-7">
+          <div className="card shadow-sm border-0">
+            <div className="card-header bg-white border-bottom py-3 px-4">
+              <div className="d-flex align-items-center justify-content-between">
+                <div>
+                  <h6 className="fw-semibold text-dark mb-0">Project Milestones</h6>
+                  <p className="text-muted small mb-0 mt-1">
+                    {completedMilestones}/{milestones.length} completed
+                  </p>
+                </div>
+                <span className="fw-bold text-primary">{Math.round(progressPercent)}%</span>
+              </div>
+              {/* Mini progress bar */}
+              <div className="progress mt-3" style={{ height: '6px', borderRadius: '4px' }}>
+                <div className="progress-bar bg-primary"
+                  style={{ width: `${progressPercent}%`, borderRadius: '4px' }} />
+              </div>
+            </div>
+            <div className="card-body p-4">
+              <div className="d-flex flex-column gap-3">
+                {milestones.map((milestone, index) => (
+                  <div
+                    key={milestone.id}
+                    className={`d-flex align-items-center justify-content-between p-3 rounded border ${
+                      milestone.completed
+                        ? 'border-success bg-success bg-opacity-10'
+                        : index === currentMilestoneIdx
+                        ? 'border-primary bg-primary bg-opacity-10'
+                        : 'border-light'
+                    }`}
+                  >
+                    {/* Left */}
+                    <div className="d-flex align-items-center gap-3">
+                      <div
+                        className="d-flex align-items-center justify-content-center rounded-circle fw-bold"
+                        style={{
+                          width: '36px', height: '36px', minWidth: '36px',
+                          backgroundColor: milestone.completed ? '#28a745' : index === currentMilestoneIdx ? '#3c50e0' : '#e9ecef',
+                          color: milestone.completed || index === currentMilestoneIdx ? '#fff' : '#adb5bd',
+                          fontSize: '0.82rem',
+                        }}
+                      >
+                        {milestone.completed ? '✓' : milestone.id}
+                      </div>
+                      <div>
+                        <p className="fw-semibold text-dark mb-0 small">{milestone.name}</p>
+                        <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>{milestone.description}</p>
+                        {milestone.completed && milestone.completedAt && (
+                          <p className="text-success mb-0" style={{ fontSize: '0.68rem' }}>
+                            Completed: {milestone.completedAt}
+                            {milestone.autoCompleted && ' (auto)'}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right */}
+                    <div className="flex-shrink-0 ms-3">
+                      {milestone.completed ? (
+                        <span className="badge bg-success rounded-pill px-3 py-2" style={{ fontSize: '0.72rem' }}>
+                          Done
+                        </span>
+                      ) : milestone.autoCompleted ? (
+                        <span className="badge bg-secondary rounded-pill px-3 py-2" style={{ fontSize: '0.72rem' }}>
+                          Auto
+                        </span>
+                      ) : (
+                        <button
+                          className="btn btn-primary btn-sm px-3"
+                          style={{ fontSize: '0.75rem' }}
+                          onClick={() => setMilestoneConfirm(milestone)}
+                        >
+                          Mark Complete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* ── MODAL: Change Supervisor ── */}
+      {showChangeSupervisor && (
+        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}>
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '420px' }}>
+            <div className="modal-content border-0 shadow">
+              <div className="modal-header border-bottom px-4 py-3">
+                <h5 className="modal-title fw-semibold text-dark">Assign Supervisor</h5>
+                <button className="btn-close" onClick={() => setShowChangeSupervisor(false)} />
+              </div>
+              <div className="modal-body px-4 py-4">
+                <label className="form-label fw-medium text-dark small">Select Supervisor</label>
+                <select className="form-select" value={supervisorInput}
+                  onChange={e => setSupervisorInput(e.target.value)}>
+                  <option value="">-- Select --</option>
+                  {supervisors.map(s => (
+                    <option key={s._id} value={s._id}>{s.name} — {s.email}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="modal-footer border-top px-4 py-3">
+                <button className="btn btn-outline-secondary px-4"
+                  onClick={() => setShowChangeSupervisor(false)}>Cancel</button>
+                <button className="btn btn-primary px-4 fw-medium"
+                  onClick={handleAssignSupervisor}>Assign</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: Add Student ── */}
+      {showAssignStudent && (
+        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}>
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '420px' }}>
+            <div className="modal-content border-0 shadow">
+              <div className="modal-header border-bottom px-4 py-3">
+                <h5 className="modal-title fw-semibold text-dark">Add Student</h5>
+                <button className="btn-close" onClick={() => setShowAssignStudent(false)} />
+              </div>
+              <div className="modal-body px-4 py-4">
+                <label className="form-label fw-medium text-dark small">Select Student</label>
+                <select className="form-select" value={studentInput}
+                  onChange={e => setStudentInput(e.target.value)}>
+                  <option value="">-- Select --</option>
+                  {availableStudents.map(s => (
+                    <option key={s._id} value={s._id}>{s.name} — {s.email}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="modal-footer border-top px-4 py-3">
+                <button className="btn btn-outline-secondary px-4"
+                  onClick={() => setShowAssignStudent(false)}>Cancel</button>
+                <button className="btn btn-primary px-4 fw-medium"
+                  onClick={handleAddStudent}>Add</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: Remove Student Confirm ── */}
+      {showRemoveConfirm && (
+        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}>
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '400px' }}>
+            <div className="modal-content border-0 shadow">
+              <div className="modal-body px-4 py-4 text-center">
+                <h6 className="fw-semibold text-dark mb-2">Remove Student?</h6>
+                <p className="text-muted small mb-0">This student will be removed from the project.</p>
+              </div>
+              <div className="modal-footer border-top px-4 py-3 justify-content-center gap-3">
+                <button className="btn btn-outline-secondary px-4"
+                  onClick={() => setShowRemoveConfirm(false)}>Cancel</button>
+                <button className="btn btn-danger px-4 fw-medium"
+                  onClick={handleRemoveStudent}>Yes, Remove</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: Mark Milestone Complete Confirm ── */}
+      {milestoneConfirm && (
+        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}>
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '420px' }}>
+            <div className="modal-content border-0 shadow">
+              <div className="modal-body px-4 py-4 text-center">
+                <div className="d-flex align-items-center justify-content-center rounded-circle mx-auto mb-3"
+                  style={{ width: '56px', height: '56px', backgroundColor: '#3c50e020' }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="#3c50e0">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                  </svg>
+                </div>
+                <h6 className="fw-semibold text-dark mb-2">
+                  Mark "{milestoneConfirm.name}" as Complete?
+                </h6>
+                <p className="text-muted small mb-0">
+                  This will update the project progress bar for all students in this project.
+                  This action cannot be undone.
+                </p>
+              </div>
+              <div className="modal-footer border-top px-4 py-3 justify-content-center gap-3">
+                <button className="btn btn-outline-secondary px-4"
+                  onClick={() => setMilestoneConfirm(null)}>Cancel</button>
+                <button className="btn btn-primary px-4 fw-medium"
+                  onClick={handleMarkMilestone}>Yes, Mark Complete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </>
+  );
 };
 
 export default ProjectDetail;
