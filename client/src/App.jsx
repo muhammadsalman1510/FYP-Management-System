@@ -48,14 +48,44 @@ import ProjectDetail from './pages/Coordinator/ProjectDetail';
 
 // Supervisor Pages
 import SupervisorDashboard from './pages/Supervisor/Dashboard';
-import SupervisorProjects from './pages/Supervisor/Projects';           // NEW
-import SupervisorProjectDetail from './pages/Supervisor/ProjectDetail'; // NEW
+import SupervisorProjects from './pages/Supervisor/Projects';
+import SupervisorProjectDetail from './pages/Supervisor/ProjectDetail';
 import SupervisorProposals from './pages/Supervisor/Proposals';
 import SupervisorTasks from './pages/Supervisor/Tasks';
 import SupervisorMeetingCalendar from './pages/Supervisor/MeetingCalendar';
 import SupervisorMeetingRequests from './pages/Supervisor/MeetingRequests';
 import SupervisorAnnouncements from './pages/Supervisor/Announcements';
 import SupervisorProfile from './pages/Supervisor/Profile';
+
+// Redirects to the correct dashboard if the user is already logged in
+const AuthRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  const role  = localStorage.getItem('role');
+
+  if (token) {
+    if (role === 'coordinator') return <Navigate to="/coordinator/dashboard" replace />;
+    if (role === 'supervisor')  return <Navigate to="/supervisor/dashboard" replace />;
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+};
+
+// Redirects to login if not authenticated, or to own dashboard if wrong role
+const ProtectedRoute = ({ children, allowedRole }) => {
+  const token = localStorage.getItem('token');
+  const role  = localStorage.getItem('role');
+
+  if (!token) return <Navigate to="/" replace />;
+
+  if (allowedRole && role !== allowedRole) {
+    if (role === 'coordinator') return <Navigate to="/coordinator/dashboard" replace />;
+    if (role === 'supervisor')  return <Navigate to="/supervisor/dashboard" replace />;
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+};
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -67,140 +97,227 @@ function App() {
   return loading ? <Loader /> : (
     <Routes>
 
-      {/* AUTH ROUTES — No layout */}
-      <Route index element={<><PageTitle title="Sign In | FYP Management System" /><SignIn /></>} />
-      <Route path="/login" element={<><PageTitle title="Sign In | FYP Management System" /><SignIn /></>} />
+      {/* AUTH ROUTES — No layout. Redirect to dashboard if already logged in. */}
+      <Route index element={
+        <AuthRoute>
+          <PageTitle title="Sign In | FYP Management System" />
+          <SignIn />
+        </AuthRoute>
+      } />
+      <Route path="/login" element={
+        <AuthRoute>
+          <PageTitle title="Sign In | FYP Management System" />
+          <SignIn />
+        </AuthRoute>
+      } />
 
 
-      {/* STUDENT ROUTES — DefaultLayout */}
+      {/* STUDENT ROUTES — DefaultLayout, role: student */}
       <Route path="/dashboard" element={
-        <DefaultLayout><PageTitle title="Dashboard | FYP Management System" /><Dashboard /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Dashboard | FYP Management System" /><Dashboard /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/project/proposal" element={
-        <DefaultLayout><PageTitle title="Project Proposal | FYP Management System" /><Proposal /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Project Proposal | FYP Management System" /><Proposal /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/project/documents" element={
-        <DefaultLayout><PageTitle title="Project Documents | FYP Management System" /><Documents /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Project Documents | FYP Management System" /><Documents /></DefaultLayout>
+        </ProtectedRoute>
       } />
-      {/* CHANGED: page title updated from "Project Status" to "Project" */}
       <Route path="/project/status" element={
-        <DefaultLayout><PageTitle title="Project | FYP Management System" /><Status /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Project | FYP Management System" /><Status /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/tasks" element={
-        <DefaultLayout><PageTitle title="Tasks | FYP Management System" /><Tasks /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Tasks | FYP Management System" /><Tasks /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/meetings/calendar" element={
-        <DefaultLayout><PageTitle title="Meeting Calendar | FYP Management System" /><Calendar /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Meeting Calendar | FYP Management System" /><Calendar /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/meetings/requests" element={
-        <DefaultLayout><PageTitle title="Meeting Requests | FYP Management System" /><StudentMeetingRequests /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Meeting Requests | FYP Management System" /><StudentMeetingRequests /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/announcements" element={
-        <DefaultLayout><PageTitle title="Announcements | FYP Management System" /><Announcements /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Announcements | FYP Management System" /><Announcements /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/supervisor/view" element={
-        <DefaultLayout><PageTitle title="My Supervisor | FYP Management System" /><SupervisorView /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="My Supervisor | FYP Management System" /><SupervisorView /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/coordinator/view" element={
-        <DefaultLayout><PageTitle title="Coordinator | FYP Management System" /><CoordinatorView /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Coordinator | FYP Management System" /><CoordinatorView /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/calendar" element={
-        <DefaultLayout><PageTitle title="Calendar | FYP Management System" /><Calendar /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Calendar | FYP Management System" /><Calendar /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/profile" element={
-        <DefaultLayout><PageTitle title="Profile | FYP Management System" /><Profile /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Profile | FYP Management System" /><Profile /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/settings" element={
-        <DefaultLayout><PageTitle title="Settings | FYP Management System" /><Settings /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Settings | FYP Management System" /><Settings /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/tables" element={
-        <DefaultLayout><PageTitle title="Tables | FYP Management System" /><Tables /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Tables | FYP Management System" /><Tables /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/chart" element={
-        <DefaultLayout><PageTitle title="Chart | FYP Management System" /><Chart /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Chart | FYP Management System" /><Chart /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/forms/form-elements" element={
-        <DefaultLayout><PageTitle title="Form Elements | FYP Management System" /><FormElements /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Form Elements | FYP Management System" /><FormElements /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/forms/form-layout" element={
-        <DefaultLayout><PageTitle title="Form Layout | FYP Management System" /><FormLayout /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Form Layout | FYP Management System" /><FormLayout /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/ui/alerts" element={
-        <DefaultLayout><PageTitle title="Alerts | FYP Management System" /><Alerts /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Alerts | FYP Management System" /><Alerts /></DefaultLayout>
+        </ProtectedRoute>
       } />
       <Route path="/ui/buttons" element={
-        <DefaultLayout><PageTitle title="Buttons | FYP Management System" /><Buttons /></DefaultLayout>
+        <ProtectedRoute allowedRole="student">
+          <DefaultLayout><PageTitle title="Buttons | FYP Management System" /><Buttons /></DefaultLayout>
+        </ProtectedRoute>
       } />
 
 
-      {/* COORDINATOR ROUTES — CoordinatorLayout */}
+      {/* COORDINATOR ROUTES — CoordinatorLayout, role: coordinator */}
       <Route path="/coordinator/dashboard" element={
-        <CoordinatorLayout><PageTitle title="Coordinator Dashboard | FYP Management System" /><CoordinatorDashboard /></CoordinatorLayout>
+        <ProtectedRoute allowedRole="coordinator">
+          <CoordinatorLayout><PageTitle title="Coordinator Dashboard | FYP Management System" /><CoordinatorDashboard /></CoordinatorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/coordinator/accounts/students" element={
-        <CoordinatorLayout><PageTitle title="Manage Students | FYP Management System" /><CoordinatorStudents /></CoordinatorLayout>
+        <ProtectedRoute allowedRole="coordinator">
+          <CoordinatorLayout><PageTitle title="Manage Students | FYP Management System" /><CoordinatorStudents /></CoordinatorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/coordinator/accounts/supervisors" element={
-        <CoordinatorLayout><PageTitle title="Manage Supervisors | FYP Management System" /><CoordinatorSupervisors /></CoordinatorLayout>
+        <ProtectedRoute allowedRole="coordinator">
+          <CoordinatorLayout><PageTitle title="Manage Supervisors | FYP Management System" /><CoordinatorSupervisors /></CoordinatorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/coordinator/accounts/projects" element={
-        <CoordinatorLayout><PageTitle title="Manage Projects | FYP Management System" /><Projects /></CoordinatorLayout>
+        <ProtectedRoute allowedRole="coordinator">
+          <CoordinatorLayout><PageTitle title="Manage Projects | FYP Management System" /><Projects /></CoordinatorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/coordinator/proposals" element={
-        <CoordinatorLayout><PageTitle title="Proposals | FYP Management System" /><CoordinatorProposals /></CoordinatorLayout>
+        <ProtectedRoute allowedRole="coordinator">
+          <CoordinatorLayout><PageTitle title="Proposals | FYP Management System" /><CoordinatorProposals /></CoordinatorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/coordinator/tasks" element={
-        <CoordinatorLayout><PageTitle title="Tasks | FYP Management System" /><CoordinatorTasks /></CoordinatorLayout>
+        <ProtectedRoute allowedRole="coordinator">
+          <CoordinatorLayout><PageTitle title="Tasks | FYP Management System" /><CoordinatorTasks /></CoordinatorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/coordinator/meetings/calendar" element={
-        <CoordinatorLayout><PageTitle title="Meeting Calendar | FYP Management System" /><CoordinatorMeetingCalendar /></CoordinatorLayout>
+        <ProtectedRoute allowedRole="coordinator">
+          <CoordinatorLayout><PageTitle title="Meeting Calendar | FYP Management System" /><CoordinatorMeetingCalendar /></CoordinatorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/coordinator/meetings/schedule" element={
-        <CoordinatorLayout><PageTitle title="Schedule Meeting | FYP Management System" /><CoordinatorScheduleMeeting /></CoordinatorLayout>
+        <ProtectedRoute allowedRole="coordinator">
+          <CoordinatorLayout><PageTitle title="Schedule Meeting | FYP Management System" /><CoordinatorScheduleMeeting /></CoordinatorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/coordinator/meetings/requests" element={
-        <CoordinatorLayout><PageTitle title="Meeting Requests | FYP Management System" /><CoordinatorMeetingRequests /></CoordinatorLayout>
+        <ProtectedRoute allowedRole="coordinator">
+          <CoordinatorLayout><PageTitle title="Meeting Requests | FYP Management System" /><CoordinatorMeetingRequests /></CoordinatorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/coordinator/announcements" element={
-        <CoordinatorLayout><PageTitle title="Announcements | FYP Management System" /><CoordinatorAnnouncements /></CoordinatorLayout>
+        <ProtectedRoute allowedRole="coordinator">
+          <CoordinatorLayout><PageTitle title="Announcements | FYP Management System" /><CoordinatorAnnouncements /></CoordinatorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/coordinator/profile" element={
-        <CoordinatorLayout><PageTitle title="Coordinator Profile | FYP Management System" /><CoordinatorProfile /></CoordinatorLayout>
+        <ProtectedRoute allowedRole="coordinator">
+          <CoordinatorLayout><PageTitle title="Coordinator Profile | FYP Management System" /><CoordinatorProfile /></CoordinatorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/coordinator/projects/:id" element={
-        <CoordinatorLayout><PageTitle title="Project Details | FYP Management System" /><ProjectDetail /></CoordinatorLayout>
+        <ProtectedRoute allowedRole="coordinator">
+          <CoordinatorLayout><PageTitle title="Project Details | FYP Management System" /><ProjectDetail /></CoordinatorLayout>
+        </ProtectedRoute>
       } />
 
 
-      {/* SUPERVISOR ROUTES — SupervisorLayout */}
+      {/* SUPERVISOR ROUTES — SupervisorLayout, role: supervisor */}
       <Route path="/supervisor/dashboard" element={
-        <SupervisorLayout><PageTitle title="Supervisor Dashboard | FYP Management System" /><SupervisorDashboard /></SupervisorLayout>
+        <ProtectedRoute allowedRole="supervisor">
+          <SupervisorLayout><PageTitle title="Supervisor Dashboard | FYP Management System" /><SupervisorDashboard /></SupervisorLayout>
+        </ProtectedRoute>
       } />
-      {/* NEW: Supervisor Projects list */}
       <Route path="/supervisor/projects" element={
-        <SupervisorLayout><PageTitle title="My Projects | FYP Management System" /><SupervisorProjects /></SupervisorLayout>
+        <ProtectedRoute allowedRole="supervisor">
+          <SupervisorLayout><PageTitle title="My Projects | FYP Management System" /><SupervisorProjects /></SupervisorLayout>
+        </ProtectedRoute>
       } />
-      {/* NEW: Supervisor Project detail */}
       <Route path="/supervisor/projects/:id" element={
-        <SupervisorLayout><PageTitle title="Project Details | FYP Management System" /><SupervisorProjectDetail /></SupervisorLayout>
+        <ProtectedRoute allowedRole="supervisor">
+          <SupervisorLayout><PageTitle title="Project Details | FYP Management System" /><SupervisorProjectDetail /></SupervisorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/supervisor/proposals" element={
-        <SupervisorLayout><PageTitle title="Proposals | FYP Management System" /><SupervisorProposals /></SupervisorLayout>
+        <ProtectedRoute allowedRole="supervisor">
+          <SupervisorLayout><PageTitle title="Proposals | FYP Management System" /><SupervisorProposals /></SupervisorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/supervisor/tasks" element={
-        <SupervisorLayout><PageTitle title="Tasks | FYP Management System" /><SupervisorTasks /></SupervisorLayout>
+        <ProtectedRoute allowedRole="supervisor">
+          <SupervisorLayout><PageTitle title="Tasks | FYP Management System" /><SupervisorTasks /></SupervisorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/supervisor/meetings/calendar" element={
-        <SupervisorLayout><PageTitle title="Meeting Calendar | FYP Management System" /><SupervisorMeetingCalendar /></SupervisorLayout>
+        <ProtectedRoute allowedRole="supervisor">
+          <SupervisorLayout><PageTitle title="Meeting Calendar | FYP Management System" /><SupervisorMeetingCalendar /></SupervisorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/supervisor/meetings/requests" element={
-        <SupervisorLayout><PageTitle title="Meeting Requests | FYP Management System" /><SupervisorMeetingRequests /></SupervisorLayout>
+        <ProtectedRoute allowedRole="supervisor">
+          <SupervisorLayout><PageTitle title="Meeting Requests | FYP Management System" /><SupervisorMeetingRequests /></SupervisorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/supervisor/announcements" element={
-        <SupervisorLayout><PageTitle title="Announcements | FYP Management System" /><SupervisorAnnouncements /></SupervisorLayout>
+        <ProtectedRoute allowedRole="supervisor">
+          <SupervisorLayout><PageTitle title="Announcements | FYP Management System" /><SupervisorAnnouncements /></SupervisorLayout>
+        </ProtectedRoute>
       } />
       <Route path="/supervisor/profile" element={
-        <SupervisorLayout><PageTitle title="Supervisor Profile | FYP Management System" /><SupervisorProfile /></SupervisorLayout>
+        <ProtectedRoute allowedRole="supervisor">
+          <SupervisorLayout><PageTitle title="Supervisor Profile | FYP Management System" /><SupervisorProfile /></SupervisorLayout>
+        </ProtectedRoute>
       } />
 
       <Route path="*" element={<Navigate to="/" replace />} />
