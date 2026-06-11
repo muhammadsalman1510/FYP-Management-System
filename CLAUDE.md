@@ -472,6 +472,4 @@ This creates the coordinator from `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env`.
 - Announcements route has no authentication currently. This will be fixed during backend phase.
 - No file upload system exists yet. Multer will be added when backend phase begins.
 - No frontend route protection yet (anyone can access any URL without logging in). This will be added in Phase 5.
-Update CLAUDE.md with the following rule:
-
-Never modify authentication, role-based access control, routing, or database schemas without asking for confirmation first.
+- Never modify authentication, role-based access control, routing, or database schemas without asking for confirmation first.
