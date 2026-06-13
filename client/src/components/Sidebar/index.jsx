@@ -113,8 +113,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
           {/*
             X close button — ONLY on small/medium screens.
             d-lg-none = completely hidden on large screens (≥992px).
-            On large screens the sidebar is always visible so no
-            close button is needed.
           */}
           <button
             onClick={() => setSidebarOpen(false)}
@@ -169,9 +167,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
               <SidebarLinkGroup activeCondition={pathname.includes('project')}>
                 {(handleClick, open) => (
                   <React.Fragment>
-                    <NavLink to="#"
-                      className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link position-relative ${pathname.includes('project') ? 'sidebar-link-active' : ''}`}
-                      onClick={(e) => { e.preventDefault(); sidebarExpanded ? handleClick() : setSidebarExpanded(true); }}
+                    {/* Button instead of NavLink so clicking only toggles, never navigates */}
+                    <button
+                      type="button"
+                      className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium sidebar-link position-relative w-100 border-0 bg-transparent text-start ${pathname.includes('project') ? 'sidebar-link-active' : ''}`}
+                      onClick={() => { sidebarExpanded ? handleClick() : setSidebarExpanded(true); }}
                     >
                       <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
                         <path d="M1.43425 7.5093H2.278C2.44675 7.5093 2.55925 7.3968 2.58737 7.31243L2.98112 6.32805H5.90612L6.27175 7.31243C6.328 7.48118 6.46862 7.5093 6.58112 7.5093H7.453C7.76237 7.48118 7.87487 7.25618 7.76237 7.03118L5.428 1.4343C5.37175 1.26555 5.3155 1.23743 5.14675 1.23743H3.88112C3.76862 1.23743 3.59987 1.29368 3.57175 1.4343L1.153 7.08743C1.0405 7.2843 1.20925 7.5093 1.43425 7.5093ZM4.47175 2.98118L5.3155 5.17493H3.59987L4.47175 2.98118Z" />
@@ -181,7 +181,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                       <svg className="position-absolute end-0 me-3" style={{ transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }} width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" clipRule="evenodd" d="M4.41107 6.9107C4.73651 6.58527 5.26414 6.58527 5.58958 6.9107L10.0003 11.3214L14.4111 6.91071C14.7365 6.58527 15.2641 6.58527 15.5896 6.91071C15.915 7.23614 15.915 7.76378 15.5896 8.08922L10.5896 13.0892C10.2641 13.4147 9.73651 13.4147 9.41107 13.0892L4.41107 8.08922C4.08563 7.76378 4.08563 7.23614 4.41107 6.9107Z" />
                       </svg>
-                    </NavLink>
+                    </button>
                     <div className={open ? 'd-block' : 'd-none'}>
                       <ul className="list-unstyled ps-4 mt-1 mb-2 d-flex flex-column gap-1">
                         <li>
@@ -202,7 +202,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                             Documents
                           </NavLink>
                         </li>
-                        {/* CHANGED: "Project Status" → "Project" */}
                         <li>
                           <NavLink
                             to="/project/status"
@@ -234,9 +233,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
               <SidebarLinkGroup activeCondition={pathname.includes('meetings')}>
                 {(handleClick, open) => (
                   <React.Fragment>
-                    <NavLink to="#"
-                      className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link position-relative ${pathname.includes('meetings') ? 'sidebar-link-active' : ''}`}
-                      onClick={(e) => { e.preventDefault(); sidebarExpanded ? handleClick() : setSidebarExpanded(true); }}
+                    {/* Button instead of NavLink so clicking only toggles, never navigates */}
+                    <button
+                      type="button"
+                      className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium sidebar-link position-relative w-100 border-0 bg-transparent text-start ${pathname.includes('meetings') ? 'sidebar-link-active' : ''}`}
+                      onClick={() => { sidebarExpanded ? handleClick() : setSidebarExpanded(true); }}
                     >
                       <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
                         <path d="M15.7499 2.9812H14.2874V2.36245C14.2874 2.02495 14.0062 1.71558 13.6405 1.71558C13.2749 1.71558 12.9937 1.99683 12.9937 2.36245V2.9812H4.97803V2.36245C4.97803 2.02495 4.69678 1.71558 4.33115 1.71558C3.96553 1.71558 3.68428 1.99683 3.68428 2.36245V2.9812H2.2499C1.29365 2.9812 0.478027 3.7687 0.478027 4.75308V14.5406C0.478027 15.4968 1.26553 16.3125 2.2499 16.3125H15.7499C16.7062 16.3125 17.5218 15.525 17.5218 14.5406V4.72495C17.5218 3.7687 16.7062 2.9812 15.7499 2.9812Z" />
@@ -245,7 +246,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                       <svg className="position-absolute end-0 me-3" style={{ transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }} width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" clipRule="evenodd" d="M4.41107 6.9107C4.73651 6.58527 5.26414 6.58527 5.58958 6.9107L10.0003 11.3214L14.4111 6.91071C14.7365 6.58527 15.2641 6.58527 15.5896 6.91071C15.915 7.23614 15.915 7.76378 15.5896 8.08922L10.5896 13.0892C10.2641 13.4147 9.73651 13.4147 9.41107 13.0892L4.41107 8.08922C4.08563 7.76378 4.08563 7.23614 4.41107 6.9107Z" />
                       </svg>
-                    </NavLink>
+                    </button>
                     <div className={open ? 'd-block' : 'd-none'}>
                       <ul className="list-unstyled ps-4 mt-1 mb-2 d-flex flex-column gap-1">
                         <li><NavLink to="/meetings/calendar" onClick={handleNavClick} className={({ isActive }) => `d-flex align-items-center px-3 py-1 rounded text-decoration-none fw-medium sidebar-sub-link ${isActive ? 'text-white' : ''}`}>Calendar</NavLink></li>

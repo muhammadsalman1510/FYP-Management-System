@@ -10,7 +10,7 @@ const SupervisorDashboard = () => {
 
   // TODO (Backend): Replace with API call
   const stats = [
-    { title: 'My Students',        value: '5',  color: '#3c50e0' },
+    { title: 'Total Students',      value: '5',  color: '#3c50e0' },
     { title: 'Pending Proposals',  value: '2',  color: '#ffc107' },
     { title: 'Pending Tasks',      value: '4',  color: '#dc3545' },
     { title: 'Upcoming Meetings',  value: '3',  color: '#28a745' },
@@ -152,7 +152,7 @@ const SupervisorDashboard = () => {
             <div className="card-body p-3">
               <div className="row g-2">
                 <div className="col-6">
-                  <a href="/supervisor/students" className="btn btn-primary w-100 py-2 small fw-medium">My Students</a>
+                  <a href="/supervisor/projects" className="btn btn-primary w-100 py-2 small fw-medium">My Projects</a>
                 </div>
                 <div className="col-6">
                   <a href="/supervisor/tasks" className="btn btn-outline-primary w-100 py-2 small fw-medium">Create Task</a>

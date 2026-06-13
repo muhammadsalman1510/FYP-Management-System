@@ -3,21 +3,20 @@ import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 
 /*
   SUPERVISOR — MEETING REQUESTS
-  Two sections:
-  1. Requests FROM students → Supervisor can approve or reject
-  2. Request TO Coordinator → Supervisor can request a meeting with coordinator
+  Tab 1: Requests FROM students — supervisor can approve or reject
+  Tab 2: Request TO coordinator — supervisor can request a meeting with coordinator
 
   TODO (Backend):
-    GET /api/supervisor/meetings/requests         — incoming requests from students
-    PUT /api/supervisor/meetings/:id/respond      — approve/reject student request
-    POST /api/supervisor/meetings/request-coordinator — request meeting with coordinator
+    GET  /api/meetings?direction=incoming        — incoming requests from students
+    PUT  /api/meetings/:id/respond               — approve/reject student request
+    POST /api/meetings                           — request meeting with coordinator
 */
 
 const SupervisorMeetingRequests = () => {
 
   const [activeTab, setActiveTab] = useState('incoming');
 
-  // Requests FROM students to this supervisor
+  // TODO (Backend): GET /api/meetings?direction=incoming
   const [incomingRequests, setIncomingRequests] = useState([
     { id: 1, from: 'Muhammad Salman', rollNumber: 'F2021001001', title: 'Proposal Discussion',  date: '2024-05-05', time: '14:00', duration: 45, submittedDate: '2024-04-28', status: 'pending',  response: '' },
     { id: 2, from: 'Ali Hassan',      rollNumber: 'F2021001002', title: 'Technical Help',        date: '2024-05-08', time: '10:00', duration: 30, submittedDate: '2024-04-27', status: 'pending',  response: '' },
@@ -25,10 +24,11 @@ const SupervisorMeetingRequests = () => {
     { id: 4, from: 'Ahmed Raza',      rollNumber: 'F2021001004', title: 'Proposal Revision',     date: '2024-05-03', time: '09:00', duration: 30, submittedDate: '2024-04-24', status: 'rejected', response: 'Please reschedule to next week.' },
   ]);
 
-  // Form for requesting meeting WITH coordinator
+  // Coordinator request form state
   const [coordinatorForm, setCoordinatorForm] = useState({
-    title: '', date: '', startTime: '', endTime: '', description: ''
+    title: '', date: '', startTime: '', endTime: '', description: '',
   });
+  const [coordinatorFormError, setCoordinatorFormError]   = useState('');
   const [coordinatorRequestSent, setCoordinatorRequestSent] = useState(false);
 
   // Respond modal state
@@ -37,11 +37,13 @@ const SupervisorMeetingRequests = () => {
   const [respondDecision, setRespondDecision] = useState('');
   const [respondMessage, setRespondMessage]   = useState('');
 
-  const counts = {
-    pending:  incomingRequests.filter(r => r.status === 'pending').length,
-    approved: incomingRequests.filter(r => r.status === 'approved').length,
-    rejected: incomingRequests.filter(r => r.status === 'rejected').length,
-  };
+  // "+ Request Meeting" modal state
+  const [showRequestModal, setShowRequestModal]   = useState(false);
+  const [requestForm, setRequestForm]             = useState({ meetWith: '', proposedDateTime: '', topic: '' });
+  const [requestFormError, setRequestFormError]   = useState('');
+  const [requestSent, setRequestSent]             = useState(false);
+
+  const pendingCount = incomingRequests.filter((r) => r.status === 'pending').length;
 
   const openRespond = (request, decision) => {
     setRespondRequest(request);
@@ -51,25 +53,55 @@ const SupervisorMeetingRequests = () => {
   };
 
   const submitResponse = () => {
-    if (!respondMessage.trim()) { alert('Please provide a response message.'); return; }
-    // TODO (Backend): PUT /api/supervisor/meetings/:id/respond
-    setIncomingRequests(prev =>
-      prev.map(r => r.id === respondRequest.id ? { ...r, status: respondDecision, response: respondMessage } : r)
+    if (!respondMessage.trim()) {
+      alert('Please provide a response message.');
+      return;
+    }
+    // TODO (Backend): PUT /api/meetings/:id/respond
+    setIncomingRequests((prev) =>
+      prev.map((r) =>
+        r.id === respondRequest.id ? { ...r, status: respondDecision, response: respondMessage } : r
+      )
     );
     setRespondModal(false);
   };
 
   const handleCoordinatorFormChange = (e) => {
     const { name, value } = e.target;
-    setCoordinatorForm(prev => ({ ...prev, [name]: value }));
+    setCoordinatorForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleCoordinatorRequest = (e) => {
-    e.preventDefault();
-    // TODO (Backend): POST /api/supervisor/meetings/request-coordinator
+  const handleCoordinatorRequest = () => {
+    setCoordinatorFormError('');
+    if (!coordinatorForm.title.trim()) { setCoordinatorFormError('Please enter a meeting title.'); return; }
+    if (!coordinatorForm.date)         { setCoordinatorFormError('Please select a preferred date.'); return; }
+    if (!coordinatorForm.startTime)    { setCoordinatorFormError('Please select a start time.'); return; }
+    if (!coordinatorForm.endTime)      { setCoordinatorFormError('Please select an end time.'); return; }
+    // TODO (Backend): POST /api/meetings { meetWith: 'coordinator', ...coordinatorForm }
     setCoordinatorRequestSent(true);
     setCoordinatorForm({ title: '', date: '', startTime: '', endTime: '', description: '' });
     setTimeout(() => setCoordinatorRequestSent(false), 4000);
+  };
+
+  const handleSubmitRequest = () => {
+    setRequestFormError('');
+    if (!requestForm.meetWith)              { setRequestFormError('Please select who you want to meet.'); return; }
+    if (!requestForm.proposedDateTime)      { setRequestFormError('Please select a proposed date and time.'); return; }
+    if (!requestForm.topic.trim())          { setRequestFormError('Please enter a topic or reason.'); return; }
+    // TODO (Backend): POST /api/meetings { meetWith, proposedDateTime, topic }
+    setRequestSent(true);
+    setRequestForm({ meetWith: '', proposedDateTime: '', topic: '' });
+    setTimeout(() => {
+      setRequestSent(false);
+      setShowRequestModal(false);
+    }, 2000);
+  };
+
+  const closeRequestModal = () => {
+    setShowRequestModal(false);
+    setRequestFormError('');
+    setRequestSent(false);
+    setRequestForm({ meetWith: '', proposedDateTime: '', topic: '' });
   };
 
   const getStatusBadge = (status) => {
@@ -85,21 +117,43 @@ const SupervisorMeetingRequests = () => {
     <>
       <Breadcrumb pageName="Meeting Requests" />
 
+      {/* Page action button */}
+      <div className="d-flex align-items-center justify-content-end mb-4">
+        <button
+          className="btn btn-primary px-4 fw-medium"
+          onClick={() => setShowRequestModal(true)}
+        >
+          + Request Meeting
+        </button>
+      </div>
+
       {/* Tab Navigation */}
       <div className="card shadow-sm border-0 mb-4">
         <div className="card-body p-0">
           <div className="d-flex border-bottom">
-            <button onClick={() => setActiveTab('incoming')}
+            <button
+              onClick={() => setActiveTab('incoming')}
               className="btn btn-link flex-fill py-3 text-decoration-none fw-medium border-0 rounded-0"
-              style={{ color: activeTab === 'incoming' ? '#3c50e0' : '#6c757d', borderBottom: activeTab === 'incoming' ? '2px solid #3c50e0' : '2px solid transparent' }}>
+              style={{
+                color: activeTab === 'incoming' ? '#3c50e0' : '#6c757d',
+                borderBottom: activeTab === 'incoming' ? '2px solid #3c50e0' : '2px solid transparent',
+              }}
+            >
               From Students
-              {counts.pending > 0 && (
-                <span className="badge bg-warning text-dark ms-2 rounded-pill" style={{ fontSize: '0.7rem' }}>{counts.pending}</span>
+              {pendingCount > 0 && (
+                <span className="badge bg-warning text-dark ms-2 rounded-pill" style={{ fontSize: '0.7rem' }}>
+                  {pendingCount}
+                </span>
               )}
             </button>
-            <button onClick={() => setActiveTab('outgoing')}
+            <button
+              onClick={() => setActiveTab('outgoing')}
               className="btn btn-link flex-fill py-3 text-decoration-none fw-medium border-0 rounded-0"
-              style={{ color: activeTab === 'outgoing' ? '#3c50e0' : '#6c757d', borderBottom: activeTab === 'outgoing' ? '2px solid #3c50e0' : '2px solid transparent' }}>
+              style={{
+                color: activeTab === 'outgoing' ? '#3c50e0' : '#6c757d',
+                borderBottom: activeTab === 'outgoing' ? '2px solid #3c50e0' : '2px solid transparent',
+              }}
+            >
               Request Coordinator Meeting
             </button>
           </div>
@@ -116,7 +170,7 @@ const SupervisorMeetingRequests = () => {
               </div>
             </div>
           ) : (
-            incomingRequests.map(req => (
+            incomingRequests.map((req) => (
               <div key={req.id} className="card shadow-sm border-0">
                 <div className="card-body p-4">
                   <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
@@ -126,7 +180,8 @@ const SupervisorMeetingRequests = () => {
                         From: <strong className="text-dark">{req.from}</strong> ({req.rollNumber})
                       </p>
                       <p className="text-muted small mb-1">
-                        Requested for: <strong className="text-dark">{req.date}</strong> at <strong className="text-dark">{req.time}</strong> ({req.duration} mins)
+                        Requested for: <strong className="text-dark">{req.date}</strong> at{' '}
+                        <strong className="text-dark">{req.time}</strong> ({req.duration} mins)
                       </p>
                       <p className="text-muted small mb-0">Submitted on: {req.submittedDate}</p>
                     </div>
@@ -136,15 +191,29 @@ const SupervisorMeetingRequests = () => {
                   </div>
 
                   {req.response && (
-                    <div className={`alert ${req.status === 'approved' ? 'alert-success' : 'alert-danger'} py-2 px-3 mt-3 mb-2`}>
-                      <p className="small mb-0"><strong>Your Response:</strong> {req.response}</p>
+                    <div
+                      className={`alert ${req.status === 'approved' ? 'alert-success' : 'alert-danger'} py-2 px-3 mt-3 mb-2`}
+                    >
+                      <p className="small mb-0">
+                        <strong>Your Response:</strong> {req.response}
+                      </p>
                     </div>
                   )}
 
                   {req.status === 'pending' && (
                     <div className="d-flex gap-2 mt-3">
-                      <button className="btn btn-success btn-sm px-4 fw-medium" onClick={() => openRespond(req, 'approved')}>✓ Approve</button>
-                      <button className="btn btn-danger btn-sm px-4 fw-medium"  onClick={() => openRespond(req, 'rejected')}>✕ Reject</button>
+                      <button
+                        className="btn btn-success btn-sm px-4 fw-medium"
+                        onClick={() => openRespond(req, 'approved')}
+                      >
+                        ✓ Approve
+                      </button>
+                      <button
+                        className="btn btn-danger btn-sm px-4 fw-medium"
+                        onClick={() => openRespond(req, 'rejected')}
+                      >
+                        ✕ Reject
+                      </button>
                     </div>
                   )}
                 </div>
@@ -171,54 +240,95 @@ const SupervisorMeetingRequests = () => {
               </div>
             )}
 
-            <form onSubmit={handleCoordinatorRequest}>
-              <div className="row g-3">
-
-                <div className="col-12">
-                  <label className="form-label fw-medium text-dark small">Meeting Title *</label>
-                  <input type="text" name="title" value={coordinatorForm.title} onChange={handleCoordinatorFormChange}
-                    className="form-control" placeholder="e.g. FYP Progress Discussion" required />
-                </div>
-
-                <div className="col-12 col-md-4">
-                  <label className="form-label fw-medium text-dark small">Preferred Date *</label>
-                  <input type="date" name="date" value={coordinatorForm.date} onChange={handleCoordinatorFormChange}
-                    className="form-control" required />
-                </div>
-
-                <div className="col-12 col-md-4">
-                  <label className="form-label fw-medium text-dark small">Start Time *</label>
-                  <input type="time" name="startTime" value={coordinatorForm.startTime} onChange={handleCoordinatorFormChange}
-                    className="form-control" required />
-                </div>
-
-                <div className="col-12 col-md-4">
-                  <label className="form-label fw-medium text-dark small">End Time *</label>
-                  <input type="time" name="endTime" value={coordinatorForm.endTime} onChange={handleCoordinatorFormChange}
-                    className="form-control" required />
-                </div>
-
-                <div className="col-12">
-                  <label className="form-label fw-medium text-dark small">Description / Agenda <span className="text-muted fw-normal">(Optional)</span></label>
-                  <textarea name="description" value={coordinatorForm.description} onChange={handleCoordinatorFormChange}
-                    rows={3} className="form-control" placeholder="What would you like to discuss?" />
-                </div>
-
-                <div className="col-12 d-flex gap-3 mt-2">
-                  <button type="submit" className="btn btn-primary px-5 fw-medium">Send Request</button>
-                  <button type="button" className="btn btn-outline-secondary px-4"
-                    onClick={() => setCoordinatorForm({ title: '', date: '', startTime: '', endTime: '', description: '' })}>
-                    Clear
-                  </button>
-                </div>
-
+            {coordinatorFormError && (
+              <div className="alert alert-danger border-0 small py-2 mb-4">
+                {coordinatorFormError}
               </div>
-            </form>
+            )}
+
+            <div className="row g-3">
+
+              <div className="col-12">
+                <label className="form-label fw-medium text-dark small">Meeting Title *</label>
+                <input
+                  type="text"
+                  name="title"
+                  value={coordinatorForm.title}
+                  onChange={handleCoordinatorFormChange}
+                  className="form-control"
+                  placeholder="e.g. FYP Progress Discussion"
+                />
+              </div>
+
+              <div className="col-12 col-md-4">
+                <label className="form-label fw-medium text-dark small">Preferred Date *</label>
+                <input
+                  type="date"
+                  name="date"
+                  value={coordinatorForm.date}
+                  onChange={handleCoordinatorFormChange}
+                  className="form-control"
+                />
+              </div>
+
+              <div className="col-12 col-md-4">
+                <label className="form-label fw-medium text-dark small">Start Time *</label>
+                <input
+                  type="time"
+                  name="startTime"
+                  value={coordinatorForm.startTime}
+                  onChange={handleCoordinatorFormChange}
+                  className="form-control"
+                />
+              </div>
+
+              <div className="col-12 col-md-4">
+                <label className="form-label fw-medium text-dark small">End Time *</label>
+                <input
+                  type="time"
+                  name="endTime"
+                  value={coordinatorForm.endTime}
+                  onChange={handleCoordinatorFormChange}
+                  className="form-control"
+                />
+              </div>
+
+              <div className="col-12">
+                <label className="form-label fw-medium text-dark small">
+                  Description / Agenda{' '}
+                  <span className="text-muted fw-normal">(Optional)</span>
+                </label>
+                <textarea
+                  name="description"
+                  value={coordinatorForm.description}
+                  onChange={handleCoordinatorFormChange}
+                  rows={3}
+                  className="form-control"
+                  placeholder="What would you like to discuss?"
+                />
+              </div>
+
+              <div className="col-12 d-flex gap-3 mt-2">
+                <button className="btn btn-primary px-5 fw-medium" onClick={handleCoordinatorRequest}>
+                  Send Request
+                </button>
+                <button
+                  className="btn btn-outline-secondary px-4"
+                  onClick={() => {
+                    setCoordinatorForm({ title: '', date: '', startTime: '', endTime: '', description: '' });
+                    setCoordinatorFormError('');
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+
+            </div>
           </div>
         </div>
       )}
 
-      {/* Respond Modal */}
+      {/* ── Respond to Student Request Modal ── */}
       {respondModal && (
         <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}>
           <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '480px' }}>
@@ -231,24 +341,109 @@ const SupervisorMeetingRequests = () => {
               </div>
               <div className="modal-body px-4 py-4">
                 <p className="text-muted small mb-3">
-                  From: <strong className="text-dark">{respondRequest?.from}</strong><br/>
-                  Title: <strong className="text-dark">{respondRequest?.title}</strong><br/>
+                  From: <strong className="text-dark">{respondRequest?.from}</strong>
+                  <br />
+                  Title: <strong className="text-dark">{respondRequest?.title}</strong>
+                  <br />
                   Date: <strong className="text-dark">{respondRequest?.date} at {respondRequest?.time}</strong>
                 </p>
                 <label className="form-label fw-medium text-dark small">Response Message *</label>
-                <textarea className="form-control" rows={3}
-                  placeholder={respondDecision === 'approved' ? 'e.g. Confirmed. See you then.' : 'e.g. I am unavailable. Please reschedule.'}
+                <textarea
+                  className="form-control"
+                  rows={3}
+                  placeholder={
+                    respondDecision === 'approved'
+                      ? 'e.g. Confirmed. See you then.'
+                      : 'e.g. I am unavailable. Please reschedule.'
+                  }
                   value={respondMessage}
                   onChange={(e) => setRespondMessage(e.target.value)}
                 />
                 {respondDecision === 'approved' && (
-                  <p className="text-success small mt-2 mb-0">✓ This meeting will be added to the calendar.</p>
+                  <p className="text-success small mt-2 mb-0">
+                    ✓ This meeting will be added to the calendar.
+                  </p>
                 )}
               </div>
               <div className="modal-footer border-top px-4 py-3">
-                <button className="btn btn-outline-secondary px-4" onClick={() => setRespondModal(false)}>Cancel</button>
-                <button className={`btn px-4 fw-medium ${respondDecision === 'approved' ? 'btn-success' : 'btn-danger'}`} onClick={submitResponse}>
+                <button className="btn btn-outline-secondary px-4" onClick={() => setRespondModal(false)}>
+                  Cancel
+                </button>
+                <button
+                  className={`btn px-4 fw-medium ${respondDecision === 'approved' ? 'btn-success' : 'btn-danger'}`}
+                  onClick={submitResponse}
+                >
                   Confirm {respondDecision === 'approved' ? 'Approval' : 'Rejection'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Request Meeting Modal (+ Request Meeting button) ── */}
+      {showRequestModal && (
+        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}>
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '480px' }}>
+            <div className="modal-content border-0 shadow">
+              <div className="modal-header border-bottom px-4 py-3">
+                <h5 className="modal-title fw-semibold text-dark">Request a Meeting</h5>
+                <button className="btn-close" onClick={closeRequestModal} />
+              </div>
+              <div className="modal-body px-4 py-4">
+
+                {requestSent && (
+                  <div className="alert alert-success border-0 small py-2 mb-3">
+                    <strong>Request sent!</strong> You will be notified when they respond.
+                  </div>
+                )}
+
+                {requestFormError && (
+                  <div className="alert alert-danger border-0 small py-2 mb-3">
+                    {requestFormError}
+                  </div>
+                )}
+
+                <div className="mb-3">
+                  <label className="form-label fw-medium text-dark small">Meet With *</label>
+                  <select
+                    className="form-select"
+                    value={requestForm.meetWith}
+                    onChange={(e) => setRequestForm((prev) => ({ ...prev, meetWith: e.target.value }))}
+                  >
+                    <option value="">Select person...</option>
+                    <option value="coordinator">Coordinator</option>
+                  </select>
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label fw-medium text-dark small">Proposed Date &amp; Time *</label>
+                  <input
+                    type="datetime-local"
+                    className="form-control"
+                    value={requestForm.proposedDateTime}
+                    onChange={(e) => setRequestForm((prev) => ({ ...prev, proposedDateTime: e.target.value }))}
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label fw-medium text-dark small">Topic / Reason *</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. FYP Progress Discussion"
+                    value={requestForm.topic}
+                    onChange={(e) => setRequestForm((prev) => ({ ...prev, topic: e.target.value }))}
+                  />
+                </div>
+
+              </div>
+              <div className="modal-footer border-top px-4 py-3">
+                <button className="btn btn-outline-secondary px-4" onClick={closeRequestModal}>
+                  Cancel
+                </button>
+                <button className="btn btn-primary px-4 fw-medium" onClick={handleSubmitRequest}>
+                  Send Request
                 </button>
               </div>
             </div>

@@ -1,60 +1,57 @@
-// 📁 FILE: src/pages/Authentication/SignIn.jsx
-// Replace your entire existing SignIn.jsx with this file
-
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const SignIn = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail]           = useState('');
+  const [password, setPassword]     = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+  const [loginError, setLoginError] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoginError('');
 
-    if (email && password) {
-      try {
-        const { data } = await axios.post('http://localhost:4000/api/auth/login', {
-          email,
-          password,
-        });
+    if (!email || !password) {
+      setLoginError('Please enter your email and password.');
+      return;
+    }
 
-        // Store token & user info
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+    try {
+      const { data } = await axios.post('http://localhost:4000/api/auth/login', {
+        email,
+        password,
+      });
 
-        // Navigate based on role from API response
-        switch (data.user.role) {
-          case 'student':
-            navigate('/dashboard');
-            break;
-          case 'supervisor':
-            navigate('/supervisor/dashboard');
-            break;
-          case 'coordinator':
-            navigate('/coordinator/dashboard');
-            break;
-          default:
-            navigate('/dashboard');
-        }
-      } catch (err) {
-        console.error('Login error:', err);
-        const message = err.response?.data?.message || 'Something went wrong. Please try again.';
-        alert(message);
+      // Store token + full user object + individual keys for Header and ProtectedRoute
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user',  JSON.stringify(data.user));
+      localStorage.setItem('name',  data.user.name);
+      localStorage.setItem('role',  data.user.role);
+
+      // Navigate based on role
+      switch (data.user.role) {
+        case 'student':
+          navigate('/dashboard');
+          break;
+        case 'supervisor':
+          navigate('/supervisor/dashboard');
+          break;
+        case 'coordinator':
+          navigate('/coordinator/dashboard');
+          break;
+        default:
+          navigate('/dashboard');
       }
-    } else {
-      alert('Please enter your email and password.');
+    } catch (err) {
+      console.error('Login error:', err);
+      const message = err.response?.data?.message || 'Invalid email or password. Please try again.';
+      setLoginError(message);
     }
   };
 
   return (
-    /*
-      Full screen centered layout.
-      min-vh-100: takes full screen height
-      bg-light: light gray background
-    */
     <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light py-4">
       <div className="container">
         <div className="row justify-content-center">
@@ -62,12 +59,17 @@ const SignIn = () => {
             <div className="card shadow border-0 rounded-3">
               <div className="card-body p-4 p-md-5">
 
-                {/* Page Title */}
                 <h2 className="fw-bold text-dark mb-4 fs-4">
                   Sign In to FYP System
                 </h2>
 
-                {/* ── Login Form ── */}
+                {/* Inline error alert — shown on failed login */}
+                {loginError && (
+                  <div className="alert alert-danger border-0 rounded-2 py-2 px-3 mb-4 small" role="alert">
+                    {loginError}
+                  </div>
+                )}
+
                 <form onSubmit={handleSubmit}>
 
                   {/* Email */}
@@ -78,12 +80,14 @@ const SignIn = () => {
                         type="email"
                         placeholder="Enter your email"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => { setEmail(e.target.value); setLoginError(''); }}
                         className="form-control form-control-lg pe-5"
                         required
                       />
-                      {/* Email icon */}
-                      <span className="position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style={{ pointerEvents: 'none' }}>
+                      <span
+                        className="position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
+                        style={{ pointerEvents: 'none' }}
+                      >
                         <svg width="20" height="20" viewBox="0 0 22 22" fill="currentColor" opacity="0.5">
                           <path d="M19.2516 3.30005H2.75156C1.58281 3.30005 0.585938 4.26255 0.585938 5.46567V16.6032C0.585938 17.7719 1.54844 18.7688 2.75156 18.7688H19.2516C20.4203 18.7688 21.4172 17.8063 21.4172 16.6032V5.4313C21.4172 4.26255 20.4203 3.30005 19.2516 3.30005ZM19.2516 4.84692L11.0016 10.2094L2.64844 4.84692H19.2516ZM19.2516 17.1532H2.75156C2.40781 17.1532 2.13281 16.8782 2.13281 16.5344V6.35942L10.1766 11.5157C10.4172 11.6875 10.6922 11.7563 10.9672 11.7563C11.2422 11.7563 11.5172 11.6875 11.7578 11.5157L19.8016 6.35942V16.5688C19.8703 16.8782 19.5953 17.1532 19.2516 17.1532Z" />
                         </svg>
@@ -99,12 +103,14 @@ const SignIn = () => {
                         type="password"
                         placeholder="Enter your password"
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => { setPassword(e.target.value); setLoginError(''); }}
                         className="form-control form-control-lg pe-5"
                         required
                       />
-                      {/* Lock icon */}
-                      <span className="position-absolute top-50 end-0 translate-middle-y me-3 text-muted" style={{ pointerEvents: 'none' }}>
+                      <span
+                        className="position-absolute top-50 end-0 translate-middle-y me-3 text-muted"
+                        style={{ pointerEvents: 'none' }}
+                      >
                         <svg width="20" height="20" viewBox="0 0 22 22" fill="currentColor" opacity="0.5">
                           <path d="M16.1547 6.80626V5.91251C16.1547 3.16251 14.0922 0.825009 11.4797 0.618759C10.0359 0.481259 8.59219 0.996884 7.52656 1.95938C6.46094 2.92188 5.84219 4.29688 5.84219 5.70626V6.80626C3.84844 7.18438 2.33594 8.93751 2.33594 11.0688V17.2906C2.33594 19.5594 4.19219 21.3813 6.42656 21.3813H15.5016C17.7703 21.3813 19.6266 19.525 19.6266 17.2563V11C19.6609 8.93751 18.1484 7.21876 16.1547 6.80626Z" />
                         </svg>
@@ -113,9 +119,7 @@ const SignIn = () => {
                   </div>
 
                   {/* Remember Me */}
-                  <div className="d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-2 mb-4">
-
-                    {/* Remember Me checkbox */}
+                  <div className="d-flex align-items-center gap-2 mb-4">
                     <label className="d-flex align-items-center gap-2 mb-0" style={{ cursor: 'pointer' }}>
                       <div className="position-relative">
                         <input
@@ -133,17 +137,16 @@ const SignIn = () => {
                           }}
                         >
                           {rememberMe && (
-                            <svg className="text-white" height="12" width="12" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="3">
+                            <svg height="12" width="12" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="3">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                             </svg>
                           )}
                         </div>
                       </div>
                       <span className="small">Remember me</span>
-                    </label>                   
+                    </label>
                   </div>
 
-                  {/* Submit button */}
                   <div className="mb-3">
                     <button type="submit" className="btn btn-primary w-100 py-3 fw-medium">
                       Sign In

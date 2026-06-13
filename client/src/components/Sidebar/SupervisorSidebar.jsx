@@ -1,5 +1,3 @@
-// 📁 FILE: src/components/Sidebar/SupervisorSidebar.jsx
-
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import SidebarLinkGroup from './SidebarLinkGroup';
@@ -107,7 +105,7 @@ const SupervisorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* CHANGED: "My Students" replaced with "Projects" */}
+              {/* Projects */}
               <li>
                 <NavLink to="/supervisor/projects" onClick={handleNavClick}
                   className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link ${pathname.includes('/supervisor/projects') ? 'sidebar-link-active' : ''}`}>
@@ -121,6 +119,7 @@ const SupervisorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
                   Projects
                 </NavLink>
               </li>
+
 
               {/* Proposals */}
               <li>
@@ -144,13 +143,15 @@ const SupervisorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* Meetings */}
+              {/* Meetings — button instead of NavLink to prevent navigation */}
               <SidebarLinkGroup activeCondition={pathname.includes('/supervisor/meetings')}>
                 {(handleClick, open) => (
                   <React.Fragment>
-                    <NavLink to="#"
-                      className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link position-relative ${pathname.includes('/supervisor/meetings') ? 'sidebar-link-active' : ''}`}
-                      onClick={(e) => { e.preventDefault(); sidebarExpanded ? handleClick() : setSidebarExpanded(true); }}>
+                    <button
+                      type="button"
+                      className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium sidebar-link position-relative w-100 border-0 bg-transparent text-start ${pathname.includes('/supervisor/meetings') ? 'sidebar-link-active' : ''}`}
+                      onClick={() => { sidebarExpanded ? handleClick() : setSidebarExpanded(true); }}
+                    >
                       <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
                         <path d="M15.7499 2.9812H14.2874V2.36245C14.2874 2.02495 14.0062 1.71558 13.6405 1.71558C13.2749 1.71558 12.9937 1.99683 12.9937 2.36245V2.9812H4.97803V2.36245C4.97803 2.02495 4.69678 1.71558 4.33115 1.71558C3.96553 1.71558 3.68428 1.99683 3.68428 2.36245V2.9812H2.2499C1.29365 2.9812 0.478027 3.7687 0.478027 4.75308V14.5406C0.478027 15.4968 1.26553 16.3125 2.2499 16.3125H15.7499C16.7062 16.3125 17.5218 15.525 17.5218 14.5406V4.72495C17.5218 3.7687 16.7062 2.9812 15.7499 2.9812Z"/>
                       </svg>
@@ -158,7 +159,7 @@ const SupervisorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
                       <svg className="position-absolute end-0 me-3" style={{ transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }} width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" clipRule="evenodd" d="M4.41107 6.9107C4.73651 6.58527 5.26414 6.58527 5.58958 6.9107L10.0003 11.3214L14.4111 6.91071C14.7365 6.58527 15.2641 6.58527 15.5896 6.91071C15.915 7.23614 15.915 7.76378 15.5896 8.08922L10.5896 13.0892C10.2641 13.4147 9.73651 13.4147 9.41107 13.0892L4.41107 8.08922C4.08563 7.76378 4.08563 7.23614 4.41107 6.9107Z"/>
                       </svg>
-                    </NavLink>
+                    </button>
                     <div className={open ? 'd-block' : 'd-none'}>
                       <ul className="list-unstyled ps-4 mt-1 mb-2 d-flex flex-column gap-1">
                         <li><NavLink to="/supervisor/meetings/calendar" onClick={handleNavClick} className={({ isActive }) => `d-flex align-items-center px-3 py-1 rounded text-decoration-none fw-medium sidebar-sub-link ${isActive ? 'text-white' : ''}`}>Calendar</NavLink></li>
