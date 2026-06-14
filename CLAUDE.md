@@ -2,6 +2,9 @@
 
 This file contains everything Claude Code needs to understand, work on, and continue building this project without asking repeated questions.
 
+**IMPORTANT — READ THIS FIRST:**
+Before doing anything, read this entire file. Do not start writing code until you have fully understood the current project state, the phase sequence, and all the rules at the bottom of this file.
+
 ---
 
 ## Project Overview
@@ -17,78 +20,85 @@ The project is a **MERN stack** application:
 
 ---
 
+## CURRENT STATUS
+
+### ✅ Frontend — 100% COMPLETE AND VERIFIED
+All pages built, all bugs fixed, full SQA completed across all 3 roles.
+Do NOT modify any frontend files unless a bug is explicitly reported.
+
+### 🔧 Backend — IN PROGRESS (CURRENT PHASE)
+Follow the 5-step backend build sequence below.
+
+---
+
 ## Repository Structure
 
 ```
 Fyp/
-├── client/                         # React frontend (Vite)
+├── client/
 │   └── src/
-│       ├── App.jsx                  # All routes defined here — has ProtectedRoute and AuthRoute
+│       ├── App.jsx                        # All routes — ProtectedRoute, AuthRoute, getStoredRole()
 │       ├── layout/
-│       │   ├── DefaultLayout.jsx    # Student layout wrapper
+│       │   ├── DefaultLayout.jsx
 │       │   ├── CoordinatorLayout.jsx
 │       │   └── SupervisorLayout.jsx
 │       ├── components/
 │       │   ├── Sidebar/
-│       │   │   ├── index.jsx        # Student sidebar
-│       │   │   ├── CoordinatorSidebar.jsx
-│       │   │   ├── SupervisorSidebar.jsx
+│       │   │   ├── index.jsx              # Student sidebar — toggle-only parent items
+│       │   │   ├── CoordinatorSidebar.jsx # toggle-only parent items
+│       │   │   ├── SupervisorSidebar.jsx  # No My Students link
 │       │   │   └── SidebarLinkGroup.jsx
-│       │   ├── Header/index.jsx     # Must read name and role from localStorage
-│       │   └── Breadcrumbs/Breadcrumb.jsx
+│       │   ├── Header/
+│       │   │   ├── index.jsx
+│       │   │   └── DropdownUser.jsx       # Reads name+role from localStorage; My Profile + Log Out only
+│       │   └── Breadcrumbs/Breadcrumb.jsx # Fixed — no double slash
 │       └── pages/
-│           ├── Authentication/SignIn.jsx   # Must save name, role, token to localStorage
-│           ├── Dashboard/Dashboard.jsx     # Student dashboard (post-login landing page)
+│           ├── Authentication/
+│           │   └── SignIn.jsx             # Saves token, user, name, role to localStorage; inline error
+│           ├── Dashboard/Dashboard.jsx    # Student post-login landing
 │           ├── Project/
-│           │   ├── Proposal.jsx            # Student submits proposal
-│           │   ├── Documents.jsx           # Student uploads documents
-│           │   └── Status.jsx              # Student project page (renamed from Project Status)
-│           ├── Tasks/Tasks.jsx             # Student tasks — shows project name tag per task
-│           ├── MeetingRequests.jsx
-│           ├── Announcements.jsx           # Student view only — no post button
+│           │   ├── Proposal.jsx
+│           │   ├── Documents.jsx
+│           │   └── Status.jsx             # Renamed from "Project Status"; has pending tasks widget
+│           ├── Tasks/Tasks.jsx            # Project tag on every row; per-task upload state
+│           ├── MeetingRequests.jsx        # Has "+ New Meeting Request" modal
+│           ├── Announcements.jsx          # View only; all posts by Dr. Asadullah Ehsan (Coordinator)
 │           ├── SupervisorView.jsx
 │           ├── CoordinatorView.jsx
+│           ├── Profile.jsx                # Edit profile + change password + photo upload
 │           ├── Coordinator/
 │           │   ├── Dashboard.jsx
-│           │   ├── Students.jsx            # Real API calls
-│           │   ├── Supervisors.jsx         # Real API calls
-│           │   ├── Projects.jsx            # Real API calls
-│           │   ├── ProjectDetail.jsx       # Real API calls — 4 tabs: Overview, Milestones, Documents, Proposal
-│           │   ├── Proposals.jsx           # Approve/reject UI — all 3 states shown
-│           │   ├── Tasks.jsx               # Searchable project dropdown, All Projects option
+│           │   ├── Students.jsx           # Real API calls
+│           │   ├── Supervisors.jsx        # Real API calls
+│           │   ├── Projects.jsx           # Real API calls
+│           │   ├── ProjectDetail.jsx      # Real API calls — 4 tabs
+│           │   ├── Proposals.jsx          # Approve/reject — all 3 states
+│           │   ├── Tasks.jsx              # Searchable dropdown, All Projects, project tags, validation
 │           │   ├── MeetingCalendar.jsx
 │           │   ├── ScheduleMeeting.jsx
 │           │   ├── MeetingRequests.jsx
-│           │   ├── Announcements.jsx       # Coordinator can post announcements
-│           │   └── Profile.jsx
+│           │   ├── Announcements.jsx      # Only role that can post/delete
+│           │   └── Profile.jsx            # Edit profile + change password + photo upload
 │           └── Supervisor/
-│               ├── Dashboard.jsx
-<<<<<<< HEAD
-│               ├── Projects.jsx             # NEW — list of assigned projects
-│               ├── ProjectDetail.jsx        # NEW — single project detail for supervisor
-│               ├── Proposals.jsx
-│               ├── Tasks.jsx
-=======
-│               ├── Projects.jsx            # List of assigned projects
-│               ├── ProjectDetail.jsx       # 4 tabs: Overview, Tasks, Submissions, Documents
-│               ├── Proposals.jsx           # READ ONLY — supervisor cannot approve/reject
-│               ├── Tasks.jsx               # Grouped by project, filter dropdown
->>>>>>> e72945d (UI cleanup phases complete - profile edit, auth fix, sidebar updates, cosmetic fixes)
+│               ├── Dashboard.jsx          # Stat card says "Total Students" not "My Students"
+│               ├── Projects.jsx           # Hardcoded — list of assigned projects
+│               ├── ProjectDetail.jsx      # 4 tabs: Overview, Tasks, Submissions, Documents
+│               ├── Proposals.jsx          # Read only
+│               ├── Tasks.jsx              # Grouped by project; filter dropdown
 │               ├── MeetingCalendar.jsx
-│               ├── MeetingRequests.jsx
-│               ├── Announcements.jsx       # VIEW ONLY — no post button, no delete, coordinator announcements only
-│               └── Profile.jsx
+│               ├── MeetingRequests.jsx    # Approve/reject + "+ Request Meeting" modal
+│               ├── Announcements.jsx      # View only — coordinator announcements only
+│               └── Profile.jsx            # Edit profile + change password + photo upload
 │
-└── server/                         # Node.js/Express backend
-    ├── index.js                     # Entry point, mounts all routes
-    ├── config/db.js                 # MongoDB connection
-    ├── middleware/
-    │   └── auth.middleware.js       # authenticate + authorize middleware
+└── server/
+    ├── index.js                           # Port 4000
+    ├── config/db.js
+    ├── middleware/auth.middleware.js       # authenticate + authorize
     ├── models/
     │   ├── user.model.js
-    │   ├── student-profile.model.js
-    │   ├── supervisor-profile.model.js
-    │   ├── project.model.js
+    │   ├── student-profile.model.js       # supervisorId OBSOLETE — do not use
+    │   ├── supervisor-profile.model.js    # currentProjects will be refactored
+    │   ├── project.model.js               # Needs extension — see Step 1 below
     │   └── announcements.js
     ├── controllers/
     │   ├── auth.controller.js
@@ -104,409 +114,391 @@ Fyp/
 
 ---
 
-## User Roles and Their Portals
+## localStorage Keys — Critical, Do Not Change
+
+```js
+// Set on login
+localStorage.setItem('token', data.token)
+localStorage.setItem('user',  JSON.stringify(data.user))
+localStorage.setItem('name',  data.user.name)
+localStorage.setItem('role',  data.user.role)
+
+// Cleared on logout
+localStorage.removeItem('token')
+localStorage.removeItem('user')
+localStorage.removeItem('name')
+localStorage.removeItem('role')
+```
+
+---
+
+## User Roles
 
 ### Coordinator
-- The admin of the system. Only one coordinator exists, seeded via `seed.js`.
-- Can create, read, update, delete students and supervisors.
-- Can create, update, delete projects.
-- Can assign and remove supervisors and students from projects.
-- Can create announcements. Only coordinator can post announcements.
-- Can review and approve/reject student proposals.
-- Can create tasks for any project or all projects.
-- Can mark project milestones as complete.
-- Can review task submissions from students.
-- Post-login landing page: `/coordinator/dashboard`
-- Sidebar label: **Coordinator Panel**
+- Admin. One coordinator, seeded via `seed.js`.
+- Can create/edit/delete students, supervisors, projects.
+- **Only role that can post and delete announcements.**
+- Can approve/reject proposals, create tasks, mark milestones, review submissions.
+- Landing page: `/coordinator/dashboard`
 
 ### Supervisor
-- Cannot create users or projects. Assigned to projects by coordinator.
-- Can view all projects assigned to them.
-- Can create tasks for their assigned projects (or all their projects at once).
-- Can review task submissions from students.
-- Can view proposals — READ ONLY, cannot approve or reject.
-- Can view announcements — READ ONLY, cannot post or delete announcements.
-- Can request meetings.
-- Post-login landing page: `/supervisor/dashboard`
-- Sidebar label: **Supervisor Panel**
+- Assigned to projects by coordinator.
+- Can view assigned projects, create tasks, review submissions.
+- Proposals — read only. Announcements — read only.
+- Can approve/reject student meeting requests, request coordinator meetings.
+- Landing page: `/supervisor/dashboard`
 
 ### Student
-- Cannot create users or projects. Added to a project by the coordinator.
-- Has exactly ONE project. Everything they do is scoped to that project.
-- Can submit a project proposal (one student from the group submits on behalf of all).
-- Can upload documents.
-- Can view and submit tasks.
-- Can request meetings with supervisor or coordinator.
-- Can view announcements — READ ONLY, cannot post announcements.
-- Can view their project progress (milestones, group members, supervisor, coordinator).
-- Post-login landing page: `/dashboard`
-- Sidebar label: **Menu**
+- Has exactly ONE project.
+- Can submit proposal, upload documents, submit tasks, request meetings.
+- Announcements — read only.
+- Landing page: `/dashboard`
 
 ---
 
-## Authentication
-
-- JWT-based authentication.
-- On login (`POST /api/auth/login`), the server returns a token and the user's role and name.
-- The frontend stores token, role, and name in `localStorage`.
-- localStorage keys used: `token`, `role`, `name`
-- Role-based navigation: after login, the frontend redirects based on role:
-  - `coordinator` → `/coordinator/dashboard`
-  - `supervisor` → `/supervisor/dashboard`
-  - `student` → `/dashboard`
-- All protected API routes require `Authorization: Bearer <token>` header.
-- Middleware: `authenticate` verifies token and attaches `req.user`. `authorize(...roles)` checks role.
-- `ProtectedRoute` component in App.jsx checks localStorage for token and role, redirects to `/` if missing or wrong role.
-- `AuthRoute` component in App.jsx redirects already-logged-in users away from the login page to their dashboard.
-- Header component reads name and role from localStorage to display the logged-in user — never hardcoded.
-
----
-
-## Known Bug — Currently Being Fixed
-
-**Header shows hardcoded "M.Salman - Student" regardless of who is logged in.**
-
-Root cause: Header component uses hardcoded dummy data instead of reading from localStorage.
-
-Fix required:
-1. `SignIn.jsx` must save `name` to localStorage after login alongside `token` and `role`
-2. `Header/index.jsx` must read `name` and `role` from localStorage to display the correct user
-
-This fix must be applied before testing any role-based pages.
-
----
-
-## What is Currently Working (Backend)
+## Backend — Currently Working
 
 ### Auth
-- `POST /api/auth/login` — fully working
+- `POST /api/auth/login` ✅
 
 ### Users (Coordinator only)
-- `POST /api/users` — create student or supervisor with full profile in a transaction
-- `GET /api/users` — list all users, filter by `?role=student|supervisor`
-- `GET /api/users/:id` — get one user with full profile
-- `PUT /api/users/:id` — update user and profile
-- `DELETE /api/users/:id` — delete user and profile in a transaction
+- `POST /api/users` ✅
+- `GET /api/users` ✅
+- `GET /api/users/:id` ✅
+- `PUT /api/users/:id` ✅
+- `DELETE /api/users/:id` ✅
 
 ### Projects (Coordinator only)
-- `POST /api/projects` — create project
-- `GET /api/projects` — list all projects
-- `GET /api/projects/:id` — get one project with supervisor and students populated
-- `PUT /api/projects/:id` — update project
-- `PUT /api/projects/:id/supervisor` — assign or unassign supervisor
-- `PUT /api/projects/:id/students` — assign student to project
-- `DELETE /api/projects/:id/students/:studentId` — remove student
-- `DELETE /api/projects/:id` — delete project
+- `POST /api/projects` ✅
+- `GET /api/projects` ✅
+- `GET /api/projects/:id` ✅
+- `PUT /api/projects/:id` ✅
+- `PUT /api/projects/:id/supervisor` ✅
+- `PUT /api/projects/:id/students` ✅
+- `DELETE /api/projects/:id/students/:studentId` ✅
+- `DELETE /api/projects/:id` ✅
 
 ### Announcements
-- `POST /api/announcements` — create announcement (no auth, incomplete)
+- `POST /api/announcements` — no auth, incomplete ⚠️
 
 ---
 
-## What is Missing (Backend — To Be Built)
+## Backend Build Sequence — DO THIS NOW
 
-<<<<<<< HEAD
-These are all the backend features that need to be built. Do NOT build them yet. Frontend must be completed first.
-=======
-**Do NOT build any of these yet. Frontend must be fully verified first.**
->>>>>>> e72945d (UI cleanup phases complete - profile edit, auth fix, sidebar updates, cosmetic fixes)
+### STEP 1 — Extend Project Model
+File: `server/models/project.model.js`
 
-### Project model needs these new fields:
+Add these fields:
 ```js
-supervisors: [{ type: ObjectId, ref: 'User' }]
-coordinator: { type: ObjectId, ref: 'User' }
-status: enum ['pending_proposal', 'active', 'completed']
-milestones: [{ id, name, description, completed, completedAt }]
-progress: Number
-proposalId: ObjectId
+supervisors:  [{ type: ObjectId, ref: 'User' }]   // replace single supervisorId
+coordinator:  { type: ObjectId, ref: 'User' }
+status: {
+  type: String,
+  enum: ['pending_proposal', 'active', 'completed'],
+  default: 'pending_proposal'
+}
+milestones: [{
+  id:          Number,
+  name:        String,
+  description: String,
+  completed:   { type: Boolean, default: false },
+  completedAt: Date
+}]
+progress:   { type: Number, default: 0 }
+proposalId: { type: ObjectId, ref: 'Proposal' }
 ```
 
-### New models needed:
-- **Proposal** — `{ title, description, problemStatement, techStack, groupMembers, submittedBy, attachmentUrl, status, coordinatorFeedback, submittedAt }`
-- **Task** — `{ title, instructions, openDate, dueDate, projectId, createdBy, creatorRole, attachmentUrl, targetScope }`
-- **TaskSubmission** — `{ taskId, submittedBy, projectId, fileUrl, submittedAt, status, feedback }`
-- **Document** — `{ projectId, uploadedBy, type, fileName, fileUrl, size, uploadedAt }`
-- **Meeting** — `{ requestedBy, requestedTo, projectId, proposedDate, status, notes }`
-
-### New routes needed:
-- `POST /api/proposals`, `GET /api/proposals`, `PUT /api/proposals/:id/review`
-- `GET /api/projects/my` — student gets their project
-- `GET /api/projects/assigned` — supervisor gets their projects
-- `PUT /api/projects/:id/milestones/:milestoneId` — coordinator marks milestone complete
-- `POST /api/tasks`, `GET /api/tasks`
-- `POST /api/tasks/:id/submit`, `GET /api/tasks/submissions`, `PUT /api/tasks/submissions/:id/review`
-- `POST /api/documents`, `GET /api/documents`
-- `POST /api/meetings`, `GET /api/meetings`, `PUT /api/meetings/:id`
-- `GET /api/announcements` — add auth
-
----
-
-## What is Currently Working (Frontend)
-
-### Coordinator
-- Projects list, Project Detail, Students, Supervisors — **real API calls**
-- Proposals page — approve/reject UI, all 3 states (pending/approved/rejected)
-- Tasks page — searchable project dropdown, All Projects option, project tags
-- ProjectDetail — 4 tabs: Overview, Milestones, Documents, Proposal
-- All other pages — hardcoded dummy data
-
-### Supervisor
-- Projects list and Project Detail — **hardcoded dummy data**
-- Tasks page — grouped by project, filter dropdown, no search bar in dropdown
-- Proposals page — **read only**, no approve/reject buttons
-- Announcements — **view only**, no post button, no delete buttons
-- All other pages — hardcoded dummy data
-
-### Student
-- Tasks page — project name tag on every row, pending and submitted tabs
-- All other pages — hardcoded dummy data
-- Login page — **real API call**
-
----
-
-## Frontend Conventions
-
-### Always give full files
-When modifying any frontend file, always return the complete updated file — never partial snippets or diffs.
-
-### Styling approach
-- Bootstrap 5 for layout (grid, flex, cards, badges, buttons, tables, progress bars)
-- Inline styles for custom colors and fine-tuned spacing
-- TailAdmin dark sidebar color: `#1e2433`
-- Primary brand color: `#3c50e0`
-- No Tailwind utility classes in component JSX
-- Dark mode toggle exists in the header
-
-### Component patterns
-- Breadcrumb: `<Breadcrumb pageName="Page Name" />`
-- All pages use Bootstrap card structure: `card border-0 shadow-sm`
-- Sidebar active state: `sidebar-link-active` class
-
-### Announcements rule
-Only the coordinator can post announcements. Supervisor and student pages show announcements as view-only with no post, edit, or delete controls.
-
-### Hardcoded data pattern
+Default milestones array to seed into every new project:
 ```js
-// TODO (Backend): Replace with GET /api/...
+[
+  { id:1, name:'Project Proposal',   description:'Proposal submitted and approved by coordinator.', completed:false },
+  { id:2, name:'Project Defense',    description:'Initial defense presented to supervisor and coordinator.', completed:false },
+  { id:3, name:'Implementation',     description:'Core development and implementation phase.', completed:false },
+  { id:4, name:'Documentation',      description:'Full project documentation submitted.', completed:false },
+  { id:5, name:'Final Presentation', description:'Final project presented and signed off.', completed:false },
+]
+```
+
+Also remove `supervisorId` field from StudentProfile.
+
+### STEP 2 — Create New Models
+
+Create these files in `server/models/`:
+
+**proposal.model.js**
+```js
+{ title, description, problemStatement, techStack,
+  groupMembers: [{ name: String, rollNumber: String }],
+  submittedBy: ObjectId→User, projectId: ObjectId→Project,
+  attachmentUrl: String,
+  status: { type: String, enum:['pending','approved','rejected'], default:'pending' },
+  coordinatorFeedback: String,
+  submittedAt: { type: Date, default: Date.now } }
+```
+
+**task.model.js**
+```js
+{ title, instructions,
+  openDate: Date, dueDate: Date,
+  projectId: { type: ObjectId, ref:'Project', default: null },
+  createdBy: ObjectId→User,
+  creatorRole: { type: String, enum:['supervisor','coordinator'] },
+  attachmentUrl: String,
+  targetScope: { type: String, enum:['project','all'], default:'project' } }
+```
+
+**tasksubmission.model.js**
+```js
+{ taskId: ObjectId→Task, submittedBy: ObjectId→User,
+  projectId: ObjectId→Project,
+  fileUrl: String, fileName: String,
+  submittedAt: { type: Date, default: Date.now },
+  status: { type: String, enum:['pending','approved','rejected'], default:'pending' },
+  feedback: String }
+```
+
+**document.model.js**
+```js
+{ projectId: ObjectId→Project, uploadedBy: ObjectId→User,
+  type: { type: String, enum:['Proposal','Literature Review','Progress Report','Implementation','Screenshots','Final Report','Other'] },
+  fileName: String, fileUrl: String,
+  size: String,
+  uploadedAt: { type: Date, default: Date.now } }
+```
+
+**meeting.model.js**
+```js
+{ requestedBy: ObjectId→User, requestedTo: ObjectId→User,
+  projectId: { type: ObjectId, ref:'Project', default: null },
+  proposedDate: Date, proposedTime: String,
+  topic: String,
+  status: { type: String, enum:['pending','approved','rejected'], default:'pending' },
+  notes: String,
+  createdAt: { type: Date, default: Date.now } }
+```
+
+### STEP 3 — Proposal Routes
+
+Create `server/routes/proposal.routes.js` and `server/controllers/proposal.controller.js`:
+
+```
+POST   /api/proposals
+  auth: student only
+  body: { title, description, problemStatement, techStack, groupMembers, projectId }
+  validates: groupMembers roll numbers exist in DB
+  creates Proposal with status: 'pending'
+
+GET    /api/proposals
+  auth: coordinator + supervisor
+  coordinator sees all, supervisor sees proposals for their projects
+
+PUT    /api/proposals/:id/review
+  auth: coordinator only
+  body: { status: 'approved'|'rejected', coordinatorFeedback }
+  on approved: auto-complete milestone 1, set project.status = 'active',
+               set project.proposalId = proposal._id,
+               recalculate project.progress
+```
+
+### STEP 4 — Task + Submission Routes
+
+Create `server/routes/task.routes.js` and `server/controllers/task.controller.js`:
+
+```
+POST   /api/tasks
+  auth: coordinator + supervisor
+  body: { title, instructions, openDate, dueDate, projectId, targetScope, attachmentUrl }
+  if targetScope='all' and coordinator: creates one task linked to null projectId
+  if targetScope='all' and supervisor: creates tasks for all their assigned projects
+
+GET    /api/tasks
+  auth: all roles
+  student: returns tasks for their project only
+  supervisor: returns tasks they created, grouped by project
+  coordinator: returns all tasks
+
+POST   /api/tasks/:id/submit
+  auth: student only
+  body: multipart/form-data with file
+  uses Multer for file upload
+  creates TaskSubmission
+
+GET    /api/tasks/submissions
+  auth: coordinator + supervisor
+  supervisor: their tasks' submissions only
+  coordinator: all submissions
+
+PUT    /api/tasks/submissions/:id/review
+  auth: coordinator + supervisor
+  body: { status: 'approved'|'rejected', feedback }
+```
+
+### STEP 5 — Document, Meeting, Announcement Routes
+
+**Documents:**
+```
+POST   /api/documents
+  auth: student only
+  multipart/form-data: file + type
+  uses Multer
+
+GET    /api/documents
+  student: their project docs
+  supervisor: docs for assigned projects
+  coordinator: all docs
+```
+
+**Meetings:**
+```
+POST   /api/meetings
+  auth: all roles
+  body: { requestedTo, projectId, proposedDate, proposedTime, topic }
+
+GET    /api/meetings
+  returns meetings relevant to logged-in user
+
+PUT    /api/meetings/:id
+  auth: supervisor + coordinator
+  body: { status: 'approved'|'rejected', notes }
+```
+
+**Announcements (fix existing):**
+```
+POST   /api/announcements
+  auth: coordinator only (add authenticate + authorize middleware)
+  body: { title, content }
+
+GET    /api/announcements
+  auth: all roles
+  returns all announcements newest first
+```
+
+**User profile (self-update):**
+```
+GET    /api/users/me
+  auth: all roles
+  returns full user + profile data for logged-in user
+
+PUT    /api/users/me
+  auth: all roles
+  body: { name, email, phone, ...role-specific fields }
+
+PUT    /api/users/me/password
+  auth: all roles
+  body: { currentPassword, newPassword }
+  validates current password before updating
+
+POST   /api/users/me/photo
+  auth: all roles
+  multipart/form-data: image file
+  uses Multer, saves to uploads folder or cloud storage
+```
+
+**Project milestone:**
+```
+PUT    /api/projects/:id/milestones/:milestoneId
+  auth: coordinator only
+  body: { completed: true }
+  recalculates project.progress = (completedCount / 5) * 100
+  if milestoneId === 1 and completed: also sets project.status = 'active'
+```
+
+**Student project route:**
+```
+GET    /api/projects/my
+  auth: student only
+  finds project where students array includes req.user._id
+  returns full project with populated supervisor, coordinator, students, milestones
+```
+
+**Supervisor assigned projects:**
+```
+GET    /api/projects/assigned
+  auth: supervisor only
+  finds projects where supervisors array includes req.user._id
+  returns populated list
 ```
 
 ---
 
-## Current Frontend Work Sequence (Phases)
+## File Upload Setup (Multer)
 
-### Phase 1 — DONE ✅
-- Renamed "Project Status" to "Project" in student sidebar and Status.jsx
-- Added pending tasks alert widget on Status.jsx
-- Updated Dashboard.jsx "View Details" to "View Project"
+Install: `npm install multer`
 
-### Phase 2 — DONE ✅
-- Added Projects to supervisor sidebar (replaced My Students)
-- Created Supervisor/Projects.jsx and Supervisor/ProjectDetail.jsx
-- Updated App.jsx with supervisor project routes
+Create `server/middleware/upload.middleware.js`:
+```js
+import multer from 'multer';
+import path from 'path';
 
-<<<<<<< HEAD
-### Phase 3 — NEXT
-- Update student Tasks page (`client/src/pages/Tasks/Tasks.jsx`)
-  - Each task row must show which project it belongs to (project name tag)
-  - Pending tab and Submitted tab must be clean and complete
-- Update supervisor Tasks page (`client/src/pages/Supervisor/Tasks.jsx`)
-  - Group tasks by project
-  - Add a project filter dropdown at the top
-  - Task creation form with project dropdown (shows only assigned projects)
-  - No search bar needed in supervisor's project dropdown
-- Update coordinator Tasks page (`client/src/pages/Coordinator/Tasks.jsx`)
-  - Project tag on every submission row
-  - "All Projects" option in the create task project dropdown
-  - Coordinator sees all projects in the dropdown, searchable
-=======
-### Phase 3 — DONE ✅
-- Student Tasks.jsx — project name tag on every row, fixed upload state bug
-- Supervisor Tasks.jsx — grouped by project, filter dropdown, project tags
-- Coordinator Tasks.jsx — searchable project dropdown, All Projects option, project tags
->>>>>>> e72945d (UI cleanup phases complete - profile edit, auth fix, sidebar updates, cosmetic fixes)
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, 'uploads/'),
+  filename: (req, file, cb) => {
+    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, unique + path.extname(file.originalname));
+  }
+});
 
-### Phase 4 — DONE ✅
-- Coordinator ProjectDetail.jsx — 4-tab layout: Overview, Milestones, Documents, Proposal
-- Coordinator Proposals.jsx — all 3 states with approve/reject functionality
+export const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    const allowed = /pdf|doc|docx|jpg|jpeg|png|zip/;
+    const ext = allowed.test(path.extname(file.originalname).toLowerCase());
+    if (ext) cb(null, true);
+    else cb(new Error('File type not allowed'));
+  }
+});
+```
 
-### Phase 5 — DONE ✅
-- App.jsx — ProtectedRoute and AuthRoute components added
-- Supervisor Proposals.jsx — read-only view
-- Supervisor Announcements.jsx — view-only, no post/delete buttons
+Create `uploads/` folder at server root. Add to `.gitignore`:
+```
+uploads/
+```
 
-### Current Bug Fix — IN PROGRESS 🔧
-- Header hardcoded name/role — fix SignIn.jsx and Header/index.jsx to use localStorage
-
-### Backend Phase — NEXT 👈
-Frontend must be fully verified and bug-free before backend work begins.
-Follow the backend sequence defined in this file.
+Serve static files in `server/index.js`:
+```js
+app.use('/uploads', express.static('uploads'));
+```
 
 ---
 
-## Task System Design
+## Backend Architecture Notes
 
-<<<<<<< HEAD
-Tasks are always linked to a specific project. When a coordinator or supervisor creates a task, they select a project from a dropdown. The task is visible to all students in that project.
-
-**Task scope options:**
-- `project` — task assigned to one specific project
-- `all` — coordinator selects "All Projects" (task goes to all projects) / supervisor selects "All My Projects" (task goes to all their assigned projects)
-
-**Student view:**
-- Tasks page shows Pending and Submitted tabs
-- Each task row shows the project name as a tag
-- On the Project page (`/project/status`), there is a pending tasks alert widget showing count with a link to the Tasks page
-
-**Supervisor view:**
-- Tasks page shows tasks grouped by project
-- Project filter dropdown at the top (no search bar needed — supervisors have ≤6 projects)
-- Submissions tab shows which project each submission came from
-
-**Coordinator view:**
-- Tasks page shows all tasks across all projects
-- Each submission row shows a project tag
-- Create task form has a searchable project dropdown with "All Projects" at the top
-=======
-- Tasks always linked to a specific project
-- `project` scope — one project, `all` scope — all eligible projects
-- Student: Pending and Submitted tabs, project name tag on each row
-- Supervisor: grouped by project, filter dropdown (no search bar — max 6 projects)
-- Coordinator: searchable dropdown, All Projects at top
->>>>>>> e72945d (UI cleanup phases complete - profile edit, auth fix, sidebar updates, cosmetic fixes)
-
----
-
-## Documents System Design
-
-- Students upload formal deliverables AND respond to verbal instructions
-- Document types: Proposal, Literature Review, Progress Report, Implementation, Screenshots, Final Report, Other
-- Supervisors and coordinators view documents inside Project Detail page
-
----
-
-## Milestone System Design
-
-<<<<<<< HEAD
-Each project has exactly 5 milestones:
-1. Project Proposal — auto-marked complete when coordinator approves the proposal
-2. Project Defense — coordinator manually marks complete
-3. Implementation — coordinator manually marks complete
-4. Documentation — coordinator manually marks complete
-5. Final Presentation — coordinator manually marks complete
-
-Progress percentage = (completed milestones / 5) × 100
-
-Tasks do NOT affect milestone progress or project progress percentage. This keeps the system clean and avoidance over-engineering.
-=======
-- 5 milestones per project
-- Milestone 1 auto-completes when coordinator approves proposal
-- Milestones 2-5 manually marked by coordinator
-- Progress = (completed / 5) × 100
-- Tasks do NOT affect progress
->>>>>>> e72945d (UI cleanup phases complete - profile edit, auth fix, sidebar updates, cosmetic fixes)
-
----
-
-## Proposal Workflow
-
-1. One student submits proposal with group member roll numbers
-2. System validates roll numbers exist in database
-3. Goes to coordinator — supervisor can view for reference only
-4. Coordinator approves or rejects with feedback
-5. On approval: milestone 1 auto-completes, project status → active
-
----
-
-## Backend Architecture
-
-- ES modules (`"type": "module"` in package.json)
+- ES modules (`"type": "module"` in server/package.json)
 - All models: `export default mongoose.model(...)`
 - Transactions for user creation/deletion
-- Server runs on port 4000
-- Frontend runs on port 5173
-
-### Environment variables (`server/.env`):
-- `MONGO_URI`, `JWT_SECRET`, `PORT`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`
+- Server port: 4000 | Frontend port: 5173
+- `.env`: `MONGO_URI`, `JWT_SECRET`, `PORT`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`
 
 ---
 
-## Important Rules When Writing Code
+## Important Rules When Writing Backend Code
 
-<<<<<<< HEAD
-1. Always return the **complete file** — never partial snippets or diffs.
-2. Always tell the exact file path where the file should be placed.
-3. If creating a new file, say **"Create new file at:"** before the path.
-4. If replacing an existing file, say **"Replace existing file at:"** before the path.
-5. If a file should be deleted, say **"Delete file at:"** before the path.
-6. All hardcoded data must have a `// TODO (Backend):` comment above it explaining which API call will replace it.
-7. Never use Tailwind utility classes in page JSX — use Bootstrap 5 classes and inline styles.
-8. Never use `<form>` HTML tags — use `onClick` and `onChange` handlers instead.
-9. Do not connect any page to the real API until explicitly told to. All pages use dummy data during the frontend phase.
-10. Do not change the routing structure or URL paths unless explicitly asked.
-11. The student post-login landing page is always `/dashboard`, not `/project/status`.
-12. The coordinator post-login landing page is always `/coordinator/dashboard`.
-13. The supervisor post-login landing page is always `/supervisor/dashboard`.
-=======
-1. **Read this entire CLAUDE.md file before writing a single line of code.**
-2. Always return the **complete file** — never partial snippets or diffs.
-3. Always tell the exact file path where the file should be placed.
-4. If creating a new file, say **"Create new file at:"** before the path.
-5. If replacing an existing file, say **"Replace existing file at:"** before the path.
-6. If a file should be deleted, say **"Delete file at:"** before the path.
-7. All hardcoded data must have a `// TODO (Backend):` comment.
-8. Never use Tailwind utility classes — use Bootstrap 5 and inline styles only.
-9. Never use `<form>` HTML tags — use `onClick` and `onChange` handlers.
-10. Do not connect any page to real API unless explicitly told to.
-11. Do not change routing structure or URL paths unless explicitly asked.
-12. Student landing page: `/dashboard`. Coordinator: `/coordinator/dashboard`. Supervisor: `/supervisor/dashboard`.
-13. **Never modify authentication logic, role-based access control, routing structure, or database schemas without explicitly asking for confirmation first.**
-14. Only the coordinator can post or delete announcements. Supervisor and student announcement pages are view-only.
-15. Header must always read name and role from localStorage — never hardcoded values.
->>>>>>> e72945d (UI cleanup phases complete - profile edit, auth fix, sidebar updates, cosmetic fixes)
+1. **Read this entire CLAUDE.md before writing any code.**
+2. Always return complete files — never partial snippets.
+3. Always state exact file path before the code block.
+4. Use ES module syntax throughout — `import/export`, not `require`.
+5. All routes must use `authenticate` middleware.
+6. Role-restricted routes must use `authorize('role')` middleware.
+7. Never modify existing working routes unless explicitly asked.
+8. Never touch any frontend files during the backend phase.
+9. **Never modify auth logic or DB schemas without asking first.**
+10. Every new route file must be imported and mounted in `server/index.js`.
+11. Use try/catch in every controller function.
+12. Return consistent response format: `{ success: true, data: ... }` or `{ success: false, message: '...' }`.
+13. File upload routes use Multer middleware before the controller.
 
 ---
 
-## How to Run the Project
+## How to Run
 
-### Backend
 ```bash
-cd server
-npm install
-npm run dev     # port 4000
+# Backend (port 4000)
+cd server && npm install && npm run dev
+
+# Frontend (port 5173)
+cd client && npm install && npm run dev
+
+# Seed coordinator
+cd server && node seed.js
 ```
-
-### Frontend
-```bash
-cd client
-npm install
-npm run dev     # port 5173
-```
-
-### Seed coordinator account
-```bash
-cd server
-node seed.js
-```
-
----
-
-## Current Known Issues / Notes
-
-<<<<<<< HEAD
-- `StudentProfile.supervisorId` field still exists in the schema but is now obsolete — supervisor-student relationship is through the Project in the new group-based design. Do not use this field for any new logic. It will be removed when backend work begins.
-- `SupervisorProfile.currentProjects` is manually incremented/decremented. This can drift. When backend is refactored, consider computing it dynamically from the Project collection instead.
-- The `Project.status` enum currently has values `available | assigned | completed`. This will be changed to `pending_proposal | active | completed` when the Project model is extended.
-- The `Project` model currently has a single `supervisorId` field. This will be changed to a `supervisors: []` array when the model is extended.
-- Announcements route has no authentication currently. This will be fixed during backend phase.
-- No file upload system exists yet. Multer will be added when backend phase begins.
-- No frontend route protection yet (anyone can access any URL without logging in). This will be added in Phase 5.
-- Never modify authentication, role-based access control, routing, or database schemas without asking for confirmation first.
-=======
-- Header shows hardcoded "M.Salman - Student" — fix in progress (SignIn.jsx + Header/index.jsx)
-- `StudentProfile.supervisorId` is obsolete — do not use, will be removed in backend phase
-- `SupervisorProfile.currentProjects` manually incremented — will be computed dynamically in backend phase
-- `Project.status` enum currently `available|assigned|completed` — will change to `pending_proposal|active|completed`
-- `Project` model has single `supervisorId` — will change to `supervisors: []` array
-- Announcements route has no auth — will be fixed in backend phase
-- No file upload system yet — Multer will be added in backend phase
->>>>>>> e72945d (UI cleanup phases complete - profile edit, auth fix, sidebar updates, cosmetic fixes)
