@@ -1,19 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../components/Breadcrumbs/Breadcrumb';
 
-/*
-  STUDENT — PROFILE
-  Name and role are read from localStorage (set by SignIn on login).
-  All other fields are hardcoded until the backend profile API is built.
-  TODO (Backend): GET /api/users/me — replace all hardcoded fields
-  TODO (Backend): PUT /api/users/me { name, email, phone } — save profile changes
-  TODO (Backend): PUT /api/users/me/password { currentPassword, newPassword }
-  TODO (Backend): POST /api/users/me/photo — upload profile photo
-*/
-
 const Profile = () => {
-
-  const storedName = localStorage.getItem('name') || 'Student';
   const storedRole = localStorage.getItem('role') || 'student';
 
   const formatRole = (r) => {
@@ -27,50 +15,126 @@ const Profile = () => {
   const displayRole = formatRole(storedRole);
 
   const getInitials = (name) =>
-    name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
+    name ? name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() : '??';
 
-  // TODO (Backend): Replace hardcoded fields with GET /api/users/me
+  // Safe defaults prevent crash before API loads
   const [profile, setProfile] = useState({
-    name:     storedName,
-    email:    'student@university.edu',
-    phone:    '+92 300 1234567',
-    semester: '7th Semester',
-    section:  'Section A',
+    name: '',
+    email: '',
+    phone: '',
+    semester: '',
+    section: '',
+    rollNumber: '',
+    program: '',
+    photoUrl: null,
   });
 
-  const [editMode, setEditMode]         = useState(false);
-  const [draft, setDraft]               = useState({ ...profile });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [editMode, setEditMode] = useState(false);
+  const [draft, setDraft] = useState({});
+  const [profileSaving, setProfileSaving] = useState(false);
   const [profileAlert, setProfileAlert] = useState(false);
+  const [profileError, setProfileError] = useState(null);
 
-  // Photo state
   const [photoPreview, setPhotoPreview] = useState(null);
-  const [photoFile, setPhotoFile]       = useState(null);
-  const [photoSaved, setPhotoSaved]     = useState(false);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoSaving, setPhotoSaving] = useState(false);
+  const [photoSaved, setPhotoSaved] = useState(false);
+  const [photoError, setPhotoError] = useState(null);
 
-  // Password state
-  const [pwForm, setPwForm]     = useState({ current: '', newPw: '', confirm: '' });
+  const [pwForm, setPwForm] = useState({ current: '', newPw: '', confirm: '' });
   const [pwErrors, setPwErrors] = useState({});
-  const [pwAlert, setPwAlert]   = useState(false);
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwAlert, setPwAlert] = useState(false);
+  const [pwApiError, setPwApiError] = useState(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/users/me', {
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || 'Failed to load profile');
+        }
+
+        // getMe returns: { success: true, data: { _id, name, email, role, phone, photoUrl, profile: {...} } }
+        // User fields are spread at the top level of data.data — there is no nested 'user' key
+        const userData = data.data;
+        const prof = data.data.profile;
+
+        const loaded = {
+          name:        userData.name        || '',
+          email:       userData.email       || '',
+          phone:       userData.phone       || '',
+          photoUrl:    userData.photoUrl    || null,
+          semester:    prof?.semester       || '',
+          section:     prof?.section        || '',
+          rollNumber:  prof?.rollNumber     || '',
+          program:     prof?.program        || '',
+        };
+        setProfile(loaded);
+        localStorage.setItem('name', userData.name || '');
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   const handleEditStart = () => {
     setDraft({ ...profile });
     setEditMode(true);
+    setProfileError(null);
   };
 
-  const handleEditCancel = () => setEditMode(false);
+  const handleEditCancel = () => {
+    setEditMode(false);
+    setProfileError(null);
+  };
 
   const handleDraftChange = (e) => {
     const { name, value } = e.target;
     setDraft((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleProfileSave = () => {
-    // TODO (Backend): PUT /api/users/me  { name, email, phone }
-    setProfile({ ...draft });
-    localStorage.setItem('name', draft.name);
-    setEditMode(false);
-    setProfileAlert(true);
-    setTimeout(() => setProfileAlert(false), 3000);
+  const handleProfileSave = async () => {
+    setProfileSaving(true);
+    setProfileError(null);
+    try {
+      const token = localStorage.getItem('token');
+      const body = {
+        name:     draft.name,
+        email:    draft.email,
+        phone:    draft.phone,
+        semester: draft.semester,
+        section:  draft.section,
+      };
+      const res = await fetch('/api/users/me', {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to save profile');
+      }
+      setProfile((prev) => ({ ...prev, ...draft }));
+      localStorage.setItem('name', draft.name);
+      setEditMode(false);
+      setProfileAlert(true);
+      setTimeout(() => setProfileAlert(false), 3000);
+    } catch (err) {
+      setProfileError(err.message);
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
   const handlePhotoChange = (e) => {
@@ -78,28 +142,52 @@ const Profile = () => {
     if (!file) return;
     setPhotoFile(file);
     setPhotoSaved(false);
+    setPhotoError(null);
     const reader = new FileReader();
     reader.onloadend = () => setPhotoPreview(reader.result);
     reader.readAsDataURL(file);
   };
 
-  const handlePhotoSave = () => {
+  const handlePhotoSave = async () => {
     if (!photoFile) return;
-    // TODO (Backend): POST /api/users/me/photo — upload photoFile
-    setPhotoSaved(true);
-    setTimeout(() => setPhotoSaved(false), 3000);
+    setPhotoSaving(true);
+    setPhotoError(null);
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('photo', photoFile);
+      const res = await fetch('/api/users/me/photo', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Photo upload failed');
+      }
+      setProfile((prev) => ({ ...prev, photoUrl: data.data.photoUrl }));
+      setPhotoSaved(true);
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      setTimeout(() => setPhotoSaved(false), 3000);
+    } catch (err) {
+      setPhotoError(err.message);
+    } finally {
+      setPhotoSaving(false);
+    }
   };
 
   const handlePwChange = (e) => {
     const { name, value } = e.target;
     setPwForm((prev) => ({ ...prev, [name]: value }));
     setPwErrors((prev) => ({ ...prev, [name]: undefined }));
+    setPwApiError(null);
   };
 
-  const handlePwSave = () => {
+  const handlePwSave = async () => {
     const errors = {};
-    if (!pwForm.current.trim()) errors.current = 'Please enter your current password.';
-    if (!pwForm.newPw.trim())   errors.newPw   = 'Please enter a new password.';
+    if (!pwForm.current.trim())  errors.current = 'Please enter your current password.';
+    if (!pwForm.newPw.trim())    errors.newPw   = 'Please enter a new password.';
     if (pwForm.newPw.trim() && !pwForm.confirm.trim()) {
       errors.confirm = 'Please confirm your new password.';
     } else if (pwForm.newPw.trim() && pwForm.confirm.trim() && pwForm.newPw !== pwForm.confirm) {
@@ -107,12 +195,55 @@ const Profile = () => {
     }
     setPwErrors(errors);
     if (Object.keys(errors).length > 0) return;
-    // TODO (Backend): PUT /api/users/me/password { currentPassword, newPassword }
-    setPwForm({ current: '', newPw: '', confirm: '' });
-    setPwErrors({});
-    setPwAlert(true);
-    setTimeout(() => setPwAlert(false), 3000);
+
+    setPwSaving(true);
+    setPwApiError(null);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/users/me/password', {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword: pwForm.current,
+          newPassword:     pwForm.newPw,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to change password');
+      }
+      setPwForm({ current: '', newPw: '', confirm: '' });
+      setPwErrors({});
+      setPwAlert(true);
+      setTimeout(() => setPwAlert(false), 3000);
+    } catch (err) {
+      setPwApiError(err.message);
+    } finally {
+      setPwSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <>
+        <Breadcrumb pageName="My Profile" />
+        <div className="d-flex justify-content-center align-items-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <Breadcrumb pageName="My Profile" />
+        <div className="alert alert-danger border-0">{error}</div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -121,7 +252,7 @@ const Profile = () => {
       <div className="row justify-content-center">
         <div className="col-12 col-xl-8">
 
-          {/* ── Profile Card ── */}
+          {/* Profile Card */}
           <div className="card shadow-sm border-0 mb-4">
 
             <div className="card-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
@@ -136,9 +267,10 @@ const Profile = () => {
             <div className="card-body p-4">
 
               {profileAlert && (
-                <div className="alert alert-success border-0 mb-4">
-                  Profile updated successfully!
-                </div>
+                <div className="alert alert-success border-0 mb-4">Profile updated successfully!</div>
+              )}
+              {profileError && (
+                <div className="alert alert-danger border-0 mb-4">{profileError}</div>
               )}
 
               {/* Photo section */}
@@ -147,6 +279,13 @@ const Profile = () => {
                   {photoPreview ? (
                     <img
                       src={photoPreview}
+                      alt="Profile"
+                      className="rounded-circle"
+                      style={{ width: '80px', height: '80px', objectFit: 'cover' }}
+                    />
+                  ) : profile.photoUrl ? (
+                    <img
+                      src={profile.photoUrl}
                       alt="Profile"
                       className="rounded-circle"
                       style={{ width: '80px', height: '80px', objectFit: 'cover' }}
@@ -165,15 +304,22 @@ const Profile = () => {
                       <input type="file" accept="image/*" className="d-none" onChange={handlePhotoChange} />
                     </label>
                     {photoFile && !photoSaved && (
-                      <button className="btn btn-primary btn-sm px-3" style={{ fontSize: '0.8rem' }} onClick={handlePhotoSave}>
+                      <button
+                        className="btn btn-primary btn-sm px-3"
+                        style={{ fontSize: '0.8rem' }}
+                        onClick={handlePhotoSave}
+                        disabled={photoSaving}
+                      >
+                        {photoSaving ? <span className="spinner-border spinner-border-sm me-1" role="status" /> : null}
                         Save Photo
                       </button>
                     )}
                   </div>
                   {photoSaved && <span className="text-success small">Photo saved!</span>}
+                  {photoError && <span className="text-danger small">{photoError}</span>}
                 </div>
                 <div className="text-center text-sm-start mt-2 mt-sm-0">
-                  <h5 className="fw-semibold text-dark mb-1">{profile.name}</h5>
+                  <h5 className="fw-semibold text-dark mb-1">{profile.name || '—'}</h5>
                   <p className="text-muted small mb-2">{displayRole}</p>
                   <span className="badge bg-primary rounded-pill px-3" style={{ fontSize: '0.7rem' }}>
                     {displayRole}
@@ -189,7 +335,7 @@ const Profile = () => {
                   {editMode ? (
                     <input type="text" name="name" className="form-control" value={draft.name} onChange={handleDraftChange} />
                   ) : (
-                    <div className="form-control bg-light text-dark">{profile.name}</div>
+                    <div className="form-control bg-light text-dark">{profile.name || '—'}</div>
                   )}
                 </div>
 
@@ -198,79 +344,106 @@ const Profile = () => {
                   {editMode ? (
                     <input type="email" name="email" className="form-control" value={draft.email} onChange={handleDraftChange} />
                   ) : (
-                    <div className="form-control bg-light text-dark">{profile.email}</div>
+                    <div className="form-control bg-light text-dark">{profile.email || '—'}</div>
                   )}
                 </div>
 
                 <div className="col-12 col-md-6">
                   <label className="form-label fw-medium text-dark small">Phone Number</label>
                   {editMode ? (
-                    <input type="text" name="phone" className="form-control" placeholder="+92 300 0000000" value={draft.phone} onChange={handleDraftChange} />
+                    <input
+                      type="text"
+                      name="phone"
+                      className="form-control"
+                      placeholder="+92 300 0000000"
+                      value={draft.phone}
+                      onChange={handleDraftChange}
+                    />
                   ) : (
-                    <div className="form-control bg-light text-dark">{profile.phone}</div>
+                    <div className="form-control bg-light text-dark">{profile.phone || '—'}</div>
                   )}
                 </div>
 
-                <div className="col-12 col-md-6">
-                  <label className="form-label fw-medium text-dark small">Semester</label>
-                  {editMode ? (
-                    <select name="semester" className="form-select" value={draft.semester} onChange={handleDraftChange}>
-                      <option>1st Semester</option>
-                      <option>2nd Semester</option>
-                      <option>3rd Semester</option>
-                      <option>4th Semester</option>
-                      <option>5th Semester</option>
-                      <option>6th Semester</option>
-                      <option>7th Semester</option>
-                      <option>8th Semester</option>
-                    </select>
-                  ) : (
-                    <div className="form-control bg-light text-dark">{profile.semester}</div>
-                  )}
-                </div>
+                {/* Semester — only relevant for students */}
+                {storedRole === 'student' && (
+                  <div className="col-12 col-md-6">
+                    <label className="form-label fw-medium text-dark small">Semester</label>
+                    {editMode ? (
+                      <select name="semester" className="form-select" value={draft.semester} onChange={handleDraftChange}>
+                        <option value="">Select Semester</option>
+                        <option value="1st Semester">1st Semester</option>
+                        <option value="2nd Semester">2nd Semester</option>
+                        <option value="3rd Semester">3rd Semester</option>
+                        <option value="4th Semester">4th Semester</option>
+                        <option value="5th Semester">5th Semester</option>
+                        <option value="6th Semester">6th Semester</option>
+                        <option value="7th Semester">7th Semester</option>
+                        <option value="8th Semester">8th Semester</option>
+                      </select>
+                    ) : (
+                      <div className="form-control bg-light text-dark">{profile.semester || '—'}</div>
+                    )}
+                  </div>
+                )}
 
-                <div className="col-12 col-md-6">
-                  <label className="form-label fw-medium text-dark small">Section</label>
-                  {editMode ? (
-                    <select name="section" className="form-select" value={draft.section} onChange={handleDraftChange}>
-                      <option>Section A</option>
-                      <option>Section B</option>
-                      <option>Section C</option>
-                    </select>
-                  ) : (
-                    <div className="form-control bg-light text-dark">{profile.section}</div>
-                  )}
-                </div>
+                {/* Section — only relevant for students */}
+                {storedRole === 'student' && (
+                  <div className="col-12 col-md-6">
+                    <label className="form-label fw-medium text-dark small">Section</label>
+                    {editMode ? (
+                      <select name="section" className="form-select" value={draft.section} onChange={handleDraftChange}>
+                        <option value="">Select Section</option>
+                        <option value="Section A">Section A</option>
+                        <option value="Section B">Section B</option>
+                        <option value="Section C">Section C</option>
+                      </select>
+                    ) : (
+                      <div className="form-control bg-light text-dark">{profile.section || '—'}</div>
+                    )}
+                  </div>
+                )}
 
               </div>
 
-              {/* Read-only student fields */}
-              <div className="row g-3">
+              {/* Read-only student-only fields */}
+              {storedRole === 'student' && (
+                <div className="row g-3">
+                  <div className="col-12">
+                    <label className="form-label fw-medium text-dark small">
+                      Roll Number
+                      <span className="ms-2 text-muted" style={{ fontSize: '0.72rem', fontWeight: 'normal' }}>— Cannot be changed</span>
+                    </label>
+                    <div className="form-control bg-light" style={{ color: '#6c757d' }}>
+                      {profile.rollNumber || '—'}
+                    </div>
+                  </div>
 
-                <div className="col-12">
-                  <label className="form-label fw-medium text-dark small">
-                    Roll Number
-                    <span className="ms-2 text-muted" style={{ fontSize: '0.72rem', fontWeight: 'normal' }}>— Cannot be changed</span>
-                  </label>
-                  <div className="form-control bg-light" style={{ color: '#6c757d' }}>F2021001001</div>
+                  <div className="col-12">
+                    <label className="form-label fw-medium text-dark small">
+                      Program
+                      <span className="ms-2 text-muted" style={{ fontSize: '0.72rem', fontWeight: 'normal' }}>— Cannot be changed</span>
+                    </label>
+                    <div className="form-control bg-light" style={{ color: '#6c757d' }}>
+                      {profile.program || '—'}
+                    </div>
+                  </div>
                 </div>
-
-                <div className="col-12">
-                  <label className="form-label fw-medium text-dark small">
-                    Program
-                    <span className="ms-2 text-muted" style={{ fontSize: '0.72rem', fontWeight: 'normal' }}>— Cannot be changed</span>
-                  </label>
-                  <div className="form-control bg-light" style={{ color: '#6c757d' }}>BSCS — Bachelor of Science in Computer Science</div>
-                </div>
-
-              </div>
+              )}
 
               {editMode && (
                 <div className="mt-4 d-flex gap-3">
-                  <button className="btn btn-primary px-5 fw-medium" onClick={handleProfileSave}>
-                    Save Changes
+                  <button
+                    className="btn btn-primary px-5 fw-medium"
+                    onClick={handleProfileSave}
+                    disabled={profileSaving}
+                  >
+                    {profileSaving ? (
+                      <><span className="spinner-border spinner-border-sm me-2" role="status" />Saving...</>
+                    ) : (
+                      'Save Changes'
+                    )}
                   </button>
-                  <button type="button" className="btn btn-outline-secondary px-4" onClick={handleEditCancel}>
+                  <button className="btn btn-outline-secondary px-4" onClick={handleEditCancel}>
                     Cancel
                   </button>
                 </div>
@@ -279,7 +452,7 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* ── Change Password Card ── */}
+          {/* Change Password Card */}
           <div className="card shadow-sm border-0">
             <div className="card-header bg-white border-bottom py-3 px-4">
               <h5 className="fw-semibold text-dark mb-0">Change Password</h5>
@@ -287,9 +460,10 @@ const Profile = () => {
             <div className="card-body p-4">
 
               {pwAlert && (
-                <div className="alert alert-success border-0 mb-4">
-                  Password changed successfully!
-                </div>
+                <div className="alert alert-success border-0 mb-4">Password changed successfully!</div>
+              )}
+              {pwApiError && (
+                <div className="alert alert-danger border-0 mb-4">{pwApiError}</div>
               )}
 
               <div className="row g-3">
@@ -336,8 +510,16 @@ const Profile = () => {
               </div>
 
               <div className="mt-4">
-                <button className="btn btn-primary px-5 fw-medium" onClick={handlePwSave}>
-                  Update Password
+                <button
+                  className="btn btn-primary px-5 fw-medium"
+                  onClick={handlePwSave}
+                  disabled={pwSaving}
+                >
+                  {pwSaving ? (
+                    <><span className="spinner-border spinner-border-sm me-2" role="status" />Saving...</>
+                  ) : (
+                    'Update Password'
+                  )}
                 </button>
               </div>
 

@@ -1,86 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
-
-/*
-  STUDENT — TASKS
-  Pending tab: tasks not yet submitted, each row shows project tag + per-task file upload.
-  Submitted tab: tasks already submitted, each row shows project tag + status badge + feedback.
-*/
 
 const Tasks = () => {
   const [activeTab, setActiveTab] = useState('pending');
-
-  // TODO (Backend): Replace with GET /api/tasks (student's project, pending status)
-  const pendingTasks = [
-    {
-      id: 1,
-      title: 'Literature Review',
-      project: 'FYP Management System',
-      instructions: 'Find and summarize at least 10 relevant research papers on your chosen topic. Include full citation details for each.',
-      openDate: '02-11-2025',
-      dueDate: '13-11-2025',
-      assignedBy: 'Mr. Shoaib Ahmed (Supervisor)',
-      attachedFile: 'literature_review_guidelines.pdf',
-    },
-    {
-      id: 2,
-      title: 'Progress Report',
-      project: 'FYP Management System',
-      instructions: 'Submit your mid-semester progress report covering implementation status, completed milestones, and any blockers.',
-      openDate: '15-11-2025',
-      dueDate: '25-11-2025',
-      assignedBy: 'Mr. Omer Farooq (Coordinator)',
-      attachedFile: null,
-    },
-  ];
-
-  // TODO (Backend): Replace with GET /api/tasks (student's project, submitted status)
-  const submittedTasks = [
-    {
-      id: 3,
-      title: 'Project Proposal',
-      project: 'FYP Management System',
-      openDate: '01-10-2025',
-      dueDate: '13-10-2025',
-      submitDate: '10-10-2025',
-      assignedBy: 'Mr. Shoaib Ahmed (Supervisor)',
-      submittedFile: 'project_proposal_draft.pdf',
-      status: 'approved',
-      feedback: 'Good work. Needs more technical detail in the methodology section.',
-    },
-    {
-      id: 4,
-      title: 'System Architecture Diagram',
-      project: 'FYP Management System',
-      openDate: '14-10-2025',
-      dueDate: '25-10-2025',
-      submitDate: '22-10-2025',
-      assignedBy: 'Mr. Omer Farooq (Coordinator)',
-      submittedFile: 'architecture_diagram.pdf',
-      status: 'submitted',
-      feedback: '',
-    },
-  ];
-
-  // Per-task upload state keyed by taskId — fixes the shared-state bug
+  const [pendingTasks, setPendingTasks] = useState([]);
+  const [submittedTasks, setSubmittedTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [uploadFiles, setUploadFiles] = useState({});
+  const [submitting, setSubmitting] = useState({});
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/tasks', {
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || 'Failed to load tasks');
+        }
+        setPendingTasks(data.data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTasks();
+  }, []);
 
   const handleFileChange = (taskId, file) => {
-    setUploadFiles(prev => ({ ...prev, [taskId]: file }));
+    setUploadFiles((prev) => ({ ...prev, [taskId]: file }));
   };
 
-  const handleSubmitTask = (taskId) => {
-    if (!uploadFiles[taskId]) {
+  const handleSubmitTask = async (task) => {
+    const file = uploadFiles[task._id];
+    if (!file) {
       alert('Please select a file before submitting.');
       return;
     }
-    // TODO (Backend): POST /api/tasks/:id/submit with multipart/form-data (file)
-    alert(`Task submitted successfully with file: ${uploadFiles[taskId].name}`);
-    setUploadFiles(prev => {
-      const next = { ...prev };
-      delete next[taskId];
-      return next;
-    });
+
+    setSubmitting((prev) => ({ ...prev, [task._id]: true }));
+
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch(`/api/tasks/${task._id}/submit`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Submission failed');
+      }
+
+      setPendingTasks((prev) => prev.filter((t) => t._id !== task._id));
+      setSubmittedTasks((prev) => [
+        ...prev,
+        {
+          ...task,
+          submittedFile: file.name,
+          submitDate: new Date().toLocaleDateString('en-GB'),
+          status: 'submitted',
+          feedback: '',
+        },
+      ]);
+      setUploadFiles((prev) => {
+        const next = { ...prev };
+        delete next[task._id];
+        return next;
+      });
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSubmitting((prev) => ({ ...prev, [task._id]: false }));
+    }
   };
 
   const getSubmissionBadge = (status) => {
@@ -98,6 +97,46 @@ const Tasks = () => {
     fontWeight: '500',
   };
 
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('en-GB', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+    }).replace(/\//g, '-');
+  };
+
+  const getProjectName = (task) => {
+    if (task.projectId && typeof task.projectId === 'object') return task.projectId.title;
+    if (task.targetScope === 'all') return 'All Projects';
+    return '—';
+  };
+
+  const getAssignedBy = (task) => {
+    if (task.assignedBy && typeof task.assignedBy === 'object') return task.assignedBy.name;
+    return 'Unknown';
+  };
+
+  if (loading) {
+    return (
+      <>
+        <Breadcrumb pageName="Tasks" />
+        <div className="d-flex justify-content-center align-items-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <Breadcrumb pageName="Tasks" />
+        <div className="alert alert-danger border-0">{error}</div>
+      </>
+    );
+  }
+
   return (
     <>
       <Breadcrumb pageName="Tasks" />
@@ -112,7 +151,7 @@ const Tasks = () => {
                 {[
                   { key: 'pending',   label: `Pending (${pendingTasks.length})` },
                   { key: 'submitted', label: `Submitted (${submittedTasks.length})` },
-                ].map(tab => (
+                ].map((tab) => (
                   <button
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
@@ -131,7 +170,7 @@ const Tasks = () => {
 
             <div className="card-body p-0">
 
-              {/* ── PENDING TAB ── */}
+              {/* PENDING TAB */}
               {activeTab === 'pending' && (
                 pendingTasks.length === 0 ? (
                   <div className="text-center py-5">
@@ -144,63 +183,62 @@ const Tasks = () => {
                         <tr>
                           <th className="px-4 py-3 fw-semibold small text-dark" style={{ width: '44px' }}>#</th>
                           <th className="px-4 py-3 fw-semibold small text-dark">Title &amp; Details</th>
-                          <th className="px-4 py-3 fw-semibold small text-dark" style={{ width: '110px' }}>Open Date</th>
+                          <th className="px-4 py-3 fw-semibold small text-dark" style={{ width: '110px' }}>Assigned On</th>
                           <th className="px-4 py-3 fw-semibold small text-dark" style={{ width: '110px' }}>Due Date</th>
                           <th className="px-4 py-3 fw-semibold small text-dark" style={{ width: '190px' }}>Submit</th>
                         </tr>
                       </thead>
                       <tbody>
                         {pendingTasks.map((task, index) => (
-                          <tr key={task.id}>
+                          <tr key={task._id}>
                             <td className="px-4 py-3 text-muted small">{index + 1}</td>
                             <td className="px-4 py-3">
                               <div className="d-flex align-items-center flex-wrap gap-2 mb-1">
                                 <span className="fw-semibold text-dark small">{task.title}</span>
                                 <span className="badge rounded-pill" style={projectTagStyle}>
-                                  {task.project}
+                                  {getProjectName(task)}
                                 </span>
                               </div>
-                              <p className="text-muted small mb-1">By: {task.assignedBy}</p>
-                              <p className="text-muted small mb-0">{task.instructions}</p>
-                              {task.attachedFile && (
-                                <button
-                                  className="btn btn-link btn-sm p-0 text-primary text-decoration-none mt-1"
-                                  style={{ fontSize: '0.8rem' }}
-                                  onClick={() => alert(`Downloading ${task.attachedFile}`)}
-                                >
-                                  📎 {task.attachedFile}
-                                </button>
+                              <p className="text-muted small mb-1">By: {getAssignedBy(task)}</p>
+                              {task.instructions && (
+                                <p className="text-muted small mb-0">{task.instructions}</p>
                               )}
                             </td>
-                            <td className="px-4 py-3 text-muted small">{task.openDate}</td>
+                            <td className="px-4 py-3 text-muted small">{formatDate(task.createdAt)}</td>
                             <td className="px-4 py-3">
-                              <span className="small fw-medium" style={{ color: '#dc3545' }}>{task.dueDate}</span>
+                              <span className="small fw-medium" style={{ color: '#dc3545' }}>
+                                {formatDate(task.dueDate)}
+                              </span>
                             </td>
                             <td className="px-4 py-3">
                               <div className="d-flex flex-column gap-2">
                                 <input
                                   type="file"
-                                  id={`file-${task.id}`}
+                                  id={`file-${task._id}`}
                                   className="d-none"
-                                  onChange={(e) => handleFileChange(task.id, e.target.files[0])}
+                                  onChange={(e) => handleFileChange(task._id, e.target.files[0])}
                                 />
                                 <label
-                                  htmlFor={`file-${task.id}`}
+                                  htmlFor={`file-${task._id}`}
                                   className="btn btn-outline-primary btn-sm mb-0"
                                   style={{ cursor: 'pointer', width: 'fit-content' }}
                                 >
                                   Upload File
                                 </label>
-                                {uploadFiles[task.id] && (
+                                {uploadFiles[task._id] && (
                                   <>
                                     <span className="text-muted" style={{ fontSize: '0.78rem' }}>
-                                      {uploadFiles[task.id].name}
+                                      {uploadFiles[task._id].name}
                                     </span>
                                     <button
                                       className="btn btn-success btn-sm"
                                       style={{ width: 'fit-content' }}
-                                      onClick={() => handleSubmitTask(task.id)}
+                                      onClick={() => handleSubmitTask(task)}
+                                      disabled={submitting[task._id]}
                                     >
+                                      {submitting[task._id] ? (
+                                        <span className="spinner-border spinner-border-sm me-1" role="status" />
+                                      ) : null}
                                       Submit
                                     </button>
                                   </>
@@ -215,7 +253,7 @@ const Tasks = () => {
                 )
               )}
 
-              {/* ── SUBMITTED TAB ── */}
+              {/* SUBMITTED TAB */}
               {activeTab === 'submitted' && (
                 submittedTasks.length === 0 ? (
                   <div className="text-center py-5">
@@ -238,27 +276,21 @@ const Tasks = () => {
                         {submittedTasks.map((task, index) => {
                           const badge = getSubmissionBadge(task.status);
                           return (
-                            <tr key={task.id}>
+                            <tr key={task._id}>
                               <td className="px-4 py-3 text-muted small">{index + 1}</td>
                               <td className="px-4 py-3">
                                 <div className="d-flex align-items-center flex-wrap gap-2 mb-1">
                                   <span className="fw-semibold text-dark small">{task.title}</span>
                                   <span className="badge rounded-pill" style={projectTagStyle}>
-                                    {task.project}
+                                    {getProjectName(task)}
                                   </span>
                                 </div>
-                                <p className="text-muted small mb-0">By: {task.assignedBy}</p>
+                                <p className="text-muted small mb-0">By: {getAssignedBy(task)}</p>
                               </td>
-                              <td className="px-4 py-3 text-muted small">{task.dueDate}</td>
+                              <td className="px-4 py-3 text-muted small">{formatDate(task.dueDate)}</td>
                               <td className="px-4 py-3 text-muted small">{task.submitDate}</td>
                               <td className="px-4 py-3">
-                                <button
-                                  className="btn btn-link btn-sm p-0 text-primary text-decoration-none"
-                                  style={{ fontSize: '0.82rem' }}
-                                  onClick={() => alert(`Downloading ${task.submittedFile}`)}
-                                >
-                                  📎 {task.submittedFile}
-                                </button>
+                                <span className="text-muted small">📎 {task.submittedFile}</span>
                               </td>
                               <td className="px-4 py-3">
                                 <span

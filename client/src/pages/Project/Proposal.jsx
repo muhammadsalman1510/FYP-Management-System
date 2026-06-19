@@ -1,466 +1,500 @@
-import React, { useState } from 'react';
-
-/*
-  STUDENT — PROJECT PROPOSAL FORM
-  Student fills project details + group member information.
-  Group size is selected first (2-4 students), then that many
-  member forms appear dynamically.
-  One student from the group submits on behalf of the group.
-
-  TODO (Backend): POST /api/proposals
-  Body: { title, description, problemStatement, stack,
-          expectedOutcome, groupMembers: [...], file }
-  TODO (Backend): GET /api/proposals/my  → to show existing proposal & status
-*/
+import React, { useState, useEffect } from 'react';
 
 const Proposal = () => {
+  const [loading, setLoading]                         = useState(true);
+  const [error, setError]                             = useState(null);
+  const [hasProject, setHasProject]                   = useState(false);
+  const [projectData, setProjectData]                 = useState(null);
+  const [submitted, setSubmitted]                     = useState(false);
+  const [proposalStatus, setProposalStatus]           = useState(null); // null | 'pending' | 'approved' | 'rejected'
+  const [rejectedFeedback, setRejectedFeedback]       = useState('');
+  const [supervisorRecommendation, setSupervisorRecommendation] = useState('pending');
+  const [supervisorFeedback, setSupervisorFeedback]   = useState('');
 
-  // ── Proposal status (replace with API call later) ──
-  // TODO (Backend): GET /api/proposals/my
-  const [status, setStatus] = useState('draft');
-  const [rejectionFeedback] = useState('Please add more technical details and refine your problem statement.');
+  // Form fields
+  const [title, setTitle]                       = useState('');
+  const [description, setDescription]           = useState('');
+  const [problemStatement, setProblemStatement] = useState('');
+  const [techStack, setTechStack]               = useState('');
+  const [groupMembers, setGroupMembers]         = useState([{ name: '', rollNumber: '' }]);
+  const [supervisorName, setSupervisorName]     = useState('');
+  const [supervisorEmail, setSupervisorEmail]   = useState('');
 
-  // ── Main form fields ──
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    problemStatement: '',
-    stack: '',
-    expectedOutcome: '',
-    file: null,
-  });
+  const [submitting, setSubmitting]   = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
-  // ── Group members ──
-  // groupSize: how many additional members (not counting the submitting student)
-  const [groupSize, setGroupSize] = useState('');
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
-  const emptyMember = {
-    name: '',
-    rollNumber: '',
-    semester: '',
-    section: '',
-    program: '',
-  };
+        // Step 1: check if student already has an active project
+        const projectRes  = await fetch('/api/projects/my', { headers });
+        const projectJson = await projectRes.json();
 
-  const [groupMembers, setGroupMembers] = useState([]);
+        if (projectRes.ok && projectJson.success) {
+          setHasProject(true);
+          setProjectData(projectJson.data);
+          return;
+        }
 
-  // When group size changes, rebuild the groupMembers array
-  const handleGroupSizeChange = (e) => {
-    const size = parseInt(e.target.value);
-    setGroupSize(e.target.value);
-    if (!isNaN(size) && size >= 1) {
-      // Fill with empty forms up to that count
-      setGroupMembers(Array.from({ length: size }, () => ({ ...emptyMember })));
-    } else {
-      setGroupMembers([]);
+        if (projectRes.status !== 404) {
+          throw new Error(projectJson.message || 'Failed to load project info');
+        }
+
+        // Step 2: no project — check if student has an existing proposal
+        const proposalRes  = await fetch('/api/proposals/my', { headers });
+        const proposalJson = await proposalRes.json();
+
+        if (!proposalRes.ok || !proposalJson.success) {
+          throw new Error(proposalJson.message || 'Failed to load proposal info');
+        }
+
+        const proposal = proposalJson.data;
+        if (!proposal) {
+          setProposalStatus(null); // no proposal at all — show blank form
+        } else {
+          setProposalStatus(proposal.status);
+          setSupervisorRecommendation(proposal.supervisorRecommendation || 'pending');
+          setSupervisorFeedback(proposal.supervisorFeedback || '');
+          if (proposal.status === 'rejected') {
+            setRejectedFeedback(proposal.coordinatorFeedback || '');
+          }
+        }
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const getRecStyle = (rec) => {
+    switch (rec) {
+      case 'approved': return { backgroundColor: '#28a74520', color: '#28a745' };
+      case 'rejected': return { backgroundColor: '#dc354520', color: '#dc3545' };
+      default:         return { backgroundColor: '#6c757d20', color: '#6c757d' };
     }
   };
 
-  // Update a specific member's field
-  const handleMemberChange = (index, field, value) => {
-    setGroupMembers(prev => {
+  const getRecLabel = (rec) => {
+    switch (rec) {
+      case 'approved': return 'Approved';
+      case 'rejected': return 'Rejected';
+      default:         return 'Pending';
+    }
+  };
+
+  const addMember = () => {
+    setGroupMembers((prev) => [...prev, { name: '', rollNumber: '' }]);
+  };
+
+  const removeMember = (index) => {
+    setGroupMembers((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateMember = (index, field, value) => {
+    setSubmitError(null);
+    setGroupMembers((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
       return updated;
     });
   };
 
-  // ── Main form handlers ──
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  const handleSubmit = async () => {
+    if (!title.trim())            { setSubmitError('Please enter a project title.'); return; }
+    if (!description.trim())      { setSubmitError('Please enter a project description.'); return; }
+    if (!problemStatement.trim()) { setSubmitError('Please enter the problem statement.'); return; }
+    if (!techStack.trim())        { setSubmitError('Please enter the technology stack.'); return; }
+    if (!supervisorName.trim())   { setSubmitError("Please enter your supervisor's name."); return; }
+    if (!supervisorEmail.trim())  { setSubmitError("Please enter your supervisor's email."); return; }
 
-  const handleFileChange = (e) => {
-    setFormData(prev => ({ ...prev, file: e.target.files[0] }));
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    // Validate that all group member fields are filled
     for (let i = 0; i < groupMembers.length; i++) {
       const m = groupMembers[i];
-      if (!m.name || !m.rollNumber || !m.semester || !m.section || !m.program) {
-        alert(`Please fill all fields for Group Member ${i + 1}`);
+      if (!m.name.trim() || !m.rollNumber.trim()) {
+        setSubmitError(`Please fill in name and roll number for Group Member ${i + 1}.`);
         return;
       }
     }
 
-    // TODO (Backend): POST /api/proposals
-    // Send formData + groupMembers to API
-    console.log('Submitting proposal:', { ...formData, groupMembers });
-    setStatus('submitted');
-    alert('Project Proposal Submitted Successfully!');
-  };
+    setSubmitting(true);
+    setSubmitError(null);
 
-  const handleSaveDraft = () => {
-    // TODO (Backend): POST /api/proposals/draft
-    alert('Draft Saved Successfully!');
-  };
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/proposals', {
+        method:  'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description, problemStatement, techStack, groupMembers, supervisorName, supervisorEmail }),
+      });
+      const data = await res.json();
 
-  // ── Status helpers ──
-  const getStatusBadge = (s) => {
-    switch (s) {
-      case 'draft':        return 'bg-warning text-dark';
-      case 'submitted':    return 'bg-primary';
-      case 'under_review': return 'bg-warning';
-      case 'approved':     return 'bg-success';
-      case 'rejected':     return 'bg-danger';
-      default:             return 'bg-secondary';
+      if (!res.ok) {
+        if (res.status === 409) {
+          setSubmitted(true); // already have a pending proposal from a previous session
+        } else {
+          setSubmitError(data.message || 'Failed to submit proposal. Please try again.');
+        }
+        return;
+      }
+
+      setSubmitted(true);
+    } catch (err) {
+      setSubmitError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const getStatusText = (s) => {
-    switch (s) {
-      case 'draft':        return 'Draft';
-      case 'submitted':    return 'Submitted';
-      case 'under_review': return 'Under Review';
-      case 'approved':     return 'Approved ✓';
-      case 'rejected':     return 'Rejected';
-      default:             return 'Unknown';
-    }
-  };
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center py-5">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
 
-  // If proposal already approved, show read-only view
-  if (status === 'approved') {
+  if (error) {
+    return <div className="alert alert-danger border-0">{error}</div>;
+  }
+
+  // Student already has an active project
+  if (hasProject) {
     return (
       <div className="d-flex flex-column gap-4">
         <div className="card shadow-sm border-0">
-          <div className="card-body p-4 text-center py-5">
+          <div className="card-header bg-white border-bottom py-3 px-4">
+            <h5 className="fw-semibold text-dark mb-0">Proposal Status</h5>
+          </div>
+          <div className="card-body text-center py-5">
             <div className="mb-3" style={{ fontSize: '3rem' }}>✅</div>
-            <h5 className="fw-semibold text-dark mb-2">Proposal Approved!</h5>
-            <p className="text-muted small mb-0">
-              Your project proposal has been approved by the coordinator.
-              Your project group has been created.
+            <h5 className="fw-semibold text-dark mb-2">Project Active</h5>
+            <p className="text-muted small mb-1">
+              {projectData?.title
+                ? <span>Your project <strong className="text-dark">"{projectData.title}"</strong> is active.</span>
+                : 'Your project proposal has been approved and your project is active.'}
             </p>
+            <p className="text-muted small mb-4">
+              You can track milestones and project progress on the Project Status page.
+            </p>
+            <a href="/project/status" className="btn btn-primary px-5 fw-medium">
+              View Project Status
+            </a>
           </div>
         </div>
       </div>
     );
   }
 
+  // Just submitted this session OR already have a pending proposal from a previous session
+  if (submitted || proposalStatus === 'pending') {
+    return (
+      <div className="card shadow-sm border-0">
+        <div className="card-body text-center py-5">
+          <div className="mb-3" style={{ fontSize: '3rem' }}>📋</div>
+          <h5 className="fw-semibold text-dark mb-2">Proposal Submitted — Awaiting Coordinator Review</h5>
+          <p className="text-muted small mb-4">
+            Your proposal has been received. The coordinator will review it and get back to you.
+            Once approved, your project will be automatically created.
+          </p>
+
+          <div className="d-inline-flex flex-column gap-2 text-start">
+            <div className="d-flex align-items-center gap-2">
+              <span className="small text-muted" style={{ minWidth: '185px', textAlign: 'right' }}>
+                Supervisor Recommendation:
+              </span>
+              <span
+                className="badge rounded-pill px-3 py-1"
+                style={getRecStyle(supervisorRecommendation)}
+              >
+                {getRecLabel(supervisorRecommendation)}
+              </span>
+            </div>
+            {supervisorFeedback && (
+              <p className="small text-muted mb-0 ms-1">
+                <strong>Supervisor feedback:</strong> {supervisorFeedback}
+              </p>
+            )}
+            <div className="d-flex align-items-center gap-2">
+              <span className="small text-muted" style={{ minWidth: '185px', textAlign: 'right' }}>
+                Coordinator Decision:
+              </span>
+              <span
+                className="badge rounded-pill px-3 py-1"
+                style={{ backgroundColor: '#ffc10730', color: '#d39e00' }}
+              >
+                Pending
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Approved but project not yet visible (edge case — approval creates project synchronously, but brief race on page load)
+  if (proposalStatus === 'approved') {
+    return (
+      <div className="card shadow-sm border-0">
+        <div className="card-body text-center py-5">
+          <div className="spinner-border text-primary mb-3" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <h5 className="fw-semibold text-dark mb-2">Project Being Created</h5>
+          <p className="text-muted small mb-0">
+            Your proposal was approved. Your project is being set up — please refresh in a moment.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show form — either no proposal (proposalStatus === null) or rejected (show feedback + fresh form)
   return (
     <div className="d-flex flex-column gap-4">
 
-      {/* ── Status Card ── */}
+      {/* Rejection feedback banner — only shown when resubmitting after a rejection */}
+      {proposalStatus === 'rejected' && (
+        <div className="alert alert-danger border-0 shadow-sm">
+          <h6 className="fw-semibold mb-3">Your Previous Proposal Was Rejected</h6>
+
+          <div className="d-flex align-items-center gap-2 mb-1">
+            <span className="small fw-medium">Supervisor Recommendation:</span>
+            <span
+              className="badge rounded-pill px-2 py-1"
+              style={getRecStyle(supervisorRecommendation)}
+            >
+              {getRecLabel(supervisorRecommendation)}
+            </span>
+          </div>
+          {supervisorFeedback && (
+            <p className="small mb-2 mt-1">
+              <strong>Supervisor feedback:</strong> {supervisorFeedback}
+            </p>
+          )}
+
+          <div className="d-flex align-items-center gap-2 mb-1 mt-2">
+            <span className="small fw-medium">Coordinator Decision:</span>
+            <span
+              className="badge rounded-pill px-2 py-1"
+              style={{ backgroundColor: '#dc354520', color: '#dc3545' }}
+            >
+              Rejected
+            </span>
+          </div>
+          {rejectedFeedback
+            ? <p className="small mb-0 mt-1"><strong>Coordinator feedback:</strong> {rejectedFeedback}</p>
+            : <p className="small mb-0 mt-1 text-danger-emphasis">No coordinator feedback was provided. You may submit a new proposal below.</p>
+          }
+        </div>
+      )}
+
       <div className="card shadow-sm border-0">
         <div className="card-header bg-white border-bottom py-3 px-4">
           <h5 className="fw-semibold text-dark mb-0">Proposal Status</h5>
         </div>
         <div className="card-body p-4">
-          <div className="d-flex align-items-center gap-3 mb-3">
+          <div className="d-flex align-items-center gap-3">
             <span
-              className={`rounded-circle badge ${getStatusBadge(status)}`}
-              style={{ width: '12px', height: '12px', padding: 0, display: 'inline-block' }}
+              className="rounded-circle bg-warning"
+              style={{ width: '12px', height: '12px', display: 'inline-block', flexShrink: 0 }}
             />
             <span className="fw-medium text-dark">
-              Status: {getStatusText(status)}
+              {proposalStatus === 'rejected'
+                ? 'Previous proposal rejected — submit a new proposal below.'
+                : 'Not yet submitted — fill the form below and click Submit.'}
             </span>
           </div>
-
-          {/* Rejection feedback */}
-          {status === 'rejected' && (
-            <div className="alert alert-danger border-0 mb-0">
-              <h6 className="fw-semibold mb-1">Feedback:</h6>
-              <p className="mb-0 small">{rejectionFeedback}</p>
-            </div>
-          )}
-
-          {/* Submitted info */}
-          {status === 'submitted' && (
-            <div className="alert alert-info border-0 mb-0 small">
-              Your proposal has been submitted and is awaiting review from your supervisor.
-            </div>
-          )}
         </div>
       </div>
 
-      {/* ── Proposal Form ── */}
-      {/* Show form if draft or rejected (can resubmit) */}
-      {(status === 'draft' || status === 'rejected') && (
-        <div className="card shadow-sm border-0">
-          <div className="card-header bg-white border-bottom py-3 px-4">
-            <h5 className="fw-semibold text-dark mb-0">Project Proposal Form</h5>
-            <p className="text-muted small mb-0 mt-1">
-              One student from your group should fill and submit this form on behalf of the group.
-            </p>
+      <div className="card shadow-sm border-0">
+        <div className="card-header bg-white border-bottom py-3 px-4">
+          <h5 className="fw-semibold text-dark mb-0">Project Proposal Form</h5>
+          <p className="text-muted small mb-0 mt-1">
+            One student from your group should fill and submit this on behalf of the group.
+            On approval, the system automatically creates your project and assigns your supervisor.
+          </p>
+        </div>
+        <div className="card-body p-4">
+
+          {submitError && (
+            <div className="alert alert-danger border-0 py-2 px-3 mb-4" style={{ fontSize: '0.875rem' }}>
+              {submitError}
+            </div>
+          )}
+
+          {/* ── Project Details ── */}
+          <h6 className="fw-semibold text-dark mb-3 pb-2 border-bottom">Project Details</h6>
+
+          <div className="mb-3">
+            <label className="form-label fw-medium text-dark small">
+              Project Title <span className="text-danger">*</span>
+            </label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Enter your project title"
+              value={title}
+              onChange={(e) => { setTitle(e.target.value); setSubmitError(null); }}
+            />
           </div>
-          <div className="card-body p-4">
-            <form onSubmit={handleSubmit}>
 
-              {/* ══════════════════════════════
-                  SECTION 1 — Project Details
-                  ══════════════════════════════ */}
-              <h6 className="fw-semibold text-dark mb-3 pb-2 border-bottom">
-                Project Details
-              </h6>
+          <div className="mb-3">
+            <label className="form-label fw-medium text-dark small">
+              Project Description <span className="text-danger">*</span>
+            </label>
+            <textarea
+              className="form-control"
+              rows={4}
+              placeholder="Describe your project in detail..."
+              value={description}
+              onChange={(e) => { setDescription(e.target.value); setSubmitError(null); }}
+            />
+          </div>
 
-              {/* Project Title */}
-              <div className="mb-3">
-                <label className="form-label fw-medium text-dark small">
-                  Project Title <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleInputChange}
-                  placeholder="Enter your project title"
-                  className="form-control"
-                  required
-                />
-              </div>
+          <div className="mb-3">
+            <label className="form-label fw-medium text-dark small">
+              Problem Statement <span className="text-danger">*</span>
+            </label>
+            <textarea
+              className="form-control"
+              rows={3}
+              placeholder="What problem does your project solve?"
+              value={problemStatement}
+              onChange={(e) => { setProblemStatement(e.target.value); setSubmitError(null); }}
+            />
+          </div>
 
-              {/* Project Description */}
-              <div className="mb-3">
-                <label className="form-label fw-medium text-dark small">
-                  Project Description <span className="text-danger">*</span>
-                </label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  rows={4}
-                  placeholder="Describe your project in detail..."
-                  className="form-control"
-                  required
-                />
-              </div>
+          <div className="mb-4">
+            <label className="form-label fw-medium text-dark small">
+              Technology Stack <span className="text-danger">*</span>
+            </label>
+            <textarea
+              className="form-control"
+              rows={2}
+              placeholder="e.g. React.js, Node.js, MongoDB, Express.js"
+              value={techStack}
+              onChange={(e) => { setTechStack(e.target.value); setSubmitError(null); }}
+            />
+          </div>
 
-              {/* Problem Statement */}
-              <div className="mb-3">
-                <label className="form-label fw-medium text-dark small">
-                  Problem Statement <span className="text-danger">*</span>
-                </label>
-                <textarea
-                  name="problemStatement"
-                  value={formData.problemStatement}
-                  onChange={handleInputChange}
-                  rows={3}
-                  placeholder="What problem does your project solve?"
-                  className="form-control"
-                  required
-                />
-              </div>
+          {/* ── Group Members ── */}
+          <h6 className="fw-semibold text-dark mb-1 pb-2 border-bottom">Group Members</h6>
+          <p className="text-muted small mb-3">
+            Add all students in your group. Each roll number must exist in the system.
+            Include yourself.
+          </p>
 
-              {/* Tech Stack */}
-              <div className="mb-3">
-                <label className="form-label fw-medium text-dark small">
-                  Technology Stack <span className="text-danger">*</span>
-                </label>
-                <textarea
-                  name="stack"
-                  value={formData.stack}
-                  onChange={handleInputChange}
-                  rows={2}
-                  placeholder="e.g. React.js, Node.js, MongoDB, Express.js"
-                  className="form-control"
-                  required
-                />
-              </div>
-
-              {/* Expected Outcome */}
-              <div className="mb-4">
-                <label className="form-label fw-medium text-dark small">
-                  Expected Outcome
-                </label>
-                <textarea
-                  name="expectedOutcome"
-                  value={formData.expectedOutcome}
-                  onChange={handleInputChange}
-                  rows={2}
-                  placeholder="What do you expect to achieve with this project?"
-                  className="form-control"
-                />
-              </div>
-
-              {/* ══════════════════════════════
-                  SECTION 2 — Group Members
-                  ══════════════════════════════ */}
-              <h6 className="fw-semibold text-dark mb-1 pb-2 border-bottom">
-                Group Members
-              </h6>
-              <p className="text-muted small mb-3">
-                Select how many other students are in your group (not counting yourself).
-                Maximum group size is 4 students total.
-              </p>
-
-              {/* Group size selector */}
-              <div className="mb-4">
-                <label className="form-label fw-medium text-dark small">
-                  Number of Other Group Members <span className="text-danger">*</span>
-                </label>
-                <select
-                  className="form-select"
-                  value={groupSize}
-                  onChange={handleGroupSizeChange}
-                  required
-                >
-                  <option value="">-- Select number of other members --</option>
-                  <option value="0">Just me (solo project)</option>
-                  <option value="1">1 other member (2 total)</option>
-                  <option value="2">2 other members (3 total)</option>
-                  <option value="3">3 other members (4 total)</option>
-                </select>
-              </div>
-
-              {/* Dynamic group member forms */}
-              {groupMembers.length > 0 && (
-                <div className="d-flex flex-column gap-4 mb-4">
-                  {groupMembers.map((member, index) => (
-                    <div key={index} className="border rounded p-4">
-                      <h6 className="fw-semibold text-dark mb-3">
-                        Group Member {index + 1}
-                      </h6>
-                      <div className="row g-3">
-
-                        {/* Full Name */}
-                        <div className="col-12 col-md-6">
-                          <label className="form-label fw-medium text-dark small">
-                            Full Name <span className="text-danger">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="e.g. Muhammad Ali"
-                            value={member.name}
-                            onChange={(e) => handleMemberChange(index, 'name', e.target.value)}
-                            required
-                          />
-                        </div>
-
-                        {/* Roll Number */}
-                        <div className="col-12 col-md-6">
-                          <label className="form-label fw-medium text-dark small">
-                            Roll Number <span className="text-danger">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="e.g. F2021001002"
-                            value={member.rollNumber}
-                            onChange={(e) => handleMemberChange(index, 'rollNumber', e.target.value)}
-                            required
-                          />
-                        </div>
-
-                        {/* Program */}
-                        <div className="col-12 col-md-4">
-                          <label className="form-label fw-medium text-dark small">
-                            Program <span className="text-danger">*</span>
-                          </label>
-                          <select
-                            className="form-select"
-                            value={member.program}
-                            onChange={(e) => handleMemberChange(index, 'program', e.target.value)}
-                            required
-                          >
-                            <option value="">-- Select --</option>
-                            <option value="BSCS">BSCS</option>
-                            <option value="BSIT">BSIT</option>
-                            <option value="BSSE">BSSE</option>
-                          </select>
-                        </div>
-
-                        {/* Semester */}
-                        <div className="col-12 col-md-4">
-                          <label className="form-label fw-medium text-dark small">
-                            Semester <span className="text-danger">*</span>
-                          </label>
-                          <select
-                            className="form-select"
-                            value={member.semester}
-                            onChange={(e) => handleMemberChange(index, 'semester', e.target.value)}
-                            required
-                          >
-                            <option value="">-- Select --</option>
-                            <option value="7">7th</option>
-                            <option value="8">8th</option>
-                          </select>
-                        </div>
-
-                        {/* Section */}
-                        <div className="col-12 col-md-4">
-                          <label className="form-label fw-medium text-dark small">
-                            Section <span className="text-danger">*</span>
-                          </label>
-                          <select
-                            className="form-select"
-                            value={member.section}
-                            onChange={(e) => handleMemberChange(index, 'section', e.target.value)}
-                            required
-                          >
-                            <option value="">-- Select --</option>
-                            {['A','B','C','D'].map(s => (
-                              <option key={s} value={s}>{s}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                      </div>
-                    </div>
-                  ))}
+          <div className="d-flex flex-column gap-3 mb-3">
+            {groupMembers.map((member, index) => (
+              <div key={index} className="border rounded p-3">
+                <div className="d-flex align-items-center justify-content-between mb-3">
+                  <h6 className="fw-semibold text-dark mb-0 small">Group Member {index + 1}</h6>
+                  {groupMembers.length > 1 && (
+                    <button
+                      className="btn btn-outline-danger btn-sm px-2 py-1"
+                      style={{ fontSize: '0.75rem' }}
+                      onClick={() => removeMember(index)}
+                    >
+                      Remove
+                    </button>
+                  )}
                 </div>
-              )}
-
-              {/* ══════════════════════════════
-                  SECTION 3 — File Upload
-                  ══════════════════════════════ */}
-              <h6 className="fw-semibold text-dark mb-3 pb-2 border-bottom">
-                Proposal Document
-              </h6>
-
-              <div className="mb-4">
-                <label className="form-label fw-medium text-dark small">
-                  Upload Proposal Document <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  onChange={handleFileChange}
-                  className="form-control"
-                  required
-                />
-                <p className="text-muted small mt-1">
-                  Supported formats: PDF, DOC, DOCX. Max size: 10MB.
-                </p>
+                <div className="row g-3">
+                  <div className="col-12 col-md-6">
+                    <label className="form-label fw-medium text-dark small">
+                      Full Name <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="e.g. Muhammad Ali"
+                      value={member.name}
+                      onChange={(e) => updateMember(index, 'name', e.target.value)}
+                    />
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label fw-medium text-dark small">
+                      Roll Number <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="e.g. F2021001002"
+                      value={member.rollNumber}
+                      onChange={(e) => updateMember(index, 'rollNumber', e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
-
-              {/* Submit buttons */}
-              <div className="d-flex gap-3">
-                <button
-                  type="button"
-                  onClick={handleSaveDraft}
-                  className="btn btn-outline-secondary px-4"
-                >
-                  Save Draft
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary px-4 fw-medium"
-                >
-                  Submit Proposal
-                </button>
-              </div>
-
-            </form>
+            ))}
           </div>
-        </div>
-      )}
 
-      {/* If submitted, show read-only submitted info */}
-      {status === 'submitted' && (
-        <div className="card shadow-sm border-0">
-          <div className="card-body text-center py-5">
-            <div className="mb-3" style={{ fontSize: '3rem' }}>📋</div>
-            <h5 className="fw-semibold text-dark mb-2">Proposal Submitted</h5>
-            <p className="text-muted small mb-0">
-              Your proposal is currently under review. You will be notified once your supervisor reviews it.
-            </p>
+          {groupMembers.length < 4 && (
+            <button
+              className="btn btn-outline-secondary btn-sm px-4 mb-4"
+              onClick={addMember}
+            >
+              + Add Member
+            </button>
+          )}
+
+          {/* ── Supervisor Info ── */}
+          <h6 className="fw-semibold text-dark mb-1 pb-2 border-bottom">Supervisor</h6>
+          <p className="text-muted small mb-3">
+            Enter your intended supervisor's name and university email exactly as registered in the system.
+          </p>
+
+          <div className="row g-3 mb-4">
+            <div className="col-12 col-md-6">
+              <label className="form-label fw-medium text-dark small">
+                Supervisor Name <span className="text-danger">*</span>
+              </label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="e.g. Dr. Ahmed Khan"
+                value={supervisorName}
+                onChange={(e) => { setSupervisorName(e.target.value); setSubmitError(null); }}
+              />
+            </div>
+            <div className="col-12 col-md-6">
+              <label className="form-label fw-medium text-dark small">
+                Supervisor Email <span className="text-danger">*</span>
+              </label>
+              <input
+                type="email"
+                className="form-control"
+                placeholder="supervisor@university.edu"
+                value={supervisorEmail}
+                onChange={(e) => { setSupervisorEmail(e.target.value); setSubmitError(null); }}
+              />
+              <p className="text-muted mt-1 mb-0" style={{ fontSize: '0.75rem' }}>
+                Must match exactly the email registered in the system.
+              </p>
+            </div>
           </div>
+
+          {/* ── Submit ── */}
+          <div className="d-flex gap-3 mt-2">
+            <button
+              className="btn btn-primary px-5 fw-medium"
+              onClick={handleSubmit}
+              disabled={submitting}
+            >
+              {submitting && <span className="spinner-border spinner-border-sm me-2" role="status" />}
+              Submit Proposal
+            </button>
+          </div>
+
         </div>
-      )}
+      </div>
 
     </div>
   );

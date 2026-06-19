@@ -1,16 +1,16 @@
 import mongoose from 'mongoose';
 
-//establishing the connection of mongodb database
 const connectDB = async () => {
+    console.log('MONGO_URI value:', JSON.stringify(process.env.MONGO_URI));
     try {
-        //getting mongodb connection from env file
         const conn = await mongoose.connect(process.env.MONGO_URI)
-        console.log("Database connection establised successfully");
+        console.log("Database connection established successfully");
+        console.log("Connected host:", conn.connection.host);
     } catch (error) {
-        console.error('something went wrong!')
+        console.error('Database connection failed:', error.message);
+        console.error(error);
+        process.exit(1);
     }
 }
 
-
-//exporting this file so we can use it anywhere in project
 export default connectDB;

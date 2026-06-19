@@ -1,43 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
-
-/*
-  COORDINATOR — PROJECT DETAIL
-  Tab-based view for managing a single project.
-
-  TODO (Backend): GET    /api/projects/:id
-  TODO (Backend): PUT    /api/projects/:id/supervisor
-  TODO (Backend): POST   /api/projects/:id/students
-  TODO (Backend): DELETE /api/projects/:id/students/:studentId
-  TODO (Backend): PUT    /api/projects/:id/milestones/:milestoneId { completed: true }
-  TODO (Backend): GET    /api/documents?projectId=:id  (Documents tab)
-  TODO (Backend): GET    /api/proposals?projectId=:id  (Proposal tab)
-*/
-
-// TODO (Backend): Replace with GET /api/documents?projectId=:id
-const DUMMY_DOCUMENTS = [
-  { _id: 'd1', name: 'Project Proposal.pdf',   type: 'Proposal',         uploadedBy: 'Muhammad Salman', uploadedAt: '2024-01-15', size: '2.4 MB' },
-  { _id: 'd2', name: 'Literature Review.docx', type: 'Literature Review', uploadedBy: 'Ali Hassan',      uploadedAt: '2024-01-20', size: '1.8 MB' },
-  { _id: 'd3', name: 'Progress Report Q1.pdf', type: 'Progress Report',   uploadedBy: 'Muhammad Salman', uploadedAt: '2024-02-10', size: '3.2 MB' },
-];
-
-// TODO (Backend): Replace with GET /api/proposals?projectId=:id
-const DUMMY_PROPOSAL = {
-  title: 'FYP Management & Tracking System',
-  description: 'A web-based system to manage and track Final Year Projects for students, supervisors, and coordinators using the MERN stack.',
-  problemStatement: 'Universities lack a unified digital platform for managing FYP workflows, leading to miscommunication, missed deadlines, and poor tracking.',
-  stack: 'React.js, Node.js, Express.js, MongoDB',
-  expectedOutcome: 'A fully functional multi-role web application that streamlines FYP management.',
-  submittedDate: '2024-04-25',
-  status: 'approved',
-  feedback: 'Excellent proposal. Proceed with project creation and team assignment.',
-  groupMembers: [
-    { name: 'Muhammad Salman', rollNumber: 'F2021001001', program: 'BSCS', semester: '7', section: 'A' },
-    { name: 'Ali Hassan',      rollNumber: 'F2021001002', program: 'BSCS', semester: '7', section: 'A' },
-  ],
-};
 
 const docTypeColors = {
   'Proposal':          '#3c50e0',
@@ -50,168 +13,229 @@ const docTypeColors = {
 };
 
 const ProjectDetail = () => {
-  const { id }      = useParams();
-  const navigate    = useNavigate();
-  const token       = localStorage.getItem('token');
-  const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
+  const { id } = useParams();
+  const navigate = useNavigate();
 
-  const [project,     setProject]     = useState(null);
+  const [project, setProject] = useState(null);
   const [supervisors, setSupervisors] = useState([]);
-  const [students,    setStudents]    = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [alert,       setAlert]       = useState({ show: false, message: '', type: 'success' });
-  const [activeTab,   setActiveTab]   = useState('overview');
+  const [students, setStudents] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [proposal, setProposal] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [alert, setAlert] = useState({ show: false, message: '', type: 'success' });
+  const [activeTab, setActiveTab] = useState('overview');
 
-  // Modals
   const [showChangeSupervisor, setShowChangeSupervisor] = useState(false);
-  const [showAssignStudent,    setShowAssignStudent]    = useState(false);
-  const [supervisorInput,      setSupervisorInput]      = useState('');
-  const [studentInput,         setStudentInput]         = useState('');
-  const [showRemoveConfirm,    setShowRemoveConfirm]    = useState(false);
-  const [removingStudentId,    setRemovingStudentId]    = useState(null);
-  const [milestoneConfirm,     setMilestoneConfirm]     = useState(null);
-
-  const [milestones, setMilestones] = useState([
-    { id: 1, name: 'Project Proposal',   completed: false, autoCompleted: true,  description: 'Auto-completed when proposal was approved.' },
-    { id: 2, name: 'Project Defense',    completed: false, autoCompleted: false, description: 'Mark after physical defense is completed.' },
-    { id: 3, name: 'Implementation',     completed: false, autoCompleted: false, description: 'Mark after implementation phase is done.' },
-    { id: 4, name: 'Documentation',      completed: false, autoCompleted: false, description: 'Mark after documentation is submitted.' },
-    { id: 5, name: 'Final Presentation', completed: false, autoCompleted: false, description: 'Mark after final presentation.' },
-  ]);
+  const [showAssignStudent, setShowAssignStudent] = useState(false);
+  const [supervisorInput, setSupervisorInput] = useState('');
+  const [studentInput, setStudentInput] = useState('');
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [removingStudentId, setRemovingStudentId] = useState(null);
+  const [milestoneConfirm, setMilestoneConfirm] = useState(null);
 
   const showAlertMsg = (message, type = 'success') => {
     setAlert({ show: true, message, type });
     setTimeout(() => setAlert({ show: false, message: '', type: 'success' }), 3500);
   };
 
-  const fetchProject = async () => {
+  const token = localStorage.getItem('token');
+  const authHeaders = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [projectRes, supervisorsRes, studentsRes, docsRes, proposalsRes] = await Promise.all([
+          fetch(`/api/projects/${id}`, { headers: authHeaders }),
+          fetch('/api/users?role=supervisor', { headers: authHeaders }),
+          fetch('/api/users?role=student', { headers: authHeaders }),
+          fetch('/api/documents', { headers: authHeaders }),
+          fetch('/api/proposals', { headers: authHeaders }),
+        ]);
+
+        const [projectData, supervisorsData, studentsData, docsData, proposalsData] = await Promise.all([
+          projectRes.json(), supervisorsRes.json(), studentsRes.json(),
+          docsRes.json(), proposalsRes.json(),
+        ]);
+
+        if (!projectRes.ok) throw new Error(projectData.message || 'Failed to load project');
+
+        // API returns { success: true, data: { ...project } }
+        setProject(projectData.data);
+
+        // getUsers returns { users: [...] }
+        setSupervisors(supervisorsData.users || []);
+        setStudents(studentsData.users || []);
+
+        if (docsData.success) {
+          setDocuments((docsData.data || []).filter(
+            (d) => d.projectId?._id?.toString() === id || d.projectId?.toString() === id
+          ));
+        }
+        if (proposalsData.success) {
+          const match = (proposalsData.data || []).find(
+            (p) => p.projectId?._id?.toString() === id || p.projectId?.toString() === id
+          );
+          setProposal(match || null);
+        }
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [id]);
+
+  const refreshProject = async () => {
     try {
-      const { data } = await axios.get(`http://localhost:4000/api/projects/${id}`, authHeaders);
-      setProject(data.project);
-      if (data.project.milestones) setMilestones(data.project.milestones);
+      const res = await fetch(`/api/projects/${id}`, { headers: authHeaders });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to refresh');
+      // API returns { success: true, data: { ...project } }
+      setProject(data.data);
     } catch (err) {
-      showAlertMsg(err.response?.data?.message || 'Failed to load project.', 'danger');
-    } finally {
-      setLoading(false);
+      showAlertMsg(err.message, 'danger');
     }
   };
-
-  const fetchSupervisors = async () => {
-    try {
-      const { data } = await axios.get('http://localhost:4000/api/users?role=supervisor', authHeaders);
-      setSupervisors(data.users || []);
-    } catch (err) { console.error(err); }
-  };
-
-  const fetchStudents = async () => {
-    try {
-      const { data } = await axios.get('http://localhost:4000/api/users?role=student', authHeaders);
-      setStudents(data.users || []);
-    } catch (err) { console.error(err); }
-  };
-
-  useEffect(() => { fetchProject(); fetchSupervisors(); fetchStudents(); }, [id]);
 
   const handleAssignSupervisor = async () => {
     if (!supervisorInput) { showAlertMsg('Please select a supervisor.', 'warning'); return; }
     try {
-      await axios.put(`http://localhost:4000/api/projects/${id}/supervisor`, { supervisorId: supervisorInput }, authHeaders);
+      const res = await fetch(`/api/projects/${id}/supervisor`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({ supervisorId: supervisorInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to assign supervisor');
       showAlertMsg('Supervisor assigned successfully!');
-      fetchProject();
+      await refreshProject();
       setShowChangeSupervisor(false);
+      setSupervisorInput('');
     } catch (err) {
-      showAlertMsg(err.response?.data?.message || 'Failed to assign supervisor.', 'danger');
+      showAlertMsg(err.message, 'danger');
     }
   };
 
   const handleAddStudent = async () => {
     if (!studentInput) { showAlertMsg('Please select a student.', 'warning'); return; }
     try {
-      await axios.post(`http://localhost:4000/api/projects/${id}/students`, { studentId: studentInput }, authHeaders);
+      const res = await fetch(`/api/projects/${id}/students`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({ studentId: studentInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to add student');
       showAlertMsg('Student added successfully!');
-      fetchProject();
+      await refreshProject();
       setShowAssignStudent(false);
+      setStudentInput('');
     } catch (err) {
-      showAlertMsg(err.response?.data?.message || 'Failed to add student.', 'danger');
+      showAlertMsg(err.message, 'danger');
     }
   };
 
   const handleRemoveStudent = async () => {
     try {
-      await axios.delete(`http://localhost:4000/api/projects/${id}/students/${removingStudentId}`, authHeaders);
+      const res = await fetch(`/api/projects/${id}/students/${removingStudentId}`, {
+        method: 'DELETE',
+        headers: authHeaders,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to remove student');
       showAlertMsg('Student removed.');
-      fetchProject();
+      await refreshProject();
       setShowRemoveConfirm(false);
+      setRemovingStudentId(null);
     } catch (err) {
-      showAlertMsg(err.response?.data?.message || 'Failed to remove student.', 'danger');
+      showAlertMsg(err.message, 'danger');
     }
   };
 
   const handleMarkMilestone = async () => {
     if (!milestoneConfirm) return;
     try {
-      // TODO (Backend): PUT /api/projects/:id/milestones/:milestoneId { completed: true }
-      await axios.put(
-        `http://localhost:4000/api/projects/${id}/milestones/${milestoneConfirm.id}`,
-        { completed: true },
-        authHeaders
-      );
-    } catch (_) {
-      // Backend route not ready yet — update locally
+      const res = await fetch(`/api/projects/${id}/milestones/${milestoneConfirm.id}`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({ completed: true }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update milestone');
+      setProject(data.data);
+      showAlertMsg(`"${milestoneConfirm.name}" marked as complete!`);
+    } catch (err) {
+      showAlertMsg(err.message, 'danger');
     }
-    setMilestones(prev =>
-      prev.map(m => m.id === milestoneConfirm.id
-        ? { ...m, completed: true, completedAt: new Date().toISOString().split('T')[0] }
-        : m
-      )
-    );
-    showAlertMsg(`"${milestoneConfirm.name}" marked as complete!`);
     setMilestoneConfirm(null);
   };
 
-  const completedMilestones = milestones.filter(m => m.completed).length;
-  const progressPercent     = (completedMilestones / milestones.length) * 100;
-  const currentMilestoneIdx = milestones.findIndex(m => !m.completed);
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  };
 
   if (loading) return (
-    <div className="d-flex align-items-center justify-content-center py-5">
-      <div className="spinner-border text-primary" />
-    </div>
+    <>
+      <Breadcrumb pageName="Project Detail" />
+      <div className="d-flex align-items-center justify-content-center py-5">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    </>
+  );
+
+  if (error) return (
+    <>
+      <Breadcrumb pageName="Project Detail" />
+      <div className="alert alert-danger border-0">{error}</div>
+    </>
   );
 
   if (!project) return (
-    <div className="card shadow-sm border-0">
-      <div className="card-body text-center py-5">
-        <p className="text-muted mb-3">Project not found.</p>
-        <button className="btn btn-primary px-4"
-          onClick={() => navigate('/coordinator/accounts/projects')}>
-          Back to Projects
-        </button>
+    <>
+      <Breadcrumb pageName="Project Detail" />
+      <div className="card shadow-sm border-0">
+        <div className="card-body text-center py-5">
+          <p className="text-muted mb-3">Project not found.</p>
+          <button className="btn btn-primary px-4" onClick={() => navigate('/coordinator/accounts/projects')}>
+            Back to Projects
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 
-  const assignedStudentIds = (project.students || []).map(s => s._id);
-  const availableStudents  = students.filter(s => !assignedStudentIds.includes(s._id));
+  const milestones = project.milestones || [];
+  const completedMilestones = milestones.filter((m) => m.completed).length;
+  const progressPercent = milestones.length > 0 ? (completedMilestones / milestones.length) * 100 : (project.progress || 0);
+  const currentMilestoneIdx = milestones.findIndex((m) => !m.completed);
+
+  const supervisor = project.supervisors?.[0];
+
+  const assignedStudentIds = (project.students || []).map((s) => s._id);
+  const availableStudents = students.filter((s) => !assignedStudentIds.includes(s._id));
+
+  const statusLabel =
+    project.status === 'active'           ? 'Active' :
+    project.status === 'completed'        ? 'Completed' :
+    project.status === 'pending_proposal' ? 'Pending Proposal' :
+    'Pending Proposal';
+
+  const statusColor =
+    project.status === 'active'    ? { bg: '#28a74520', text: '#28a745' } :
+    project.status === 'completed' ? { bg: '#3c50e020', text: '#3c50e0' } :
+    { bg: '#ffc10720', text: '#d39e00' };
 
   const tabs = [
-    { key: 'overview',   label: 'Overview' },
-    { key: 'milestones', label: `Milestones (${completedMilestones}/${milestones.length})` },
-    { key: 'documents',  label: `Documents (${DUMMY_DOCUMENTS.length})` },
-    { key: 'proposal',   label: 'Proposal' },
+    { key: 'overview',    label: 'Overview' },
+    { key: 'milestones',  label: `Milestones (${completedMilestones}/${milestones.length})` },
+    { key: 'documents',   label: `Documents (${documents.length})` },
+    { key: 'proposal',    label: 'Proposal' },
   ];
-
-  const statusLabel = project.status === 'active'
-    ? 'Active'
-    : project.status === 'completed'
-    ? 'Completed'
-    : 'Pending Proposal';
-
-  const statusColor = project.status === 'active'
-    ? { bg: '#28a74520', text: '#28a745' }
-    : project.status === 'completed'
-    ? { bg: '#3c50e020', text: '#3c50e0' }
-    : { bg: '#ffc10720', text: '#d39e00' };
 
   return (
     <>
@@ -227,7 +251,6 @@ const ProjectDetail = () => {
         Back to Projects
       </button>
 
-      {/* Alert */}
       {alert.show && (
         <div className={`alert alert-${alert.type} border-0 shadow-sm mb-4`}>
           {alert.message}
@@ -257,7 +280,6 @@ const ProjectDetail = () => {
             </div>
           </div>
 
-          {/* Progress bar */}
           <div className="mt-3">
             <div className="d-flex justify-content-between mb-1">
               <span className="text-muted" style={{ fontSize: '0.75rem' }}>
@@ -280,7 +302,7 @@ const ProjectDetail = () => {
       {/* Tabs */}
       <div className="mb-4" style={{ borderBottom: '2px solid #e9ecef' }}>
         <div className="d-flex gap-1 flex-wrap">
-          {tabs.map(tab => (
+          {tabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
@@ -301,36 +323,33 @@ const ProjectDetail = () => {
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════
-          TAB: OVERVIEW — Supervisor + Students
-          ══════════════════════════════════════════ */}
+      {/* ── TAB: OVERVIEW ── */}
       {activeTab === 'overview' && (
         <div className="row g-4">
 
-          {/* Supervisor */}
           <div className="col-12 col-xl-5">
             <div className="card shadow-sm border-0">
               <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3 px-4">
                 <h6 className="fw-semibold text-dark mb-0">Supervisor</h6>
                 <button
                   className="btn btn-outline-primary btn-sm px-3"
-                  onClick={() => setShowChangeSupervisor(true)}
+                  onClick={() => { setSupervisorInput(''); setShowChangeSupervisor(true); }}
                 >
-                  {project.supervisor ? 'Change' : 'Assign'}
+                  {supervisor ? 'Change' : 'Assign'}
                 </button>
               </div>
               <div className="card-body p-4">
-                {project.supervisor ? (
+                {supervisor ? (
                   <div className="d-flex align-items-center gap-3">
                     <div
                       className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
                       style={{ width: '44px', height: '44px', minWidth: '44px', backgroundColor: '#28a745', fontSize: '0.9rem' }}
                     >
-                      {(project.supervisor.name || 'S').split(' ').map(n => n[0]).join('').slice(0, 2)}
+                      {(supervisor.name || 'S').split(' ').map((n) => n[0]).join('').slice(0, 2)}
                     </div>
                     <div>
-                      <p className="fw-semibold text-dark mb-0 small">{project.supervisor.name}</p>
-                      <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>{project.supervisor.email}</p>
+                      <p className="fw-semibold text-dark mb-0 small">{supervisor.name}</p>
+                      <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>{supervisor.email}</p>
                     </div>
                   </div>
                 ) : (
@@ -340,7 +359,6 @@ const ProjectDetail = () => {
             </div>
           </div>
 
-          {/* Students */}
           <div className="col-12 col-xl-7">
             <div className="card shadow-sm border-0">
               <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3 px-4">
@@ -351,8 +369,10 @@ const ProjectDetail = () => {
                   </span>
                 </h6>
                 {(project.students || []).length < project.maxStudents && (
-                  <button className="btn btn-outline-primary btn-sm px-3"
-                    onClick={() => setShowAssignStudent(true)}>
+                  <button
+                    className="btn btn-outline-primary btn-sm px-3"
+                    onClick={() => { setStudentInput(''); setShowAssignStudent(true); }}
+                  >
                     + Add
                   </button>
                 )}
@@ -362,7 +382,7 @@ const ProjectDetail = () => {
                   <p className="text-muted small mb-0 text-center py-3">No students added yet.</p>
                 ) : (
                   <div className="d-flex flex-column gap-2">
-                    {project.students.map(student => (
+                    {project.students.map((student) => (
                       <div
                         key={student._id}
                         className="d-flex align-items-center justify-content-between p-2 rounded border"
@@ -372,7 +392,7 @@ const ProjectDetail = () => {
                             className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
                             style={{ width: '32px', height: '32px', minWidth: '32px', backgroundColor: '#3c50e0', fontSize: '0.72rem' }}
                           >
-                            {(student.name || 'S').split(' ').map(n => n[0]).join('').slice(0, 2)}
+                            {(student.name || 'S').split(' ').map((n) => n[0]).join('').slice(0, 2)}
                           </div>
                           <div>
                             <p className="fw-medium text-dark mb-0" style={{ fontSize: '0.82rem' }}>{student.name}</p>
@@ -397,9 +417,7 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════
-          TAB: MILESTONES
-          ══════════════════════════════════════════ */}
+      {/* ── TAB: MILESTONES ── */}
       {activeTab === 'milestones' && (
         <div className="card shadow-sm border-0">
           <div className="card-header bg-white border-bottom py-3 px-4">
@@ -446,7 +464,7 @@ const ProjectDetail = () => {
                       <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>{milestone.description}</p>
                       {milestone.completed && milestone.completedAt && (
                         <p className="text-success mb-0" style={{ fontSize: '0.68rem' }}>
-                          Completed: {milestone.completedAt}{milestone.autoCompleted && ' (auto)'}
+                          Completed: {formatDate(milestone.completedAt)}
                         </p>
                       )}
                     </div>
@@ -454,8 +472,6 @@ const ProjectDetail = () => {
                   <div className="flex-shrink-0 ms-3">
                     {milestone.completed ? (
                       <span className="badge bg-success rounded-pill px-3 py-2" style={{ fontSize: '0.72rem' }}>Done</span>
-                    ) : milestone.autoCompleted ? (
-                      <span className="badge bg-secondary rounded-pill px-3 py-2" style={{ fontSize: '0.72rem' }}>Auto</span>
                     ) : (
                       <button
                         className="btn btn-primary btn-sm px-3"
@@ -473,9 +489,7 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════
-          TAB: DOCUMENTS
-          ══════════════════════════════════════════ */}
+      {/* ── TAB: DOCUMENTS ── */}
       {activeTab === 'documents' && (
         <div className="card shadow-sm border-0">
           <div className="card-header bg-white border-bottom py-3 px-4">
@@ -483,13 +497,13 @@ const ProjectDetail = () => {
             <p className="text-muted small mb-0 mt-1">Files uploaded by students for this project.</p>
           </div>
           <div className="card-body p-4">
-            {DUMMY_DOCUMENTS.length === 0 ? (
+            {documents.length === 0 ? (
               <div className="text-center py-5">
                 <p className="text-muted mb-0">No documents uploaded yet.</p>
               </div>
             ) : (
               <div className="d-flex flex-column gap-3">
-                {DUMMY_DOCUMENTS.map(doc => (
+                {documents.map((doc) => (
                   <div key={doc._id} className="d-flex align-items-center justify-content-between p-3 border rounded">
                     <div className="d-flex align-items-center gap-3">
                       <div
@@ -505,15 +519,23 @@ const ProjectDetail = () => {
                         </svg>
                       </div>
                       <div>
-                        <p className="fw-semibold text-dark mb-0 small">{doc.name}</p>
+                        <p className="fw-semibold text-dark mb-0 small">{doc.fileName}</p>
                         <p className="text-muted mb-0" style={{ fontSize: '0.73rem' }}>
-                          {doc.type} &bull; {doc.uploadedAt} &bull; {doc.size} &bull; By {doc.uploadedBy}
+                          {doc.type} &bull; {formatDate(doc.uploadedAt)} &bull; {doc.size} &bull; By {doc.uploadedBy?.name || '—'}
                         </p>
                       </div>
                     </div>
-                    <button className="btn btn-outline-primary btn-sm px-3" style={{ fontSize: '0.75rem' }}>
-                      Download
-                    </button>
+                    {doc.fileUrl && (
+                      <a
+                        href={doc.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-outline-primary btn-sm px-3"
+                        style={{ fontSize: '0.75rem' }}
+                      >
+                        Download
+                      </a>
+                    )}
                   </div>
                 ))}
               </div>
@@ -522,97 +544,91 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════
-          TAB: PROPOSAL
-          ══════════════════════════════════════════ */}
+      {/* ── TAB: PROPOSAL ── */}
       {activeTab === 'proposal' && (
         <div className="card shadow-sm border-0">
-          <div className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between">
-            <div>
-              <h6 className="fw-semibold text-dark mb-0">Project Proposal</h6>
-              <p className="text-muted small mb-0 mt-1">Submitted by the student group.</p>
+          {!proposal ? (
+            <div className="card-body text-center py-5">
+              <p className="text-muted mb-0">No proposal submitted yet for this project.</p>
             </div>
-            <span
-              className="badge rounded-pill px-3 py-2"
-              style={{
-                backgroundColor: DUMMY_PROPOSAL.status === 'approved' ? '#28a74520' : DUMMY_PROPOSAL.status === 'rejected' ? '#dc354520' : '#ffc10720',
-                color: DUMMY_PROPOSAL.status === 'approved' ? '#28a745' : DUMMY_PROPOSAL.status === 'rejected' ? '#dc3545' : '#d39e00',
-                fontSize: '0.78rem',
-              }}
-            >
-              {DUMMY_PROPOSAL.status.charAt(0).toUpperCase() + DUMMY_PROPOSAL.status.slice(1)}
-            </span>
-          </div>
-          <div className="card-body p-4">
-            <div className="row g-4 mb-4">
-              <div className="col-12">
-                <p className="fw-semibold text-dark small mb-1">Project Title</p>
-                <p className="text-muted small mb-0">{DUMMY_PROPOSAL.title}</p>
+          ) : (
+            <>
+              <div className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between">
+                <div>
+                  <h6 className="fw-semibold text-dark mb-0">Project Proposal</h6>
+                  <p className="text-muted small mb-0 mt-1">
+                    Submitted by {proposal.submittedBy?.name || proposal.studentId?.name || '—'} on {formatDate(proposal.submittedAt || proposal.createdAt)}
+                  </p>
+                </div>
+                <span
+                  className="badge rounded-pill px-3 py-2"
+                  style={{
+                    backgroundColor: proposal.status === 'approved' ? '#28a74520' : proposal.status === 'rejected' ? '#dc354520' : '#ffc10720',
+                    color: proposal.status === 'approved' ? '#28a745' : proposal.status === 'rejected' ? '#dc3545' : '#d39e00',
+                    fontSize: '0.78rem',
+                  }}
+                >
+                  {proposal.status ? proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1) : '—'}
+                </span>
               </div>
-              <div className="col-12">
-                <p className="fw-semibold text-dark small mb-1">Description</p>
-                <p className="text-muted small mb-0">{DUMMY_PROPOSAL.description}</p>
-              </div>
-              <div className="col-12">
-                <p className="fw-semibold text-dark small mb-1">Problem Statement</p>
-                <p className="text-muted small mb-0">{DUMMY_PROPOSAL.problemStatement}</p>
-              </div>
-              <div className="col-12 col-md-6">
-                <p className="fw-semibold text-dark small mb-1">Technology Stack</p>
-                <p className="text-muted small mb-0">{DUMMY_PROPOSAL.stack}</p>
-              </div>
-              <div className="col-12 col-md-6">
-                <p className="fw-semibold text-dark small mb-1">Expected Outcome</p>
-                <p className="text-muted small mb-0">{DUMMY_PROPOSAL.expectedOutcome}</p>
-              </div>
-              <div className="col-12 col-md-6">
-                <p className="fw-semibold text-dark small mb-1">Submitted On</p>
-                <p className="text-muted small mb-0">{DUMMY_PROPOSAL.submittedDate}</p>
-              </div>
-            </div>
+              <div className="card-body p-4">
+                <div className="row g-4 mb-4">
+                  <div className="col-12">
+                    <p className="fw-semibold text-dark small mb-1">Project Title</p>
+                    <p className="text-muted small mb-0">{proposal.title || '—'}</p>
+                  </div>
+                  <div className="col-12">
+                    <p className="fw-semibold text-dark small mb-1">Description</p>
+                    <p className="text-muted small mb-0">{proposal.description || '—'}</p>
+                  </div>
+                  <div className="col-12">
+                    <p className="fw-semibold text-dark small mb-1">Problem Statement</p>
+                    <p className="text-muted small mb-0">{proposal.problemStatement || '—'}</p>
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <p className="fw-semibold text-dark small mb-1">Technology Stack</p>
+                    <p className="text-muted small mb-0">{proposal.techStack || '—'}</p>
+                  </div>
+                </div>
 
-            {/* Group Members */}
-            <div className="mb-4">
-              <p className="fw-semibold text-dark small mb-2">
-                Group Members ({DUMMY_PROPOSAL.groupMembers.length})
-              </p>
-              <div className="table-responsive">
-                <table className="table table-sm table-bordered mb-0">
-                  <thead className="table-light">
-                    <tr>
-                      <th className="small fw-semibold">#</th>
-                      <th className="small fw-semibold">Name</th>
-                      <th className="small fw-semibold">Roll No.</th>
-                      <th className="small fw-semibold">Program</th>
-                      <th className="small fw-semibold">Semester</th>
-                      <th className="small fw-semibold">Section</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {DUMMY_PROPOSAL.groupMembers.map((m, i) => (
-                      <tr key={i}>
-                        <td className="small text-muted">{i + 1}</td>
-                        <td className="small fw-medium text-dark">{m.name}</td>
-                        <td className="small text-muted">{m.rollNumber}</td>
-                        <td className="small text-muted">{m.program}</td>
-                        <td className="small text-muted">{m.semester}</td>
-                        <td className="small text-muted">{m.section}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                {(proposal.groupMembers?.length > 0) && (
+                  <div className="mb-4">
+                    <p className="fw-semibold text-dark small mb-2">
+                      Group Members ({proposal.groupMembers.length})
+                    </p>
+                    <div className="table-responsive">
+                      <table className="table table-sm table-bordered mb-0">
+                        <thead className="table-light">
+                          <tr>
+                            <th className="small fw-semibold">#</th>
+                            <th className="small fw-semibold">Name</th>
+                            <th className="small fw-semibold">Roll No.</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {proposal.groupMembers.map((m, i) => (
+                            <tr key={i}>
+                              <td className="small text-muted">{i + 1}</td>
+                              <td className="small fw-medium text-dark">{m.name}</td>
+                              <td className="small text-muted">{m.rollNumber}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
 
-            {/* Feedback */}
-            {DUMMY_PROPOSAL.feedback && (
-              <div className={`alert ${DUMMY_PROPOSAL.status === 'approved' ? 'alert-success' : 'alert-danger'} py-2 px-3 mb-0`}>
-                <p className="small mb-0">
-                  <strong>Coordinator Feedback:</strong> {DUMMY_PROPOSAL.feedback}
-                </p>
+                {proposal.coordinatorFeedback && (
+                  <div className={`alert ${proposal.status === 'approved' ? 'alert-success' : 'alert-danger'} py-2 px-3 mb-0`}>
+                    <p className="small mb-0">
+                      <strong>Coordinator Feedback:</strong> {proposal.coordinatorFeedback}
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
       )}
 
@@ -627,19 +643,20 @@ const ProjectDetail = () => {
               </div>
               <div className="modal-body px-4 py-4">
                 <label className="form-label fw-medium text-dark small">Select Supervisor</label>
-                <select className="form-select" value={supervisorInput}
-                  onChange={e => setSupervisorInput(e.target.value)}>
+                <select
+                  className="form-select"
+                  value={supervisorInput}
+                  onChange={(e) => setSupervisorInput(e.target.value)}
+                >
                   <option value="">-- Select --</option>
-                  {supervisors.map(s => (
+                  {supervisors.map((s) => (
                     <option key={s._id} value={s._id}>{s.name} — {s.email}</option>
                   ))}
                 </select>
               </div>
               <div className="modal-footer border-top px-4 py-3">
-                <button className="btn btn-outline-secondary px-4"
-                  onClick={() => setShowChangeSupervisor(false)}>Cancel</button>
-                <button className="btn btn-primary px-4 fw-medium"
-                  onClick={handleAssignSupervisor}>Assign</button>
+                <button className="btn btn-outline-secondary px-4" onClick={() => setShowChangeSupervisor(false)}>Cancel</button>
+                <button className="btn btn-primary px-4 fw-medium" onClick={handleAssignSupervisor}>Assign</button>
               </div>
             </div>
           </div>
@@ -657,19 +674,20 @@ const ProjectDetail = () => {
               </div>
               <div className="modal-body px-4 py-4">
                 <label className="form-label fw-medium text-dark small">Select Student</label>
-                <select className="form-select" value={studentInput}
-                  onChange={e => setStudentInput(e.target.value)}>
+                <select
+                  className="form-select"
+                  value={studentInput}
+                  onChange={(e) => setStudentInput(e.target.value)}
+                >
                   <option value="">-- Select --</option>
-                  {availableStudents.map(s => (
+                  {availableStudents.map((s) => (
                     <option key={s._id} value={s._id}>{s.name} — {s.email}</option>
                   ))}
                 </select>
               </div>
               <div className="modal-footer border-top px-4 py-3">
-                <button className="btn btn-outline-secondary px-4"
-                  onClick={() => setShowAssignStudent(false)}>Cancel</button>
-                <button className="btn btn-primary px-4 fw-medium"
-                  onClick={handleAddStudent}>Add</button>
+                <button className="btn btn-outline-secondary px-4" onClick={() => setShowAssignStudent(false)}>Cancel</button>
+                <button className="btn btn-primary px-4 fw-medium" onClick={handleAddStudent}>Add</button>
               </div>
             </div>
           </div>
@@ -686,10 +704,8 @@ const ProjectDetail = () => {
                 <p className="text-muted small mb-0">This student will be removed from the project.</p>
               </div>
               <div className="modal-footer border-top px-4 py-3 justify-content-center gap-3">
-                <button className="btn btn-outline-secondary px-4"
-                  onClick={() => setShowRemoveConfirm(false)}>Cancel</button>
-                <button className="btn btn-danger px-4 fw-medium"
-                  onClick={handleRemoveStudent}>Yes, Remove</button>
+                <button className="btn btn-outline-secondary px-4" onClick={() => setShowRemoveConfirm(false)}>Cancel</button>
+                <button className="btn btn-danger px-4 fw-medium" onClick={handleRemoveStudent}>Yes, Remove</button>
               </div>
             </div>
           </div>
@@ -718,10 +734,8 @@ const ProjectDetail = () => {
                 </p>
               </div>
               <div className="modal-footer border-top px-4 py-3 justify-content-center gap-3">
-                <button className="btn btn-outline-secondary px-4"
-                  onClick={() => setMilestoneConfirm(null)}>Cancel</button>
-                <button className="btn btn-primary px-4 fw-medium"
-                  onClick={handleMarkMilestone}>Yes, Mark Complete</button>
+                <button className="btn btn-outline-secondary px-4" onClick={() => setMilestoneConfirm(null)}>Cancel</button>
+                <button className="btn btn-primary px-4 fw-medium" onClick={handleMarkMilestone}>Yes, Mark Complete</button>
               </div>
             </div>
           </div>

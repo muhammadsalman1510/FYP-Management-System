@@ -2,10 +2,16 @@ import Project from '../models/project.model.js'
 import User from '../models/user.model.js'
 import SupervisorProfile from '../models/supervisor-profile.model.js'
 
+const DEFAULT_MILESTONES = [
+    { id: 1, name: 'Project Proposal',   description: 'Proposal submitted and approved by coordinator.', completed: false, completedAt: null },
+    { id: 2, name: 'Project Defense',    description: 'Initial defense presented to supervisor and coordinator.', completed: false, completedAt: null },
+    { id: 3, name: 'Implementation',     description: 'Core development and implementation phase.', completed: false, completedAt: null },
+    { id: 4, name: 'Documentation',      description: 'Full project documentation submitted.', completed: false, completedAt: null },
+    { id: 5, name: 'Final Presentation', description: 'Final project presented and signed off.', completed: false, completedAt: null },
+];
 
 /**
  * Verify that a userId exists and has role 'supervisor'.
- * Returns the User doc on success, or throws with a status-ready error.
  */
 const getSupervisorUser = async (supervisorId) => {
     const user = await User.findById(supervisorId)
@@ -42,13 +48,20 @@ const checkSupervisorCapacity = async (supervisorUserId) => {
     return profile
 }
 
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+const populateProject = (query) =>
+    query
+        .populate('supervisors', 'name email phone photoUrl')
+        .populate('coordinator', 'name email phone')
+        .populate('students', 'name email')
+
 // ─── controllers ────────────────────────────────────────────────────────────
 
 /**
  * POST /api/projects
- * Coordinator only — create a project and assign a supervisor immediately.
- *
- * Body: { title, description?, supervisorId, maxStudents }
+ * Coordinator only — create a project.
+ * Body: { title, description?, maxStudents }
  */
 export const createProject = async (req, res) => {
     try {
@@ -56,182 +69,131 @@ export const createProject = async (req, res) => {
 
         if (!title || maxStudents == null) {
             return res.status(400).json({
+                success: false,
                 message: 'title and maxStudents are required',
             })
         }
 
         if (maxStudents < 1) {
             return res.status(400).json({
-                message: 'maxStudents must be at least 1'
+                success: false,
+                message: 'maxStudents must be at least 1',
             })
         }
 
-        // --- Create project ---
         const project = await Project.create({
             title: title.trim(),
-            description,
+            description: description || '',
             maxStudents,
-            supervisorId: null,
-            status: 'available',
+            supervisors: [],
+            coordinator: req.user._id,
+            milestones: DEFAULT_MILESTONES.map(m => ({ ...m })),
+            status: 'pending_proposal',
+            progress: 0,
         })
 
-        return res.status(201).json({
-            message: 'Project created successfully',
-            project,
-        })
+        return res.status(201).json({ success: true, data: project })
     } catch (err) {
-        if (err.status) {
-            return res.status(err.status).json({ message: err.message })
-        }
+        if (err.status) return res.status(err.status).json({ success: false, message: err.message })
         console.error('createProject error:', err)
-        return res.status(500).json({ message: 'Internal server error' })
+        return res.status(500).json({ success: false, message: 'Internal server error' })
     }
 }
 
 /**
  * GET /api/projects
- * Coordinator only — list all projects, optionally filter by status or supervisorId.
- *
- * Query: ?status=available|assigned|completed  &  ?supervisorId=<id>
+ * Coordinator only — list all projects, optionally filter by status.
+ * Query: ?status=pending_proposal|active|completed
  */
 export const getProjects = async (req, res) => {
     try {
         const filter = {}
         if (req.query.status) filter.status = req.query.status
-        if (req.query.supervisorId) filter.supervisorId = req.query.supervisorId
 
-        const projects = await Project.find(filter).populate('supervisorId', 'name email')
-        return res.status(200).json({ projects })
+        const projects = await populateProject(Project.find(filter).sort({ createdAt: -1 }))
+        return res.status(200).json({ success: true, data: projects })
     } catch (err) {
         console.error('getProjects error:', err)
-        return res.status(500).json({ message: 'Internal server error' })
+        return res.status(500).json({ success: false, message: 'Internal server error' })
     }
 }
 
 /**
  * GET /api/projects/:id
- * Coordinator only — get a single project with supervisor info.
+ * Coordinator only — get a single project with full population.
  */
 export const getProjectById = async (req, res) => {
     try {
-        const project = await Project.findById(req.params.id)
-            .populate(
-                'supervisorId',
-                'name email'
-            )
-            .populate('students', 'name email')
+        const project = await populateProject(Project.findById(req.params.id))
 
         if (!project) {
-            return res.status(404).json({ message: 'Project not found' })
+            return res.status(404).json({ success: false, message: 'Project not found' })
         }
-        return res.status(200).json({ project })
+        return res.status(200).json({ success: true, data: project })
     } catch (err) {
         console.error('getProjectById error:', err)
-        return res.status(500).json({ message: 'Internal server error' })
+        return res.status(500).json({ success: false, message: 'Internal server error' })
     }
 }
 
 /**
  * PUT /api/projects/:id/supervisor
- * Coordinator only — reassign a project to a different supervisor.
- *
- * Body: { supervisorId }
+ * Coordinator only — assign or replace the supervisor on a project.
+ * Body: { supervisorId } — pass null to remove all supervisors.
  */
 export const assignSupervisor = async (req, res) => {
     try {
         const { supervisorId } = req.body
 
         const project = await Project.findById(req.params.id)
-
         if (!project) {
-            return res.status(404).json({
-                message: 'Project not found',
-            })
+            return res.status(404).json({ success: false, message: 'Project not found' })
         }
 
-        // --- Prevent no-op ---
-        if (
-            project.supervisorId?.toString() === supervisorId
-        ) {
-            return res.status(400).json({
-                message: 'This supervisor is already assigned to the project',
-            })
+        // Release slots for all currently assigned supervisors
+        if (project.supervisors && project.supervisors.length > 0) {
+            await Promise.all(
+                project.supervisors.map(async (supId) => {
+                    const profile = await SupervisorProfile.findOne({ userId: supId })
+                    if (profile && profile.currentProjects > 0) {
+                        profile.currentProjects -= 1
+                        await profile.save()
+                    }
+                })
+            )
         }
 
-        // --- Optional workflow guard ---
-        // Prevent removing supervisor from assigned project
-        if (
-            supervisorId === null &&
-            project.status === 'assigned'
-        ) {
-            return res.status(400).json({
-                message:
-                    'Cannot unassign supervisor from an assigned project',
-            })
-        }
-
-        let newProfile = null
-
-        // --- Validate new supervisor only if assigning ---
-        if (supervisorId !== null) {
+        if (supervisorId) {
             await getSupervisorUser(supervisorId)
-            newProfile = await checkSupervisorCapacity(supervisorId)
-        }
+            const newProfile = await checkSupervisorCapacity(supervisorId)
 
-        // --- Release old supervisor slot ---
-        if (project.supervisorId) {
-            const oldProfile = await SupervisorProfile.findOne({
-                userId: project.supervisorId,
-            })
+            project.supervisors = [supervisorId]
+            await project.save()
 
-            if (oldProfile && oldProfile.currentProjects > 0) {
-                oldProfile.currentProjects -= 1
-                await oldProfile.save()
-            }
-        }
-
-        // --- Assign / unassign supervisor ---
-        project.supervisorId = supervisorId
-        await project.save()
-
-        // --- Increment new supervisor count ---
-        if (newProfile) {
             newProfile.currentProjects += 1
             await newProfile.save()
+        } else {
+            project.supervisors = []
+            await project.save()
         }
 
-        const updated = await Project.findById(project._id).populate(
-            'supervisorId',
-            'name email'
-        )
+        const updated = await populateProject(Project.findById(project._id))
 
         return res.status(200).json({
-            message:
-                supervisorId === null
-                    ? 'Supervisor unassigned successfully'
-                    : 'Supervisor assigned successfully',
-            project: updated,
+            success: true,
+            message: supervisorId ? 'Supervisor assigned successfully' : 'Supervisor unassigned successfully',
+            data: updated,
         })
-
     } catch (err) {
-        if (err.status) {
-            return res.status(err.status).json({
-                message: err.message,
-            })
-        }
-
+        if (err.status) return res.status(err.status).json({ success: false, message: err.message })
         console.error('assignSupervisor error:', err)
-
-        return res.status(500).json({
-            message: 'Internal server error',
-        })
+        return res.status(500).json({ success: false, message: 'Internal server error' })
     }
 }
 
 /**
  * PUT /api/projects/:id/students
  * Coordinator only — assign a student to a project.
- *
  * Body: { studentId }
  */
 export const assignStudent = async (req, res) => {
@@ -239,57 +201,45 @@ export const assignStudent = async (req, res) => {
         const { studentId } = req.body
 
         if (!studentId) {
-            return res.status(400).json({ message: 'studentId is required' })
+            return res.status(400).json({ success: false, message: 'studentId is required' })
         }
 
-        // --- Validate student ---
         const user = await User.findById(studentId)
         if (!user) {
-            return res.status(404).json({ message: 'User not found' })
+            return res.status(404).json({ success: false, message: 'User not found' })
         }
         if (user.role !== 'student') {
-            return res.status(400).json({ message: 'Provided userId does not belong to a student' })
+            return res.status(400).json({ success: false, message: 'Provided userId does not belong to a student' })
         }
 
-        // --- Find project ---
         const project = await Project.findById(req.params.id)
         if (!project) {
-            return res.status(404).json({ message: 'Project not found' })
+            return res.status(404).json({ success: false, message: 'Project not found' })
         }
 
-        // --- Check duplicate ---
         if (project.students.some(id => id.toString() === studentId)) {
-            return res.status(409).json({ message: 'Student is already assigned to this project' })
+            return res.status(409).json({ success: false, message: 'Student is already assigned to this project' })
         }
 
-        // --- Check capacity ---
         if (project.students.length >= project.maxStudents) {
-            return res.status(409).json({ message: `Project is full — max ${project.maxStudents} students allowed` })
+            return res.status(409).json({ success: false, message: `Project is full — max ${project.maxStudents} students allowed` })
         }
 
-        // --- Assign student ---
         project.students.push(studentId)
         await project.save()
 
-        const updated = await Project.findById(project._id)
-            .populate('supervisorId', 'name email')
-            .populate('students', 'name email')
+        const updated = await populateProject(Project.findById(project._id))
 
-        return res.status(200).json({
-            message: 'Student assigned successfully',
-            project: updated,
-        })
-
+        return res.status(200).json({ success: true, message: 'Student assigned successfully', data: updated })
     } catch (err) {
         console.error('assignStudent error:', err)
-        return res.status(500).json({ message: 'Internal server error' })
+        return res.status(500).json({ success: false, message: 'Internal server error' })
     }
 }
 
 /**
  * PUT /api/projects/:id
  * Coordinator only — update a project's title, description, and maxStudents.
- *
  * Body: { title?, description?, maxStudents? }
  */
 export const updateProject = async (req, res) => {
@@ -298,15 +248,16 @@ export const updateProject = async (req, res) => {
 
         const project = await Project.findById(req.params.id)
         if (!project) {
-            return res.status(404).json({ message: 'Project not found' })
+            return res.status(404).json({ success: false, message: 'Project not found' })
         }
 
         if (maxStudents !== undefined) {
             if (maxStudents < 1) {
-                return res.status(400).json({ message: 'maxStudents must be at least 1' })
+                return res.status(400).json({ success: false, message: 'maxStudents must be at least 1' })
             }
             if (maxStudents < project.students.length) {
                 return res.status(400).json({
+                    success: false,
                     message: `maxStudents cannot be less than current student count (${project.students.length})`
                 })
             }
@@ -318,14 +269,12 @@ export const updateProject = async (req, res) => {
 
         await project.save()
 
-        return res.status(200).json({
-            message: 'Project updated successfully',
-            project,
-        })
+        const updated = await populateProject(Project.findById(project._id))
 
+        return res.status(200).json({ success: true, message: 'Project updated successfully', data: updated })
     } catch (err) {
         console.error('updateProject error:', err)
-        return res.status(500).json({ message: 'Internal server error' })
+        return res.status(500).json({ success: false, message: 'Internal server error' })
     }
 }
 
@@ -337,61 +286,151 @@ export const removeStudent = async (req, res) => {
     try {
         const { studentId } = req.params
 
-        // --- Find project ---
         const project = await Project.findById(req.params.id)
         if (!project) {
-            return res.status(404).json({ message: 'Project not found' })
+            return res.status(404).json({ success: false, message: 'Project not found' })
         }
 
-        // --- Check student exists in project ---
         if (!project.students.some(id => id.toString() === studentId)) {
-            return res.status(404).json({ message: 'Student is not assigned to this project' })
+            return res.status(404).json({ success: false, message: 'Student is not assigned to this project' })
         }
 
-        // --- Remove student ---
         project.students = project.students.filter(id => id.toString() !== studentId)
         await project.save()
 
-        const updated = await Project.findById(project._id)
-            .populate('supervisorId', 'name email')
-            .populate('students', 'name email')
+        const updated = await populateProject(Project.findById(project._id))
 
-        return res.status(200).json({
-            message: 'Student removed successfully',
-            project: updated,
-        })
-
+        return res.status(200).json({ success: true, message: 'Student removed successfully', data: updated })
     } catch (err) {
         console.error('removeStudent error:', err)
-        return res.status(500).json({ message: 'Internal server error' })
+        return res.status(500).json({ success: false, message: 'Internal server error' })
     }
 }
 
 /**
  * DELETE /api/projects/:id
- * Coordinator only — delete a project and release supervisor's slot.
+ * Coordinator only — delete a project and release all supervisor slots.
  */
 export const deleteProject = async (req, res) => {
     try {
         const project = await Project.findById(req.params.id)
         if (!project) {
-            return res.status(404).json({ message: 'Project not found' })
+            return res.status(404).json({ success: false, message: 'Project not found' })
         }
 
-        // --- Release supervisor slot ---
-        if (project.supervisorId) {
-            const profile = await SupervisorProfile.findOne({ userId: project.supervisorId })
-            if (profile && profile.currentProjects > 0) {
-                profile.currentProjects -= 1
-                await profile.save()
-            }
+        // Release slots for all supervisors on this project
+        if (project.supervisors && project.supervisors.length > 0) {
+            await Promise.all(
+                project.supervisors.map(async (supId) => {
+                    const profile = await SupervisorProfile.findOne({ userId: supId })
+                    if (profile && profile.currentProjects > 0) {
+                        profile.currentProjects -= 1
+                        await profile.save()
+                    }
+                })
+            )
         }
 
         await project.deleteOne()
 
-        return res.status(200).json({ message: 'Project deleted successfully' })
+        return res.status(200).json({ success: true, message: 'Project deleted successfully' })
     } catch (err) {
         console.error('deleteProject error:', err)
-        return res.status(500).json({ message: 'Internal server error' })
+        return res.status(500).json({ success: false, message: 'Internal server error' })
     }
 }
+
+// ─── Student / Supervisor self-service ──────────────────────────────────────
+
+/**
+ * GET /api/projects/my
+ * Student only — returns the project this student belongs to.
+ */
+export const getMyProject = async (req, res) => {
+    try {
+        const project = await Project.findOne({ students: req.user._id })
+            .populate('supervisors', 'name email phone photoUrl')
+            .populate('coordinator', 'name email phone')
+            .populate('students', 'name email');
+
+        if (!project) {
+            return res.status(404).json({ success: false, message: 'No project assigned to you' });
+        }
+
+        return res.status(200).json({ success: true, data: project });
+    } catch (err) {
+        console.error('getMyProject error:', err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+/**
+ * GET /api/projects/assigned
+ * Supervisor only — returns all projects assigned to this supervisor.
+ */
+export const getAssignedProjects = async (req, res) => {
+    try {
+        const projects = await Project.find({ supervisors: req.user._id })
+            .populate('students', 'name email')
+            .populate('coordinator', 'name email')
+            .sort({ createdAt: -1 });
+
+        return res.status(200).json({ success: true, data: projects });
+    } catch (err) {
+        console.error('getAssignedProjects error:', err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+/**
+ * PUT /api/projects/:id/milestones/:milestoneId
+ * Coordinator only — mark a milestone complete/incomplete and recalculate progress.
+ * Body: { completed: true|false }
+ */
+export const updateMilestone = async (req, res) => {
+    try {
+        const { completed } = req.body;
+        const milestoneId = parseInt(req.params.milestoneId, 10);
+
+        if (typeof completed !== 'boolean') {
+            return res.status(400).json({
+                success: false,
+                message: 'completed must be a boolean',
+            });
+        }
+
+        if (isNaN(milestoneId) || milestoneId < 1 || milestoneId > 5) {
+            return res.status(400).json({
+                success: false,
+                message: 'milestoneId must be a number between 1 and 5',
+            });
+        }
+
+        const project = await Project.findById(req.params.id);
+        if (!project) {
+            return res.status(404).json({ success: false, message: 'Project not found' });
+        }
+
+        const milestone = project.milestones.find((m) => m.id === milestoneId);
+        if (!milestone) {
+            return res.status(404).json({ success: false, message: 'Milestone not found' });
+        }
+
+        milestone.completed = completed;
+        milestone.completedAt = completed ? new Date() : null;
+
+        const completedCount = project.milestones.filter((m) => m.completed).length;
+        project.progress = Math.round((completedCount / 5) * 100);
+
+        if (milestoneId === 1 && completed) {
+            project.status = 'active';
+        }
+
+        await project.save();
+
+        return res.status(200).json({ success: true, data: project });
+    } catch (err) {
+        console.error('updateMilestone error:', err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};

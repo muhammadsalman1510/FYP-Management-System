@@ -1,53 +1,137 @@
-import { Link } from 'react-router-dom';
-
-/*
-  STUDENT — DASHBOARD
-  Shows project progress bar with 5 milestones,
-  group members, supervisor info, recent tasks, quick actions.
-
-  TODO (Backend): GET /api/projects/my-project
-  Replace all hardcoded data below with API response.
-*/
+import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
 
-  // TODO (Backend): Replace with GET /api/projects/my-project
-  const project = {
-    title: 'FYP Management System',
-    status: 'active', // 'no-project' | 'proposal-pending' | 'active'
-    supervisor: { name: 'Mr. Shoaib Ahmed', department: 'Computer Science' },
-    groupMembers: [
-      { name: 'Muhammad Salman', rollNumber: 'F2021001001' },
-      { name: 'Ali Hassan',      rollNumber: 'F2021001002' },
-    ],
-    milestones: [
-      { id: 1, name: 'Proposal',       completed: true  },
-      { id: 2, name: 'Defense',        completed: false },
-      { id: 3, name: 'Implementation', completed: false },
-      { id: 4, name: 'Documentation',  completed: false },
-      { id: 5, name: 'Final',          completed: false },
-    ],
+  const [project, setProject] = useState(null);
+  const [pendingTasksCount, setPendingTasksCount] = useState(0);
+  const [upcomingMeetingsCount, setUpcomingMeetingsCount] = useState(0);
+  const [recentAnnouncements, setRecentAnnouncements] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [hoveredCard, setHoveredCard] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+        const [projectRes, tasksRes, meetingsRes, announcementsRes] = await Promise.all([
+          fetch('/api/projects/my', { headers }),
+          fetch('/api/tasks', { headers }),
+          fetch('/api/meetings', { headers }),
+          fetch('/api/announcements', { headers }),
+        ]);
+
+        if (projectRes.ok) {
+          const projectData = await projectRes.json();
+          if (projectData.success) setProject(projectData.data);
+        }
+
+        if (tasksRes.ok) {
+          const tasksData = await tasksRes.json();
+          if (tasksData.success) {
+            const pending = (tasksData.data || []).filter((t) => t.status === 'pending').length;
+            setPendingTasksCount(pending);
+          }
+        }
+
+        if (meetingsRes.ok) {
+          const meetingsData = await meetingsRes.json();
+          if (meetingsData.success) {
+            const now = new Date();
+            const upcoming = (meetingsData.data || []).filter((m) => {
+              if (!m.proposedDate) return false;
+              return new Date(m.proposedDate) >= now && m.status !== 'rejected';
+            }).length;
+            setUpcomingMeetingsCount(upcoming);
+          }
+        }
+
+        if (announcementsRes.ok) {
+          const annData = await announcementsRes.json();
+          if (annData.success) setRecentAnnouncements((annData.data || []).slice(0, 2));
+        }
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  if (loading) return (
+    <div className="d-flex justify-content-center align-items-center py-5">
+      <div className="spinner-border text-primary" role="status">
+        <span className="visually-hidden">Loading...</span>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="alert alert-danger border-0">{error}</div>
+  );
+
+  if (!project) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
+        <div className="text-center">
+          <div className="mb-3" style={{ fontSize: '3rem' }}>📋</div>
+          <h5 className="fw-semibold text-dark mb-2">No Project Assigned Yet</h5>
+          <p className="text-muted small mb-0">Contact your coordinator to get assigned to a project.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const milestones         = project.milestones || [];
+  const completedMilestones = milestones.filter((m) => m.completed).length;
+  const progressPercent    = milestones.length > 0 ? (completedMilestones / milestones.length) * 100 : 0;
+  const currentMilestone   = milestones.find((m) => !m.completed);
+
+  const supervisor = project.supervisors?.[0] || project.supervisorId || null;
+  const students   = project.students || [];
+
+  const getInitials = (name) =>
+    name ? name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() : '??';
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    const now  = new Date();
+    const then = new Date(dateStr);
+    const diffDays = Math.floor((now - then) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return '1 day ago';
+    if (diffDays < 30)  return `${diffDays} days ago`;
+    return then.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  // TODO (Backend): Replace with GET /api/tasks?status=pending
-  const pendingTasksCount = 3;
-
-  // TODO (Backend): Replace with GET /api/meetings?upcoming=true
-  const upcomingMeetingsCount = 2;
-
-  const completedMilestones = project.milestones.filter(m => m.completed).length;
-  const progressPercent     = (completedMilestones / project.milestones.length) * 100;
-
-  const currentMilestone = project.milestones.find(m => !m.completed);
+  const cardStyle = (index) => ({
+    cursor: 'pointer',
+    transition: 'box-shadow 0.15s, transform 0.15s',
+    boxShadow: hoveredCard === index
+      ? '0 6px 24px rgba(0,0,0,0.13)'
+      : '0 1px 4px rgba(0,0,0,0.07)',
+    transform: hoveredCard === index ? 'translateY(-2px)' : 'translateY(0)',
+  });
 
   return (
     <>
-      {/* ── Top Stats Row ── */}
+      {/* top stats row */}
       <div className="row g-4 row-cols-1 row-cols-md-2 row-cols-xl-4 mb-4">
 
         {/* Project Progress */}
         <div className="col">
-          <div className="card shadow-sm border-0 h-100">
+          <div
+            className="card border-0 h-100"
+            style={cardStyle(0)}
+            onClick={() => navigate('/project/status')}
+            onMouseEnter={() => setHoveredCard(0)}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
             <div className="card-body p-4">
               <div className="d-flex align-items-center justify-content-between mb-3">
                 <div className="d-flex align-items-center justify-content-center rounded-circle"
@@ -58,7 +142,7 @@ const Dashboard = () => {
                   </svg>
                 </div>
                 <span className="badge bg-primary rounded-pill" style={{ fontSize: '0.7rem' }}>
-                  {completedMilestones}/{project.milestones.length} Milestones
+                  {completedMilestones}/{milestones.length} Milestones
                 </span>
               </div>
               <h3 className="fw-bold text-dark mb-0">{Math.round(progressPercent)}%</h3>
@@ -69,7 +153,13 @@ const Dashboard = () => {
 
         {/* Pending Tasks */}
         <div className="col">
-          <div className="card shadow-sm border-0 h-100">
+          <div
+            className="card border-0 h-100"
+            style={cardStyle(1)}
+            onClick={() => navigate('/tasks')}
+            onMouseEnter={() => setHoveredCard(1)}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
             <div className="card-body p-4">
               <div className="d-flex align-items-center justify-content-center rounded-circle mb-3"
                 style={{ width: '44px', height: '44px', backgroundColor: '#ffc10720' }}>
@@ -85,7 +175,13 @@ const Dashboard = () => {
 
         {/* Current Milestone */}
         <div className="col">
-          <div className="card shadow-sm border-0 h-100">
+          <div
+            className="card border-0 h-100"
+            style={cardStyle(2)}
+            onClick={() => navigate('/project/status')}
+            onMouseEnter={() => setHoveredCard(2)}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
             <div className="card-body p-4">
               <div className="d-flex align-items-center justify-content-center rounded-circle mb-3"
                 style={{ width: '44px', height: '44px', backgroundColor: '#28a74520' }}>
@@ -103,7 +199,13 @@ const Dashboard = () => {
 
         {/* Upcoming Meetings */}
         <div className="col">
-          <div className="card shadow-sm border-0 h-100">
+          <div
+            className="card border-0 h-100"
+            style={cardStyle(3)}
+            onClick={() => navigate('/meetings/requests')}
+            onMouseEnter={() => setHoveredCard(3)}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
             <div className="card-body p-4">
               <div className="d-flex align-items-center justify-content-center rounded-circle mb-3"
                 style={{ width: '44px', height: '44px', backgroundColor: '#17a2b820' }}>
@@ -119,10 +221,10 @@ const Dashboard = () => {
 
       </div>
 
-      {/* ── Bottom Row ── */}
+      {/* bottom row */}
       <div className="row g-4">
 
-        {/* ── Project Progress + Milestones (col-8) ── */}
+        {/* milestones progress card */}
         <div className="col-12 col-xl-8">
           <div className="card shadow-sm border-0">
             <div className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between">
@@ -130,14 +232,12 @@ const Dashboard = () => {
                 <h6 className="fw-semibold text-dark mb-0">Project Progress</h6>
                 <p className="text-muted small mb-0">{project.title}</p>
               </div>
-              {/* CHANGED: button label updated from "View Details" to "View Project" */}
               <Link to="/project/status" className="btn btn-outline-primary btn-sm px-3">
                 View Project
               </Link>
             </div>
             <div className="card-body p-4">
 
-              {/* Progress bar */}
               <div className="mb-4">
                 <div className="d-flex justify-content-between mb-2">
                   <span className="small fw-medium text-dark">Overall Completion</span>
@@ -151,103 +251,119 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* Milestone steps */}
-              <div className="d-flex align-items-center justify-content-between position-relative">
-                {/* Connecting line */}
-                <div
-                  className="position-absolute"
-                  style={{ top: '18px', left: '18px', right: '18px', height: '2px', backgroundColor: '#e9ecef', zIndex: 0 }}
-                />
-                {/* Completed line overlay */}
-                <div
-                  className="position-absolute"
-                  style={{
-                    top: '18px', left: '18px',
-                    width: `calc(${progressPercent}% - 18px)`,
-                    height: '2px', backgroundColor: '#3c50e0', zIndex: 1,
-                    transition: 'width 0.5s ease',
-                  }}
-                />
-
-                {project.milestones.map((m, i) => (
-                  <div key={m.id} className="d-flex flex-column align-items-center" style={{ zIndex: 2, flex: 1 }}>
-                    {/* Circle */}
-                    <div
-                      className="d-flex align-items-center justify-content-center rounded-circle fw-bold mb-2"
-                      style={{
-                        width: '36px', height: '36px',
-                        backgroundColor: m.completed ? '#3c50e0' : i === project.milestones.findIndex(x => !x.completed) ? '#3c50e020' : '#e9ecef',
-                        color: m.completed ? '#fff' : i === project.milestones.findIndex(x => !x.completed) ? '#3c50e0' : '#adb5bd',
-                        border: i === project.milestones.findIndex(x => !x.completed) ? '2px solid #3c50e0' : 'none',
-                        fontSize: '0.75rem',
-                      }}
-                    >
-                      {m.completed ? '✓' : m.id}
-                    </div>
-                    <span className="text-dark text-center" style={{ fontSize: '0.68rem', maxWidth: '60px', lineHeight: '1.2' }}>
-                      {m.name}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              {milestones.length > 0 ? (
+                <div className="d-flex align-items-center justify-content-between position-relative">
+                  <div
+                    className="position-absolute"
+                    style={{ top: '18px', left: '18px', right: '18px', height: '2px', backgroundColor: '#e9ecef', zIndex: 0 }}
+                  />
+                  <div
+                    className="position-absolute"
+                    style={{
+                      top: '18px', left: '18px',
+                      width: `calc(${progressPercent}% - 18px)`,
+                      height: '2px', backgroundColor: '#3c50e0', zIndex: 1,
+                      transition: 'width 0.5s ease',
+                    }}
+                  />
+                  {milestones.map((m, i) => {
+                    const currentIdx = milestones.findIndex((x) => !x.completed);
+                    const isCurrent  = i === currentIdx;
+                    return (
+                      <div key={m._id || i} className="d-flex flex-column align-items-center" style={{ zIndex: 2, flex: 1 }}>
+                        <div
+                          className="d-flex align-items-center justify-content-center rounded-circle fw-bold mb-2"
+                          style={{
+                            width: '36px', height: '36px',
+                            backgroundColor: m.completed ? '#3c50e0' : isCurrent ? '#3c50e020' : '#e9ecef',
+                            color: m.completed ? '#fff' : isCurrent ? '#3c50e0' : '#adb5bd',
+                            border: isCurrent ? '2px solid #3c50e0' : 'none',
+                            fontSize: '0.75rem',
+                          }}
+                        >
+                          {m.completed ? '✓' : i + 1}
+                        </div>
+                        <span className="text-dark text-center" style={{ fontSize: '0.68rem', maxWidth: '60px', lineHeight: '1.2' }}>
+                          {m.name}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-muted small mb-0">No milestones defined yet.</p>
+              )}
 
             </div>
           </div>
         </div>
 
-        {/* ── Group Members + Supervisor (col-4) ── */}
+        {/* group members + supervisor */}
         <div className="col-12 col-xl-4">
+
           <div className="card shadow-sm border-0 mb-4">
             <div className="card-header bg-white border-bottom py-3 px-4">
               <h6 className="fw-semibold text-dark mb-0">My Group</h6>
             </div>
             <div className="card-body p-3">
-              <div className="d-flex flex-column gap-2">
-                {project.groupMembers.map((m, i) => (
-                  <div key={i} className="d-flex align-items-center gap-2 p-2 rounded"
-                    style={{ backgroundColor: '#f8f9fa' }}>
-                    <div
-                      className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                      style={{ width: '32px', height: '32px', minWidth: '32px', backgroundColor: '#3c50e0', fontSize: '0.72rem' }}
-                    >
-                      {m.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+              {students.length === 0 ? (
+                <p className="text-muted small mb-0 px-1">No students listed yet.</p>
+              ) : (
+                <div className="d-flex flex-column gap-2">
+                  {students.map((s, i) => (
+                    <div key={s._id || i} className="d-flex align-items-center gap-2 p-2 rounded"
+                      style={{ backgroundColor: '#f8f9fa' }}>
+                      <div
+                        className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
+                        style={{ width: '32px', height: '32px', minWidth: '32px', backgroundColor: '#3c50e0', fontSize: '0.72rem' }}
+                      >
+                        {getInitials(s.name)}
+                      </div>
+                      <div>
+                        <p className="fw-medium text-dark mb-0" style={{ fontSize: '0.82rem' }}>{s.name}</p>
+                        <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>{s.email}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="fw-medium text-dark mb-0" style={{ fontSize: '0.82rem' }}>{m.name}</p>
-                      <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>{m.rollNumber}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Supervisor mini card */}
-          <div className="card shadow-sm border-0">
-            <div className="card-header bg-white border-bottom py-3 px-4">
-              <h6 className="fw-semibold text-dark mb-0">Supervisor</h6>
-            </div>
-            <div className="card-body p-3">
-              <div className="d-flex align-items-center gap-2 mb-3">
-                <div
-                  className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                  style={{ width: '38px', height: '38px', minWidth: '38px', backgroundColor: '#28a745', fontSize: '0.8rem' }}
-                >
-                  {project.supervisor.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                </div>
-                <div>
-                  <p className="fw-medium text-dark mb-0 small">{project.supervisor.name}</p>
-                  <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>{project.supervisor.department}</p>
-                </div>
+          {supervisor ? (
+            <div className="card shadow-sm border-0">
+              <div className="card-header bg-white border-bottom py-3 px-4">
+                <h6 className="fw-semibold text-dark mb-0">Supervisor</h6>
               </div>
-              <Link to="/supervisor/view" className="btn btn-outline-primary btn-sm w-100">
-                View Profile
-              </Link>
+              <div className="card-body p-3">
+                <div className="d-flex align-items-center gap-2 mb-3">
+                  <div
+                    className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
+                    style={{ width: '38px', height: '38px', minWidth: '38px', backgroundColor: '#28a745', fontSize: '0.8rem' }}
+                  >
+                    {getInitials(supervisor.name)}
+                  </div>
+                  <div>
+                    <p className="fw-medium text-dark mb-0 small">{supervisor.name}</p>
+                    <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>{supervisor.email}</p>
+                  </div>
+                </div>
+                <Link to="/supervisor/view" className="btn btn-outline-primary btn-sm w-100">
+                  View Profile
+                </Link>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="card shadow-sm border-0">
+              <div className="card-body p-3 text-center">
+                <p className="text-muted small mb-0">No supervisor assigned yet.</p>
+              </div>
+            </div>
+          )}
+
         </div>
 
-        {/* ── Quick Actions ── */}
+        {/* quick actions */}
         <div className="col-12 col-xl-6">
           <div className="card shadow-sm border-0">
             <div className="card-header bg-white border-bottom py-3 px-4">
@@ -280,7 +396,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* ── Recent Announcements ── */}
+        {/* recent announcements */}
         <div className="col-12 col-xl-6">
           <div className="card shadow-sm border-0">
             <div className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between">
@@ -288,19 +404,19 @@ const Dashboard = () => {
               <Link to="/announcements" className="text-primary small text-decoration-none">View All</Link>
             </div>
             <div className="card-body p-4">
-              {/* TODO (Backend): Replace with GET /api/announcements?limit=2 */}
-              <div className="d-flex flex-column gap-3">
-                <div className="border-bottom pb-3">
-                  <p className="small fw-medium text-dark mb-1">FYP Defense Schedule Released</p>
-                  <p className="small text-muted mb-1">Check your assigned date and time on the noticeboard.</p>
-                  <span className="text-muted" style={{ fontSize: '0.72rem' }}>2 days ago</span>
+              {recentAnnouncements.length === 0 ? (
+                <p className="text-muted small mb-0">No announcements yet.</p>
+              ) : (
+                <div className="d-flex flex-column gap-3">
+                  {recentAnnouncements.map((ann, i) => (
+                    <div key={ann._id} className={i < recentAnnouncements.length - 1 ? 'border-bottom pb-3' : ''}>
+                      <p className="small fw-medium text-dark mb-1">{ann.title}</p>
+                      <p className="small text-muted mb-1">{ann.content?.slice(0, 80)}{ann.content?.length > 80 ? '...' : ''}</p>
+                      <span className="text-muted" style={{ fontSize: '0.72rem' }}>{formatDate(ann.createdAt)}</span>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <p className="small fw-medium text-dark mb-1">Submission Deadline Reminder</p>
-                  <p className="small text-muted mb-1">All documentation must be submitted by May 15.</p>
-                  <span className="text-muted" style={{ fontSize: '0.72rem' }}>4 days ago</span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

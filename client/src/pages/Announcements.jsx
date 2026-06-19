@@ -1,47 +1,62 @@
-// 📁 FILE: src/pages/Announcements.jsx
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../components/Breadcrumbs/Breadcrumb';
 
-/*
-  STUDENT — ANNOUNCEMENTS PAGE
-  Read-only. Shows announcements posted by coordinator.
-  TODO (Backend): GET /api/announcements
-  Replace useState data with API call.
-*/
-
 const Announcements = () => {
+  const [announcements, setAnnouncements] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // TODO (Backend): Replace with API call
-  const [announcements] = useState([
-    {
-      _id: '1',
-      title: 'FYP Defense Schedule Released',
-      content: 'The final FYP defense schedule has been released. All students are required to check their assigned date and time on the noticeboard. Dress code is formal.',
-      postedBy: { name: 'Dr. Asadullah Ehsan (Coordinator)' },
-      createdAt: '2024-04-25T10:30:00Z',
-    },
-    {
-      _id: '2',
-      title: 'Submission Deadline Reminder',
-      content: 'All project documentation must be submitted by May 15, 2024. Late submissions will not be accepted without prior approval from the coordinator.',
-      postedBy: { name: 'Dr. Asadullah Ehsan (Coordinator)' },
-      createdAt: '2024-04-22T14:15:00Z',
-    },
-    {
-      _id: '3',
-      title: 'Supervisor Meeting Week',
-      content: 'All students must have at least one supervisor meeting this week and get it logged in the system. Supervisors please update meeting statuses by Friday.',
-      postedBy: { name: 'Dr. Asadullah Ehsan (Coordinator)' },
-      createdAt: '2024-04-18T09:00:00Z',
-    },
-  ]);
+  useEffect(() => {
+    const fetchAnnouncements = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/announcements', {
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || 'Failed to load announcements');
+        }
+        setAnnouncements(data.data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAnnouncements();
+  }, []);
 
   const formatDate = (isoString) => {
     const date = new Date(isoString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) +
-      ' at ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    return (
+      date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) +
+      ' at ' +
+      date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    );
   };
+
+  if (loading) {
+    return (
+      <>
+        <Breadcrumb pageName="Announcements" />
+        <div className="d-flex justify-content-center align-items-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <Breadcrumb pageName="Announcements" />
+        <div className="alert alert-danger border-0">{error}</div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -71,10 +86,10 @@ const Announcements = () => {
                     className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
                     style={{ width: '28px', height: '28px', minWidth: '28px', backgroundColor: '#3c50e0', fontSize: '0.7rem' }}
                   >
-                    {ann.postedBy.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    CO
                   </div>
                   <span className="text-muted small">
-                    Posted by <strong className="text-dark">{ann.postedBy.name}</strong>
+                    Posted by <strong className="text-dark">Coordinator</strong>
                   </span>
                   <span className="text-muted small">•</span>
                   <span className="text-muted small">{formatDate(ann.createdAt)}</span>

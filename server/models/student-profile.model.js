@@ -45,11 +45,6 @@ const studentProfileSchema = new mongoose.Schema(
             required: [true, "Section is required"],
             trim: true,
         },
-        supervisorId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "SupervisorProfile",
-            default: null, // assigned later, not at registration
-        },
     },
     {
         timestamps: true,

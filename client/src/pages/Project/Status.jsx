@@ -1,104 +1,102 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 
-/*
-  STUDENT — PROJECT PAGE (formerly "Project Status")
-  Shows 5 milestones. Progress bar fills 20% per milestone.
-
-  MILESTONE LOGIC:
-  - Milestone 1 (Proposal): Auto-completed when COORDINATOR approves proposal
-    (proposal goes directly to coordinator, no supervisor step)
-  - Milestones 2-5: Coordinator manually marks each as complete
-
-  Also shows: group members, supervisor, coordinator info.
-
-  TODO (Backend): GET /api/projects/my-project
-  Replace hardcoded data below with real API response.
-*/
-
 const Status = () => {
+  const [project, setProject] = useState(null);
+  const [taskCount, setTaskCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // TODO (Backend): Replace with GET /api/projects/my-project
-  const project = {
-    title: 'FYP Management System',
-    supervisor: {
-      name: 'Mr. Shoaib Ahmed',
-      email: 'shoaib@university.edu',
-      department: 'Computer Science',
-    },
-    coordinator: {
-      name: 'Mr. Omer Farooq',
-      email: 'omer@university.edu',
-      department: 'Computer Science',
-    },
-    groupMembers: [
-      { name: 'Muhammad Salman', rollNumber: 'F2021001001', program: 'BSCS', semester: '7th', section: 'A' },
-      { name: 'Ali Hassan',      rollNumber: 'F2021001002', program: 'BSCS', semester: '7th', section: 'A' },
-    ],
-    milestones: [
-      {
-        id: 1,
-        name: 'Project Proposal',
-        description: 'Proposal submitted and approved by coordinator.',
-        completed: true,
-        completedAt: '2024-04-10',
-        autoCompleted: true,
-        // Auto-completed when coordinator approves proposal
-        // No supervisor step — proposal goes directly to coordinator
-      },
-      {
-        id: 2,
-        name: 'Project Defense',
-        description: 'Initial defense presented to supervisor and coordinator.',
-        completed: false,
-        completedAt: null,
-        autoCompleted: false,
-        // Coordinator clicks "Mark Complete" after physical defense
-      },
-      {
-        id: 3,
-        name: 'Implementation',
-        description: 'Core development and implementation phase completed.',
-        completed: false,
-        completedAt: null,
-        autoCompleted: false,
-      },
-      {
-        id: 4,
-        name: 'Documentation',
-        description: 'Full project documentation submitted and approved.',
-        completed: false,
-        completedAt: null,
-        autoCompleted: false,
-      },
-      {
-        id: 5,
-        name: 'Final Presentation',
-        description: 'Final project presented and signed off by coordinator.',
-        completed: false,
-        completedAt: null,
-        autoCompleted: false,
-      },
-    ],
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+    const fetchData = async () => {
+      try {
+        const [projectRes, tasksRes] = await Promise.all([
+          fetch('/api/projects/my', { headers }),
+          fetch('/api/tasks', { headers }),
+        ]);
+
+        const projectData = await projectRes.json();
+        if (!projectRes.ok || !projectData.success) {
+          throw new Error(projectData.message || 'Failed to load project');
+        }
+        setProject(projectData.data);
+
+        const tasksData = await tasksRes.json();
+        if (tasksRes.ok && tasksData.success) {
+          setTaskCount(tasksData.data.length);
+        }
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const formatDate = (isoStr) => {
+    if (!isoStr) return null;
+    return new Date(isoStr).toLocaleDateString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+    });
   };
 
-  // TODO (Backend): Replace with real pending tasks count from GET /api/tasks?status=pending
-  const pendingTasksCount = 2;
+  const getInitials = (name) =>
+    name ? name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() : '??';
 
-  const completedCount    = project.milestones.filter(m => m.completed).length;
-  const overallProgress   = (completedCount / project.milestones.length) * 100;
-  const currentMilestone  = project.milestones.find(m => !m.completed);
-  const currentMilestoneIdx = project.milestones.findIndex(m => !m.completed);
+  if (loading) {
+    return (
+      <>
+        <Breadcrumb pageName="Project" />
+        <div className="d-flex justify-content-center align-items-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <Breadcrumb pageName="Project" />
+        <div className="alert alert-danger border-0">{error}</div>
+      </>
+    );
+  }
+
+  if (!project) {
+    return (
+      <>
+        <Breadcrumb pageName="Project" />
+        <div className="alert alert-info border-0">No project has been assigned to you yet.</div>
+      </>
+    );
+  }
+
+  const milestones = project.milestones || [];
+  const completedCount = milestones.filter((m) => m.completed).length;
+  const overallProgress = milestones.length > 0 ? (completedCount / milestones.length) * 100 : 0;
+  const currentMilestoneIdx = milestones.findIndex((m) => !m.completed);
+  const currentMilestone = currentMilestoneIdx >= 0 ? milestones[currentMilestoneIdx] : null;
+
+  const supervisors = project.supervisors || [];
+  const coordinator = project.coordinator || null;
+  const students = project.students || [];
 
   return (
     <>
-      {/* CHANGED: pageName updated from "Project Status" to "Project" */}
       <Breadcrumb pageName="Project" />
 
       <div className="d-flex flex-column gap-4">
 
-        {/* ── Pending Tasks Alert Widget ── */}
-        {pendingTasksCount > 0 && (
+        {/* Pending Tasks Alert */}
+        {taskCount > 0 && (
           <div
             className="d-flex align-items-center justify-content-between p-3 rounded border border-warning"
             style={{ backgroundColor: '#fff8e1' }}
@@ -109,15 +107,15 @@ const Status = () => {
                 style={{ width: '40px', height: '40px', minWidth: '40px', backgroundColor: '#ffc10720' }}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffc107">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
                 </svg>
               </div>
               <div>
                 <p className="fw-semibold mb-0 text-dark" style={{ fontSize: '0.9rem' }}>
-                  You have {pendingTasksCount} pending {pendingTasksCount === 1 ? 'task' : 'tasks'}
+                  You have {taskCount} {taskCount === 1 ? 'task' : 'tasks'} assigned
                 </p>
                 <p className="text-muted mb-0" style={{ fontSize: '0.78rem' }}>
-                  Complete your pending tasks before the deadline.
+                  Complete your tasks before the deadline.
                 </p>
               </div>
             </div>
@@ -131,15 +129,13 @@ const Status = () => {
           </div>
         )}
 
-        {/* ── Progress Overview Card ── */}
+        {/* Progress Overview Card */}
         <div className="card shadow-sm border-0">
           <div className="card-header bg-white border-bottom py-3 px-4">
             <h5 className="fw-semibold text-dark mb-0">Project Progress</h5>
             <p className="text-muted small mb-0 mt-1">{project.title}</p>
           </div>
           <div className="card-body p-4">
-
-            {/* Stats row */}
             <div className="row g-3 mb-4 text-center">
               <div className="col-12 col-md-4">
                 <p className="fs-3 fw-bold text-primary mb-0">{Math.round(overallProgress)}%</p>
@@ -153,13 +149,12 @@ const Status = () => {
               </div>
               <div className="col-12 col-md-4">
                 <p className="fs-3 fw-bold text-success mb-0">
-                  {completedCount}/{project.milestones.length}
+                  {completedCount}/{milestones.length}
                 </p>
                 <p className="text-muted small mb-0">Milestones Completed</p>
               </div>
             </div>
 
-            {/* Progress bar */}
             <div className="mb-2">
               <div className="d-flex justify-content-between mb-1">
                 <span className="small fw-medium text-dark">Completion</span>
@@ -171,21 +166,22 @@ const Status = () => {
                   style={{ width: `${overallProgress}%`, borderRadius: '6px', transition: 'width 0.5s' }}
                 />
               </div>
-              {/* Labels under bar */}
               <div className="d-flex justify-content-between mt-1">
-                {project.milestones.map((m) => (
-                  <span key={m.id} className="text-muted text-center"
-                    style={{ fontSize: '0.65rem', flex: 1 }}>
-                    {m.name.split(' ')[0]}
+                {milestones.map((m) => (
+                  <span
+                    key={m.id || m._id}
+                    className="text-muted text-center"
+                    style={{ fontSize: '0.65rem', flex: 1 }}
+                  >
+                    {m.name ? m.name.split(' ')[0] : `M${m.id}`}
                   </span>
                 ))}
               </div>
             </div>
-
           </div>
         </div>
 
-        {/* ── 5 Milestones Detail ── */}
+        {/* Milestones Detail */}
         <div className="card shadow-sm border-0">
           <div className="card-header bg-white border-bottom py-3 px-4">
             <h5 className="fw-semibold text-dark mb-0">Milestones</h5>
@@ -195,9 +191,9 @@ const Status = () => {
           </div>
           <div className="card-body p-4">
             <div className="d-flex flex-column gap-3">
-              {project.milestones.map((milestone, index) => (
+              {milestones.map((milestone, index) => (
                 <div
-                  key={milestone.id}
+                  key={milestone.id || milestone._id || index}
                   className={`d-flex align-items-center justify-content-between p-3 rounded border ${
                     milestone.completed
                       ? 'border-success bg-success bg-opacity-10'
@@ -206,7 +202,6 @@ const Status = () => {
                       : 'border-light'
                   }`}
                 >
-                  {/* Left: circle + info */}
                   <div className="d-flex align-items-center gap-3">
                     <div
                       className="d-flex align-items-center justify-content-center rounded-circle fw-bold"
@@ -221,7 +216,7 @@ const Status = () => {
                         fontSize: '0.85rem',
                       }}
                     >
-                      {milestone.completed ? '✓' : milestone.id}
+                      {milestone.completed ? '✓' : milestone.id || (index + 1)}
                     </div>
                     <div>
                       <p className="fw-semibold text-dark mb-0 small">{milestone.name}</p>
@@ -230,14 +225,11 @@ const Status = () => {
                       </p>
                       {milestone.completed && milestone.completedAt && (
                         <p className="text-success mb-0" style={{ fontSize: '0.72rem' }}>
-                          ✓ Completed on {milestone.completedAt}
-                          {milestone.autoCompleted && ' (auto — proposal approved)'}
+                          ✓ Completed on {formatDate(milestone.completedAt)}
                         </p>
                       )}
                     </div>
                   </div>
-
-                  {/* Right: badge */}
                   <div className="flex-shrink-0 ms-3">
                     {milestone.completed ? (
                       <span className="badge bg-success rounded-pill px-3 py-2" style={{ fontSize: '0.72rem' }}>
@@ -257,7 +249,7 @@ const Status = () => {
               ))}
             </div>
 
-            {completedCount === project.milestones.length && (
+            {completedCount === milestones.length && milestones.length > 0 && (
               <div className="alert alert-success border-0 mt-4 text-center mb-0">
                 🎉 <strong>Congratulations!</strong> All milestones completed. Your FYP is finished!
               </div>
@@ -265,37 +257,43 @@ const Status = () => {
           </div>
         </div>
 
-        {/* ── Group Members Card ── */}
+        {/* Group Members Card */}
         <div className="card shadow-sm border-0">
           <div className="card-header bg-white border-bottom py-3 px-4">
             <h5 className="fw-semibold text-dark mb-0">Group Members</h5>
           </div>
           <div className="card-body p-4">
-            <div className="row g-3">
-              {project.groupMembers.map((member, i) => (
-                <div key={i} className="col-12 col-md-6">
-                  <div className="d-flex align-items-center gap-3 p-3 border rounded">
-                    <div
-                      className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                      style={{ width: '40px', height: '40px', minWidth: '40px', backgroundColor: '#3c50e0', fontSize: '0.85rem' }}
-                    >
-                      {member.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                    </div>
-                    <div>
-                      <p className="fw-semibold text-dark mb-0 small">{member.name}</p>
-                      <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>
-                        {member.rollNumber} &bull; {member.program} &bull; Sem {member.semester} &bull; Sec {member.section}
-                      </p>
+            {students.length === 0 ? (
+              <p className="text-muted small mb-0">No students assigned yet.</p>
+            ) : (
+              <div className="row g-3">
+                {students.map((member, i) => (
+                  <div key={member._id || i} className="col-12 col-md-6">
+                    <div className="d-flex align-items-center gap-3 p-3 border rounded">
+                      <div
+                        className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
+                        style={{
+                          width: '40px', height: '40px', minWidth: '40px',
+                          backgroundColor: '#3c50e0', fontSize: '0.85rem',
+                        }}
+                      >
+                        {getInitials(member.name)}
+                      </div>
+                      <div>
+                        <p className="fw-semibold text-dark mb-0 small">{member.name}</p>
+                        <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>{member.email}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ── Supervisor + Coordinator Row ── */}
+        {/* Supervisor + Coordinator Row */}
         <div className="row g-4">
+
           {/* Supervisor */}
           <div className="col-12 col-md-6">
             <div className="card shadow-sm border-0 h-100">
@@ -303,22 +301,30 @@ const Status = () => {
                 <h5 className="fw-semibold text-dark mb-0">Supervisor</h5>
               </div>
               <div className="card-body p-4">
-                <div className="d-flex align-items-center gap-3 mb-3">
-                  <div
-                    className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                    style={{ width: '48px', height: '48px', minWidth: '48px', backgroundColor: '#28a745', fontSize: '1rem' }}
-                  >
-                    {project.supervisor.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                  </div>
-                  <div>
-                    <p className="fw-semibold text-dark mb-0">{project.supervisor.name}</p>
-                    <p className="text-muted small mb-0">{project.supervisor.department}</p>
-                  </div>
-                </div>
-                <p className="small mb-3">
-                  <span className="fw-medium">Email:</span> {project.supervisor.email}
-                </p>
-                <a href="/meetings/requests" className="btn btn-primary w-100 py-2">
+                {supervisors.length === 0 ? (
+                  <p className="text-muted small mb-3">No supervisor assigned yet.</p>
+                ) : (
+                  supervisors.map((sup, i) => (
+                    <div key={sup._id || i} className={i > 0 ? 'mt-3 pt-3 border-top' : 'mb-3'}>
+                      <div className="d-flex align-items-center gap-3 mb-2">
+                        <div
+                          className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
+                          style={{ width: '48px', height: '48px', minWidth: '48px', backgroundColor: '#28a745', fontSize: '1rem' }}
+                        >
+                          {getInitials(sup.name)}
+                        </div>
+                        <div>
+                          <p className="fw-semibold text-dark mb-0">{sup.name}</p>
+                          <p className="text-muted small mb-0">Supervisor</p>
+                        </div>
+                      </div>
+                      <p className="small mb-0">
+                        <span className="fw-medium">Email:</span> {sup.email}
+                      </p>
+                    </div>
+                  ))
+                )}
+                <a href="/meetings/requests" className="btn btn-primary w-100 py-2 mt-3">
                   Request Meeting
                 </a>
               </div>
@@ -332,27 +338,34 @@ const Status = () => {
                 <h5 className="fw-semibold text-dark mb-0">Coordinator</h5>
               </div>
               <div className="card-body p-4">
-                <div className="d-flex align-items-center gap-3 mb-3">
-                  <div
-                    className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                    style={{ width: '48px', height: '48px', minWidth: '48px', backgroundColor: '#3c50e0', fontSize: '1rem' }}
-                  >
-                    {project.coordinator.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                  </div>
-                  <div>
-                    <p className="fw-semibold text-dark mb-0">{project.coordinator.name}</p>
-                    <p className="text-muted small mb-0">{project.coordinator.department}</p>
-                  </div>
-                </div>
-                <p className="small mb-3">
-                  <span className="fw-medium">Email:</span> {project.coordinator.email}
-                </p>
+                {coordinator ? (
+                  <>
+                    <div className="d-flex align-items-center gap-3 mb-3">
+                      <div
+                        className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
+                        style={{ width: '48px', height: '48px', minWidth: '48px', backgroundColor: '#3c50e0', fontSize: '1rem' }}
+                      >
+                        {getInitials(coordinator.name)}
+                      </div>
+                      <div>
+                        <p className="fw-semibold text-dark mb-0">{coordinator.name}</p>
+                        <p className="text-muted small mb-0">Coordinator</p>
+                      </div>
+                    </div>
+                    <p className="small mb-3">
+                      <span className="fw-medium">Email:</span> {coordinator.email}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-muted small mb-3">No coordinator assigned yet.</p>
+                )}
                 <a href="/meetings/requests" className="btn btn-primary w-100 py-2">
                   Request Meeting
                 </a>
               </div>
             </div>
           </div>
+
         </div>
 
       </div>

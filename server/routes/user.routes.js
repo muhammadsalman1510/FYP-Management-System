@@ -1,16 +1,32 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
-import { createUser, getUsers, getUserById, updateUser, deleteUser } from '../controllers/user.controller.js';
+import { upload } from '../middleware/upload.middleware.js';
+import {
+    createUser,
+    getUsers,
+    getUserById,
+    updateUser,
+    deleteUser,
+    getMe,
+    updateMe,
+    updatePassword,
+    uploadPhoto,
+} from '../controllers/user.controller.js';
 
 const router = express.Router();
 
-router.use(authenticate);
-router.use(authorize('coordinator'));
+// ── Self-update routes — all roles, no coordinator restriction ────────────────
+// MUST be declared before /:id to prevent Express treating 'me' as an id param
+router.get('/me', authenticate, getMe);
+router.put('/me/password', authenticate, updatePassword);
+router.put('/me', authenticate, updateMe);
+router.post('/me/photo', authenticate, upload.single('photo'), uploadPhoto);
 
-router.post('/', createUser);
-router.get('/', getUsers);
-router.get('/:id', getUserById);
-router.put('/:id', updateUser);
-router.delete('/:id', deleteUser);
+// ── Coordinator-only routes ───────────────────────────────────────────────────
+router.post('/', authenticate, authorize('coordinator'), createUser);
+router.get('/', authenticate, authorize('coordinator'), getUsers);
+router.get('/:id', authenticate, authorize('coordinator'), getUserById);
+router.put('/:id', authenticate, authorize('coordinator'), updateUser);
+router.delete('/:id', authenticate, authorize('coordinator'), deleteUser);
 
 export default router;

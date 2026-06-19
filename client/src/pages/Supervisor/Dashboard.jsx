@@ -1,58 +1,115 @@
-import React from 'react';
-/*
-  SUPERVISOR DASHBOARD
-  Shows overview of assigned students, pending proposals,
-  pending task submissions, and upcoming meetings.
-  TODO (Backend): GET /api/supervisor/dashboard-stats
-*/
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const SupervisorDashboard = () => {
+  const navigate = useNavigate();
 
-  // TODO (Backend): Replace with API call
+  const [projects, setProjects] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [proposals, setProposals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [hoveredCard, setHoveredCard] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+        const [projectsRes, subsRes, propsRes] = await Promise.all([
+          fetch('/api/projects/assigned', { headers }),
+          fetch('/api/tasks/submissions', { headers }),
+          fetch('/api/proposals', { headers }),
+        ]);
+
+        const [projectsData, subsData, propsData] = await Promise.all([
+          projectsRes.json(),
+          subsRes.json(),
+          propsRes.json(),
+        ]);
+
+        if (!projectsRes.ok || !projectsData.success) throw new Error(projectsData.message || 'Failed to load projects');
+        if (!subsRes.ok || !subsData.success) throw new Error(subsData.message || 'Failed to load submissions');
+
+        setProjects(projectsData.data || []);
+        setSubmissions(subsData.data || []);
+        if (propsRes.ok && propsData.success) setProposals(propsData.data || []);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  if (loading) return (
+    <div className="d-flex justify-content-center align-items-center py-5">
+      <div className="spinner-border text-primary" role="status">
+        <span className="visually-hidden">Loading...</span>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="alert alert-danger border-0">{error}</div>
+  );
+
+  const totalProjects      = projects.length;
+  const activeProjects     = projects.filter((p) => p.status === 'active').length;
+  const totalStudents      = projects.reduce((acc, p) => acc + (p.students?.length || 0), 0);
+  const pendingSubmissions = submissions.filter((s) => s.status === 'pending').length;
+
   const stats = [
-    { title: 'Total Students',      value: '5',  color: '#3c50e0' },
-    { title: 'Pending Proposals',  value: '2',  color: '#ffc107' },
-    { title: 'Pending Tasks',      value: '4',  color: '#dc3545' },
-    { title: 'Upcoming Meetings',  value: '3',  color: '#28a745' },
+    { title: 'Total Projects',      value: totalProjects,      color: '#3c50e0', path: '/supervisor/projects' },
+    { title: 'Active Projects',     value: activeProjects,     color: '#28a745', path: '/supervisor/projects' },
+    { title: 'Total Students',      value: totalStudents,      color: '#17a2b8', path: '/supervisor/projects' },
+    { title: 'Pending Submissions', value: pendingSubmissions, color: '#dc3545', path: '/supervisor/tasks'    },
   ];
 
-  // TODO (Backend): GET /api/supervisor/proposals?status=pending
-  const recentProposals = [
-    { id: 1, student: 'Muhammad Salman', title: 'FYP Management System',     submittedDate: '2024-04-25', status: 'pending'  },
-    { id: 2, student: 'Ali Hassan',      title: 'E-Commerce Platform',        submittedDate: '2024-04-24', status: 'pending'  },
-    { id: 3, student: 'Sara Khan',       title: 'Hospital Management System', submittedDate: '2024-04-23', status: 'approved' },
-  ];
-
-  // TODO (Backend): GET /api/supervisor/tasks/submissions?status=submitted
-  const recentSubmissions = [
-    { id: 1, student: 'Muhammad Salman', task: 'Literature Review',  submitDate: '2024-04-26', status: 'submitted' },
-    { id: 2, student: 'Ali Hassan',      task: 'Progress Report',    submitDate: '2024-04-25', status: 'submitted' },
-    { id: 3, student: 'Usman Tariq',     task: 'Literature Review',  submitDate: '2024-04-24', status: 'approved'  },
-  ];
+  const recentProposals   = proposals.slice(0, 3);
+  const recentSubmissions = submissions.slice(0, 3);
 
   const getStatusBadge = (status) => {
     switch (status) {
-      case 'approved':  return 'bg-success';
-      case 'pending':   return 'bg-warning text-dark';
-      case 'submitted': return 'bg-primary';
-      case 'rejected':  return 'bg-danger';
-      default:          return 'bg-secondary';
+      case 'approved': return 'bg-success';
+      case 'pending':  return 'bg-warning text-dark';
+      case 'rejected': return 'bg-danger';
+      default:         return 'bg-secondary';
     }
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
   return (
     <>
-      {/* Page Title */}
       <div className="mb-4">
         <h4 className="fw-bold text-dark mb-1">Supervisor Dashboard</h4>
         <p className="text-muted small mb-0">Welcome back! Here's an overview of your students' progress.</p>
       </div>
 
-      {/* Stat Cards */}
+      {/* stat cards */}
       <div className="row g-4 mb-4 row-cols-1 row-cols-sm-2 row-cols-xl-4">
-        {stats.map((stat, index) => (
-          <div key={index} className="col">
-            <div className="card shadow-sm border-0 h-100">
+        {stats.map((stat, i) => (
+          <div key={i} className="col">
+            <div
+              className="card border-0 h-100"
+              style={{
+                cursor: 'pointer',
+                transition: 'box-shadow 0.15s, transform 0.15s',
+                boxShadow: hoveredCard === i
+                  ? '0 6px 24px rgba(0,0,0,0.13)'
+                  : '0 1px 4px rgba(0,0,0,0.07)',
+                transform: hoveredCard === i ? 'translateY(-2px)' : 'translateY(0)',
+              }}
+              onClick={() => navigate(stat.path)}
+              onMouseEnter={() => setHoveredCard(i)}
+              onMouseLeave={() => setHoveredCard(null)}
+            >
               <div className="card-body px-4 py-4">
                 <div
                   className="d-flex align-items-center justify-content-center rounded-circle mb-3"
@@ -71,10 +128,10 @@ const SupervisorDashboard = () => {
         ))}
       </div>
 
-      {/* Bottom Section */}
+      {/* bottom section */}
       <div className="row g-4">
 
-        {/* Recent Proposals */}
+        {/* recent proposals */}
         <div className="col-12 col-xl-7">
           <div className="card shadow-sm border-0">
             <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3 px-4">
@@ -82,69 +139,77 @@ const SupervisorDashboard = () => {
               <a href="/supervisor/proposals" className="text-primary small text-decoration-none">View All</a>
             </div>
             <div className="card-body p-0">
-              <div className="table-responsive">
-                <table className="table table-hover align-middle mb-0">
-                  <thead className="table-light">
-                    <tr>
-                      <th className="px-4 py-3 fw-semibold small text-dark">Student</th>
-                      <th className="px-4 py-3 fw-semibold small text-dark">Project Title</th>
-                      <th className="px-4 py-3 fw-semibold small text-dark">Status</th>
-                      <th className="px-4 py-3 fw-semibold small text-dark">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentProposals.map(p => (
-                      <tr key={p.id}>
-                        <td className="px-4 py-3 fw-medium text-dark small">{p.student}</td>
-                        <td className="px-4 py-3 text-muted small">{p.title}</td>
-                        <td className="px-4 py-3">
-                          <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(p.status)}`} style={{ fontSize: '0.72rem' }}>
-                            {p.status.charAt(0).toUpperCase() + p.status.slice(1)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          {p.status === 'pending' ? (
-                            <a href="/supervisor/proposals" className="btn btn-primary btn-sm px-3">Review</a>
-                          ) : (
-                            <a href="/supervisor/proposals" className="btn btn-outline-secondary btn-sm px-3">View</a>
-                          )}
-                        </td>
+              {recentProposals.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-muted small mb-0">No proposals yet.</p>
+                </div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-hover align-middle mb-0">
+                    <thead className="table-light">
+                      <tr>
+                        <th className="px-4 py-3 fw-semibold small text-dark">Student</th>
+                        <th className="px-4 py-3 fw-semibold small text-dark">Title</th>
+                        <th className="px-4 py-3 fw-semibold small text-dark">Status</th>
+                        <th className="px-4 py-3 fw-semibold small text-dark">Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {recentProposals.map((p) => (
+                        <tr key={p._id}>
+                          <td className="px-4 py-3 fw-medium text-dark small">{p.submittedBy?.name || '—'}</td>
+                          <td className="px-4 py-3 text-muted small">{p.title}</td>
+                          <td className="px-4 py-3">
+                            <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(p.status)}`} style={{ fontSize: '0.72rem' }}>
+                              {p.status?.charAt(0).toUpperCase() + p.status?.slice(1)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <a href="/supervisor/proposals" className="btn btn-outline-secondary btn-sm px-3">View</a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Recent Task Submissions + Quick Actions */}
+        {/* task submissions + quick actions */}
         <div className="col-12 col-xl-5">
 
-          {/* Task Submissions */}
           <div className="card shadow-sm border-0 mb-4">
             <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3 px-4">
               <h6 className="fw-semibold text-dark mb-0">Task Submissions</h6>
               <a href="/supervisor/tasks" className="text-primary small text-decoration-none">View All</a>
             </div>
             <div className="card-body p-3">
-              <div className="d-flex flex-column gap-3">
-                {recentSubmissions.map(sub => (
-                  <div key={sub.id} className="d-flex align-items-center justify-content-between border rounded p-3">
-                    <div>
-                      <p className="fw-medium text-dark small mb-0">{sub.student}</p>
-                      <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>{sub.task} • {sub.submitDate}</p>
+              {recentSubmissions.length === 0 ? (
+                <div className="text-center py-3">
+                  <p className="text-muted small mb-0">No submissions yet.</p>
+                </div>
+              ) : (
+                <div className="d-flex flex-column gap-3">
+                  {recentSubmissions.map((sub) => (
+                    <div key={sub._id} className="d-flex align-items-center justify-content-between border rounded p-3">
+                      <div>
+                        <p className="fw-medium text-dark small mb-0">{sub.studentId?.name || '—'}</p>
+                        <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>
+                          {sub.taskId?.title || 'Task'} &bull; {formatDate(sub.submittedAt)}
+                        </p>
+                      </div>
+                      <span className={`badge rounded-pill px-2 py-1 ${getStatusBadge(sub.status)}`} style={{ fontSize: '0.7rem' }}>
+                        {sub.status?.charAt(0).toUpperCase() + sub.status?.slice(1)}
+                      </span>
                     </div>
-                    <span className={`badge rounded-pill px-2 py-1 ${getStatusBadge(sub.status)}`} style={{ fontSize: '0.7rem' }}>
-                      {sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Quick Actions */}
           <div className="card shadow-sm border-0">
             <div className="card-header bg-white border-bottom py-3 px-4">
               <h6 className="fw-semibold text-dark mb-0">Quick Actions</h6>

@@ -65,16 +65,15 @@ const getStoredRole = () => {
 };
 
 // Redirects already-authenticated users away from the login page to their dashboard.
+// Only redirects if both a token and a role are present in localStorage.
 const AuthRoute = ({ children }) => {
   const token = localStorage.getItem('token');
-  const role  = getStoredRole();
-
-  if (token) {
+  const role = localStorage.getItem('role');
+  if (token && role) {
     if (role === 'coordinator') return <Navigate to="/coordinator/dashboard" replace />;
     if (role === 'supervisor')  return <Navigate to="/supervisor/dashboard" replace />;
     return <Navigate to="/dashboard" replace />;
   }
-
   return children;
 };
 

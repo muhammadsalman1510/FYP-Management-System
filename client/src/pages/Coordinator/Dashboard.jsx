@@ -1,36 +1,64 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-/*
-  COORDINATOR DASHBOARD
-  Shows an overview of the entire FYP system:
-  - Stat cards: total students, supervisors, pending proposals, pending tasks
-  - Recent proposals waiting for review
-  - Recent meeting requests
-  - Quick action buttons
-*/
 const CoordinatorDashboard = () => {
+  const navigate = useNavigate();
 
-  // ── Sample data (replace with API calls when backend is ready) ──
-  const stats = [
-    { title: 'Total Students',    value: '24',  icon: 'students',   color: '#3c50e0' },
-    { title: 'Total Supervisors', value: '6',   icon: 'supervisors',color: '#28a745' },
-    { title: 'Pending Proposals', value: '5',   icon: 'proposals',  color: '#ffc107' },
-    { title: 'Pending Tasks',     value: '8',   icon: 'tasks',      color: '#dc3545' },
-  ];
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [studentCount, setStudentCount] = useState(0);
+  const [supervisorCount, setSupervisorCount] = useState(0);
+  const [pendingProposalCount, setPendingProposalCount] = useState(0);
+  const [pendingTaskCount, setPendingTaskCount] = useState(0);
+  const [recentProposals, setRecentProposals] = useState([]);
+  const [recentMeetings, setRecentMeetings] = useState([]);
+  const [hoveredCard, setHoveredCard] = useState(null);
 
-  const recentProposals = [
-    { id: 1, student: 'Muhammad Salman', title: 'FYP Management System',    supervisor: 'Mr. Shoaib', submittedDate: '2024-04-25', status: 'pending'  },
-    { id: 2, student: 'Ali Hassan',      title: 'E-Commerce Platform',       supervisor: 'Mr. Shoaib', submittedDate: '2024-04-24', status: 'pending'  },
-    { id: 3, student: 'Sara Khan',       title: 'Hospital Management System',supervisor: 'Mr. Omer',   submittedDate: '2024-04-23', status: 'approved' },
-  ];
+  useEffect(() => {
+    const fetchAll = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
-  const recentMeetingRequests = [
-    { id: 1, from: 'Muhammad Salman', role: 'Student',    title: 'Proposal Discussion',  date: '2024-04-28', time: '14:00', status: 'pending'  },
-    { id: 2, from: 'Mr. Shoaib',      role: 'Supervisor', title: 'Progress Review',       date: '2024-04-29', time: '11:00', status: 'pending'  },
-    { id: 3, from: 'Ali Hassan',      role: 'Student',    title: 'Technical Discussion',  date: '2024-04-30', time: '10:00', status: 'approved' },
-  ];
+        const [studentsRes, supervisorsRes, proposalsRes, submissionsRes, meetingsRes] = await Promise.all([
+          fetch('/api/users?role=student', { headers }),
+          fetch('/api/users?role=supervisor', { headers }),
+          fetch('/api/proposals', { headers }),
+          fetch('/api/tasks/submissions', { headers }),
+          fetch('/api/meetings', { headers }),
+        ]);
 
-  // ── Helper: status badge ──
+        const [studentsData, supervisorsData, proposalsData, submissionsData, meetingsData] = await Promise.all([
+          studentsRes.json(),
+          supervisorsRes.json(),
+          proposalsRes.json(),
+          submissionsRes.json(),
+          meetingsRes.json(),
+        ]);
+
+        // getUsers returns { users: [...] } — not the standard { success, data } format
+        setStudentCount((studentsData.users || []).length);
+        setSupervisorCount((supervisorsData.users || []).length);
+
+        // proposals, submissions, meetings use { success: true, data: [...] }
+        const allProposals = proposalsData.data || [];
+        setPendingProposalCount(allProposals.filter(p => p.status === 'pending').length);
+        setRecentProposals(allProposals.slice(0, 3));
+
+        const allSubmissions = submissionsData.data || [];
+        setPendingTaskCount(allSubmissions.filter(s => s.status === 'pending').length);
+
+        setRecentMeetings((meetingsData.data || []).slice(0, 3));
+      } catch (err) {
+        setError('Failed to load dashboard data. Please refresh the page.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAll();
+  }, []);
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'approved': return 'bg-success';
@@ -40,7 +68,6 @@ const CoordinatorDashboard = () => {
     }
   };
 
-  // ── Helper: stat card icon ──
   const StatIcon = ({ type, color }) => {
     switch (type) {
       case 'students':
@@ -73,49 +100,72 @@ const CoordinatorDashboard = () => {
     }
   };
 
+  const statCards = [
+    { title: 'Total Students',    value: studentCount,          icon: 'students',    color: '#3c50e0', path: '/coordinator/accounts/students' },
+    { title: 'Total Supervisors', value: supervisorCount,        icon: 'supervisors', color: '#28a745', path: '/coordinator/accounts/supervisors' },
+    { title: 'Pending Proposals', value: pendingProposalCount,   icon: 'proposals',   color: '#ffc107', path: '/coordinator/proposals' },
+    { title: 'Pending Tasks',     value: pendingTaskCount,       icon: 'tasks',       color: '#dc3545', path: '/coordinator/tasks' },
+  ];
+
+  if (loading) {
+    return (
+      <div className="d-flex align-items-center justify-content-center" style={{ minHeight: '300px' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="alert alert-danger border-0 shadow-sm">
+        <strong>Error:</strong> {error}
+      </div>
+    );
+  }
+
   return (
     <>
-      {/* ── Page Title ── */}
       <div className="mb-4">
         <h4 className="fw-bold text-dark mb-1">Coordinator Dashboard</h4>
         <p className="text-muted small mb-0">Welcome back! Here's what's happening in your FYP system.</p>
       </div>
 
-      {/* ══════════════════════════════════
-          STAT CARDS ROW
-          ══════════════════════════════════ */}
+      {/* ══ STAT CARDS ══ */}
       <div className="row g-4 mb-4 row-cols-1 row-cols-sm-2 row-cols-xl-4">
-        {stats.map((stat, index) => (
+        {statCards.map((stat, index) => (
           <div key={index} className="col">
-            <div className="card shadow-sm h-100 border-0">
+            <div
+              className="card h-100 border-0"
+              style={{
+                cursor: 'pointer',
+                transition: 'box-shadow 0.15s, transform 0.15s',
+                boxShadow: hoveredCard === index
+                  ? '0 6px 24px rgba(0,0,0,0.13)'
+                  : '0 1px 4px rgba(0,0,0,0.07)',
+                transform: hoveredCard === index ? 'translateY(-2px)' : 'translateY(0)',
+              }}
+              onClick={() => navigate(stat.path)}
+              onMouseEnter={() => setHoveredCard(index)}
+              onMouseLeave={() => setHoveredCard(null)}
+            >
               <div className="card-body px-4 py-4">
-
-                {/* Icon circle */}
                 <div
                   className="d-flex align-items-center justify-content-center rounded-circle mb-3"
-                  style={{
-                    width: '48px',
-                    height: '48px',
-                    backgroundColor: stat.color + '20', /* 20 = 12% opacity in hex */
-                  }}
+                  style={{ width: '48px', height: '48px', backgroundColor: stat.color + '20' }}
                 >
                   <StatIcon type={stat.icon} color={stat.color} />
                 </div>
-
-                {/* Value + Label */}
                 <h3 className="fw-bold text-dark mb-1">{stat.value}</h3>
                 <p className="text-muted small mb-0">{stat.title}</p>
-
               </div>
             </div>
           </div>
         ))}
       </div>
-      {/* ══ END STAT CARDS ══ */}
 
-      {/* ══════════════════════════════════
-          BOTTOM SECTION: Proposals + Meetings
-          ══════════════════════════════════ */}
+      {/* ══ BOTTOM SECTION ══ */}
       <div className="row g-4">
 
         {/* ── Recent Proposals ── */}
@@ -126,81 +176,86 @@ const CoordinatorDashboard = () => {
               <a href="/coordinator/proposals" className="text-primary small text-decoration-none">View All</a>
             </div>
             <div className="card-body p-0">
-              <div className="table-responsive">
-                <table className="table table-hover align-middle mb-0">
-                  <thead className="table-light">
-                    <tr>
-                      <th className="px-4 py-3 fw-semibold small text-dark">Student</th>
-                      <th className="px-4 py-3 fw-semibold small text-dark">Project Title</th>
-                      <th className="px-4 py-3 fw-semibold small text-dark">Supervisor</th>
-                      <th className="px-4 py-3 fw-semibold small text-dark">Status</th>
-                      <th className="px-4 py-3 fw-semibold small text-dark">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentProposals.map((proposal) => (
-                      <tr key={proposal.id}>
-                        <td className="px-4 py-3 small fw-medium text-dark">{proposal.student}</td>
-                        <td className="px-4 py-3 small text-muted">{proposal.title}</td>
-                        <td className="px-4 py-3 small text-muted">{proposal.supervisor}</td>
-                        <td className="px-4 py-3">
-                          <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(proposal.status)}`}>
-                            {proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          {proposal.status === 'pending' && (
-                            <a href="/coordinator/proposals" className="btn btn-primary btn-sm px-3">
-                              Review
-                            </a>
-                          )}
-                          {proposal.status !== 'pending' && (
-                            <a href="/coordinator/proposals" className="btn btn-outline-secondary btn-sm px-3">
-                              View
-                            </a>
-                          )}
-                        </td>
+              {recentProposals.length === 0 ? (
+                <p className="text-muted text-center py-5 small">No proposals yet.</p>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-hover align-middle mb-0">
+                    <thead className="table-light">
+                      <tr>
+                        <th className="px-4 py-3 fw-semibold small text-dark">Student</th>
+                        <th className="px-4 py-3 fw-semibold small text-dark">Title</th>
+                        <th className="px-4 py-3 fw-semibold small text-dark">Status</th>
+                        <th className="px-4 py-3 fw-semibold small text-dark">Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {recentProposals.map((proposal) => (
+                        <tr key={proposal._id}>
+                          <td className="px-4 py-3 small fw-medium text-dark">
+                            {proposal.submittedBy?.name || '—'}
+                          </td>
+                          <td className="px-4 py-3 small text-muted">
+                            {proposal.title || '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(proposal.status)}`}>
+                              {proposal.status ? proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1) : '—'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <a href="/coordinator/proposals" className="btn btn-primary btn-sm px-3">
+                              {proposal.status === 'pending' ? 'Review' : 'View'}
+                            </a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* ── Recent Meeting Requests + Quick Actions ── */}
+        {/* ── Meeting Requests + Quick Actions ── */}
         <div className="col-12 col-xl-5">
 
-          {/* Meeting Requests */}
           <div className="card shadow-sm border-0 mb-4">
             <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3 px-4">
               <h6 className="fw-semibold text-dark mb-0">Meeting Requests</h6>
               <a href="/coordinator/meetings/requests" className="text-primary small text-decoration-none">View All</a>
             </div>
             <div className="card-body p-3">
-              <div className="d-flex flex-column gap-3">
-                {recentMeetingRequests.map((req) => (
-                  <div key={req.id} className="d-flex align-items-center justify-content-between border rounded p-3">
-                    <div>
-                      <p className="fw-medium text-dark small mb-0">{req.from}</p>
-                      <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>
-                        {req.role} • {req.title}
-                      </p>
-                      <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>
-                        {req.date} at {req.time}
-                      </p>
+              {recentMeetings.length === 0 ? (
+                <p className="text-muted text-center py-3 small mb-0">No meeting requests yet.</p>
+              ) : (
+                <div className="d-flex flex-column gap-3">
+                  {recentMeetings.map((meeting) => (
+                    <div key={meeting._id} className="d-flex align-items-center justify-content-between border rounded p-3">
+                      <div>
+                        <p className="fw-medium text-dark small mb-0">
+                          {meeting.requestedBy?.name || '—'}
+                        </p>
+                        <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>
+                          {meeting.requestedBy?.role || ''} • {meeting.title || meeting.topic || '—'}
+                        </p>
+                        <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>
+                          {meeting.scheduledAt
+                            ? new Date(meeting.scheduledAt).toLocaleString()
+                            : meeting.proposedTime || '—'}
+                        </p>
+                      </div>
+                      <span className={`badge rounded-pill px-2 py-1 ${getStatusBadge(meeting.status)}`} style={{ fontSize: '0.7rem' }}>
+                        {meeting.status ? meeting.status.charAt(0).toUpperCase() + meeting.status.slice(1) : '—'}
+                      </span>
                     </div>
-                    <span className={`badge rounded-pill px-2 py-1 ${getStatusBadge(req.status)}`} style={{ fontSize: '0.7rem' }}>
-                      {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Quick Actions */}
           <div className="card shadow-sm border-0">
             <div className="card-header bg-white border-bottom py-3 px-4">
               <h6 className="fw-semibold text-dark mb-0">Quick Actions</h6>
@@ -233,8 +288,6 @@ const CoordinatorDashboard = () => {
 
         </div>
       </div>
-      {/* ══ END BOTTOM SECTION ══ */}
-
     </>
   );
 };

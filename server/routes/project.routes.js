@@ -9,23 +9,28 @@ import {
     updateProject,
     assignStudent,
     removeStudent,
-} from '../controllers/project.controller.js'
+    getMyProject,
+    getAssignedProjects,
+    updateMilestone,
+} from '../controllers/project.controller.js';
 
-const router = express.Router()
+const router = express.Router();
 
-router.use(authenticate)
-router.use(authorize('coordinator'))
+// ── Fixed-path routes FIRST — must come before /:id ──────────────────────────
+router.get('/my', authenticate, authorize('student'), getMyProject);
+router.get('/assigned', authenticate, authorize('supervisor'), getAssignedProjects);
 
-router.post('/', createProject)                             // create project + assign supervisor
+// ── Coordinator-only routes ───────────────────────────────────────────────────
+router.post('/', authenticate, authorize('coordinator'), createProject);
+router.get('/', authenticate, authorize('coordinator'), getProjects);
+router.get('/:id', authenticate, authorize('coordinator'), getProjectById);
 
-router.get('/', getProjects)                                // list all projects
-router.get('/:id', getProjectById)                          // get one project
+router.put('/:id/supervisor', authenticate, authorize('coordinator'), assignSupervisor);
+router.put('/:id/students', authenticate, authorize('coordinator'), assignStudent);
+router.put('/:id/milestones/:milestoneId', authenticate, authorize('coordinator'), updateMilestone);
+router.put('/:id', authenticate, authorize('coordinator'), updateProject);
 
-router.put('/:id/supervisor', assignSupervisor)             // reassign supervisor
-router.put('/:id/students', assignStudent)                  // assign student
-router.put('/:id', updateProject)                           // update project
+router.delete('/:id/students/:studentId', authenticate, authorize('coordinator'), removeStudent);
+router.delete('/:id', authenticate, authorize('coordinator'), deleteProject);
 
-router.delete('/:id/students/:studentId', removeStudent)    // remove student from project
-router.delete('/:id', deleteProject)                        // delete project
-
-export default router
+export default router;

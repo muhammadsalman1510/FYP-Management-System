@@ -1,121 +1,144 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
-
-/*
-  SUPERVISOR — TASKS
-  Tabs:
-    1. Create Task   — assign to a specific project or "All My Projects"
-    2. All Tasks     — tasks grouped with project tag; project filter dropdown at top
-    3. Submissions   — submissions with project tag; project filter dropdown at top
-
-  TODO (Backend):
-    POST /api/tasks                        — create task
-    GET  /api/tasks                        — get supervisor's tasks (filtered by assigned projects)
-    GET  /api/tasks/submissions            — get submissions for supervisor's projects
-    PUT  /api/tasks/submissions/:id/review — approve or reject submission
-*/
 
 const SupervisorTasks = () => {
   const [activeTab, setActiveTab] = useState('create');
 
-  // TODO (Backend): Replace with GET /api/projects/assigned (supervisor's assigned projects only)
-  const myProjects = [
-    { id: 1, name: 'FYP Management System' },
-    { id: 2, name: 'Smart Attendance System' },
-    { id: 3, name: 'Hospital Management System' },
-  ];
+  const [projects, setProjects]       = useState([]);
+  const [tasks, setTasks]             = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState(null);
 
-  // TODO (Backend): Replace with GET /api/tasks (supervisor's tasks)
-  const [tasks, setTasks] = useState([
-    { id: 1, title: 'Literature Review', projectId: 1, projectName: 'FYP Management System',   scope: 'specific',        instructions: 'Find and summarize 10 research papers.', openDate: '2025-11-02', dueDate: '2025-11-13', submissionsCount: 3 },
-    { id: 2, title: 'Progress Report',   projectId: 2, projectName: 'Smart Attendance System', scope: 'specific',        instructions: 'Submit your mid-semester progress.',      openDate: '2025-11-15', dueDate: '2025-11-25', submissionsCount: 1 },
-    { id: 3, title: 'System Design',     projectId: null, projectName: 'All My Projects',       scope: 'all_my_projects', instructions: 'Submit your full system design document.', openDate: '2025-12-01', dueDate: '2025-12-15', submissionsCount: 0 },
-  ]);
-
-  // TODO (Backend): Replace with GET /api/tasks/submissions (supervisor's projects)
-  const [submissions, setSubmissions] = useState([
-    { id: 1, taskTitle: 'Literature Review', projectName: 'FYP Management System',   student: 'Muhammad Salman', rollNumber: 'F2021001001', submittedFile: 'lit_review_salman.pdf', submitDate: '2025-11-10', status: 'submitted', feedback: '' },
-    { id: 2, taskTitle: 'Literature Review', projectName: 'FYP Management System',   student: 'Ali Hassan',      rollNumber: 'F2021001002', submittedFile: 'lit_review_ali.pdf',    submitDate: '2025-11-11', status: 'approved',  feedback: 'Good work.' },
-    { id: 3, taskTitle: 'Progress Report',   projectName: 'Smart Attendance System', student: 'Sara Khan',       rollNumber: 'F2021001003', submittedFile: 'progress_sara.pdf',     submitDate: '2025-11-20', status: 'submitted', feedback: '' },
-  ]);
-
-  // Project filters for All Tasks and Submissions tabs
   const [taskFilter, setTaskFilter]             = useState('all');
   const [submissionFilter, setSubmissionFilter] = useState('all');
 
-  // Create task form
-  const emptyTask = { title: '', instructions: '', openDate: '', dueDate: '', projectId: '', scope: 'specific', attachFile: null };
-  const [taskForm, setTaskForm] = useState(emptyTask);
+  const emptyForm = { title: '', instructions: '', openDate: '', dueDate: '', targetScope: 'project', projectId: '' };
+  const [taskForm, setTaskForm]   = useState(emptyForm);
   const [formError, setFormError] = useState('');
+  const [creating, setCreating]   = useState(false);
+
+  const [reviewModal, setReviewModal]         = useState(false);
+  const [reviewSub, setReviewSub]             = useState(null);
+  const [reviewDecision, setReviewDecision]   = useState('');
+  const [reviewFeedback, setReviewFeedback]   = useState('');
+  const [reviewing, setReviewing]             = useState(false);
+
+  useEffect(() => {
+    const fetchAll = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+        const [projRes, tasksRes, subsRes] = await Promise.all([
+          fetch('/api/projects/assigned', { headers }),
+          fetch('/api/tasks', { headers }),
+          fetch('/api/tasks/submissions', { headers }),
+        ]);
+
+        const projData  = await projRes.json();
+        const tasksData = await tasksRes.json();
+        const subsData  = await subsRes.json();
+
+        if (!projRes.ok  || !projData.success)  throw new Error(projData.message  || 'Failed to load projects');
+        if (!tasksRes.ok || !tasksData.success) throw new Error(tasksData.message || 'Failed to load tasks');
+        if (!subsRes.ok  || !subsData.success)  throw new Error(subsData.message  || 'Failed to load submissions');
+
+        setProjects(projData.data);
+        setTasks(tasksData.data);
+        setSubmissions(subsData.data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAll();
+  }, []);
 
   const handleFormChange = (field, value) => {
-    setTaskForm(prev => ({ ...prev, [field]: value }));
+    setTaskForm((prev) => ({ ...prev, [field]: value }));
     setFormError('');
   };
 
-  const handleProjectSelect = (value) => {
-    if (value === 'all_my_projects') {
-      setTaskForm(prev => ({ ...prev, projectId: 'all_my_projects', scope: 'all_my_projects' }));
-    } else {
-      setTaskForm(prev => ({ ...prev, projectId: value, scope: 'specific' }));
-    }
+  const handleScopeChange = (value) => {
+    setTaskForm((prev) => ({ ...prev, targetScope: value, projectId: value === 'all' ? '' : prev.projectId }));
     setFormError('');
   };
 
-  const handleCreateTask = () => {
+  const handleCreateTask = async () => {
     if (!taskForm.title.trim())        { setFormError('Task title is required.'); return; }
-    if (!taskForm.projectId)           { setFormError('Please select a project.'); return; }
     if (!taskForm.instructions.trim()) { setFormError('Instructions are required.'); return; }
     if (!taskForm.openDate)            { setFormError('Open date is required.'); return; }
     if (!taskForm.dueDate)             { setFormError('Due date is required.'); return; }
+    if (taskForm.targetScope === 'project' && !taskForm.projectId) {
+      setFormError('Please select a project.'); return;
+    }
 
-    const isAll = taskForm.projectId === 'all_my_projects';
-    const selectedProject = myProjects.find(p => p.id === Number(taskForm.projectId));
-
-    // TODO (Backend): POST /api/tasks
-    setTasks(prev => [...prev, {
-      ...taskForm,
-      id: Date.now(),
-      projectId: isAll ? null : Number(taskForm.projectId),
-      projectName: isAll ? 'All My Projects' : selectedProject.name,
-      scope: isAll ? 'all_my_projects' : 'specific',
-      submissionsCount: 0,
-    }]);
-    setTaskForm(emptyTask);
+    setCreating(true);
     setFormError('');
-    setActiveTab('tasks');
-    alert('Task created successfully!');
+    try {
+      const token = localStorage.getItem('token');
+      const body = {
+        title:        taskForm.title.trim(),
+        instructions: taskForm.instructions.trim(),
+        openDate:     taskForm.openDate,
+        dueDate:      taskForm.dueDate,
+        targetScope:  taskForm.targetScope,
+      };
+      if (taskForm.targetScope === 'project') body.projectId = taskForm.projectId;
+
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to create task');
+
+      // data.data may be a single task or array (when targetScope='all')
+      const newTasks = Array.isArray(data.data) ? data.data : [data.data];
+      setTasks((prev) => [...newTasks, ...prev]);
+      setTaskForm(emptyForm);
+      setActiveTab('tasks');
+    } catch (err) {
+      setFormError(err.message);
+    } finally {
+      setCreating(false);
+    }
   };
 
-  // Filtered lists
-  const filteredTasks = taskFilter === 'all'
-    ? tasks
-    : tasks.filter(t => String(t.projectId) === String(taskFilter) || (taskFilter === 'all_my_projects' && t.scope === 'all_my_projects'));
-
-  const filteredSubmissions = submissionFilter === 'all'
-    ? submissions
-    : submissions.filter(s => s.projectName === myProjects.find(p => p.id === Number(submissionFilter))?.name);
-
-  // Review modal
-  const [reviewModal, setReviewModal]           = useState(false);
-  const [reviewSubmission, setReviewSubmission] = useState(null);
-  const [reviewDecision, setReviewDecision]     = useState('');
-  const [reviewFeedback, setReviewFeedback]     = useState('');
-
   const openReview = (sub, decision) => {
-    setReviewSubmission(sub);
+    setReviewSub(sub);
     setReviewDecision(decision);
     setReviewFeedback('');
     setReviewModal(true);
   };
 
-  const submitReview = () => {
+  const submitReview = async () => {
     if (!reviewFeedback.trim()) { alert('Please provide feedback.'); return; }
-    // TODO (Backend): PUT /api/tasks/submissions/:id/review  { status, feedback }
-    setSubmissions(prev =>
-      prev.map(s => s.id === reviewSubmission.id ? { ...s, status: reviewDecision, feedback: reviewFeedback } : s)
-    );
-    setReviewModal(false);
+    setReviewing(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/tasks/submissions/${reviewSub._id}/review`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: reviewDecision, feedback: reviewFeedback }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Review failed');
+
+      setSubmissions((prev) =>
+        prev.map((s) =>
+          s._id === reviewSub._id ? { ...s, status: reviewDecision, feedback: reviewFeedback } : s
+        )
+      );
+      setReviewModal(false);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setReviewing(false);
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -126,12 +149,58 @@ const SupervisorTasks = () => {
     }
   };
 
-  const projectTagStyle = {
-    backgroundColor: '#ede9fe',
-    color: '#5b21b6',
-    fontSize: '0.68rem',
-    fontWeight: '500',
+  const projectTagStyle = { backgroundColor: '#ede9fe', color: '#5b21b6', fontSize: '0.68rem', fontWeight: '500' };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('en-GB', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+    }).replace(/\//g, '-');
   };
+
+  const getProjectName = (task) => {
+    if (task.projectId && typeof task.projectId === 'object') return task.projectId.title;
+    if (task.targetScope === 'all') return 'All Projects';
+    return '—';
+  };
+
+  const pendingSubsCount = submissions.filter((s) => s.status === 'pending').length;
+
+  const filteredTasks = taskFilter === 'all'
+    ? tasks
+    : tasks.filter((t) => t.projectId && (t.projectId._id || t.projectId) === taskFilter);
+
+  const filteredSubs = submissionFilter === 'all'
+    ? submissions
+    : submissions.filter((s) => s.projectId && (s.projectId._id || s.projectId) === submissionFilter);
+
+  const getSubsCountForTask = (taskId) =>
+    submissions.filter((s) => {
+      const sid = s.taskId?._id || s.taskId;
+      return String(sid) === String(taskId);
+    }).length;
+
+  if (loading) {
+    return (
+      <>
+        <Breadcrumb pageName="Tasks" />
+        <div className="d-flex justify-content-center align-items-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <Breadcrumb pageName="Tasks" />
+        <div className="alert alert-danger border-0">{error}</div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -144,8 +213,8 @@ const SupervisorTasks = () => {
             {[
               { key: 'create',      label: 'Create Task' },
               { key: 'tasks',       label: `All Tasks (${tasks.length})` },
-              { key: 'submissions', label: `Submissions (${submissions.filter(s => s.status === 'submitted').length} Pending)` },
-            ].map(tab => (
+              { key: 'submissions', label: `Submissions (${pendingSubsCount} Pending)` },
+            ].map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
@@ -189,19 +258,32 @@ const SupervisorTasks = () => {
               </div>
 
               <div className="col-12 col-md-6">
-                <label className="form-label fw-medium text-dark small">Assign To Project *</label>
+                <label className="form-label fw-medium text-dark small">Assign To *</label>
                 <select
                   className="form-select"
-                  value={taskForm.projectId}
-                  onChange={(e) => handleProjectSelect(e.target.value)}
+                  value={taskForm.targetScope}
+                  onChange={(e) => handleScopeChange(e.target.value)}
                 >
-                  <option value="">— Select a project —</option>
-                  <option value="all_my_projects">All My Projects</option>
-                  {myProjects.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
+                  <option value="project">Specific Project</option>
+                  <option value="all">All My Projects</option>
                 </select>
               </div>
+
+              {taskForm.targetScope === 'project' && (
+                <div className="col-12 col-md-6">
+                  <label className="form-label fw-medium text-dark small">Select Project *</label>
+                  <select
+                    className="form-select"
+                    value={taskForm.projectId}
+                    onChange={(e) => handleFormChange('projectId', e.target.value)}
+                  >
+                    <option value="">— Select a project —</option>
+                    {projects.map((p) => (
+                      <option key={p._id} value={p._id}>{p.title}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="col-12">
                 <label className="form-label fw-medium text-dark small">Instructions *</label>
@@ -234,24 +316,18 @@ const SupervisorTasks = () => {
                 />
               </div>
 
-              <div className="col-12">
-                <label className="form-label fw-medium text-dark small">
-                  Attach File <span className="text-muted fw-normal">(Optional)</span>
-                </label>
-                <input
-                  type="file"
-                  className="form-control"
-                  onChange={(e) => handleFormChange('attachFile', e.target.files[0])}
-                />
-              </div>
-
               <div className="col-12 d-flex gap-3 mt-2">
-                <button className="btn btn-primary px-5 fw-medium" onClick={handleCreateTask}>
+                <button
+                  className="btn btn-primary px-5 fw-medium"
+                  onClick={handleCreateTask}
+                  disabled={creating}
+                >
+                  {creating ? <span className="spinner-border spinner-border-sm me-2" role="status" /> : null}
                   Create Task
                 </button>
                 <button
                   className="btn btn-outline-secondary px-4"
-                  onClick={() => { setTaskForm(emptyTask); setFormError(''); }}
+                  onClick={() => { setTaskForm(emptyForm); setFormError(''); }}
                 >
                   Clear
                 </button>
@@ -265,9 +341,7 @@ const SupervisorTasks = () => {
       {/* ── ALL TASKS ── */}
       {activeTab === 'tasks' && (
         <div className="card shadow-sm border-0">
-          <div
-            className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-3"
-          >
+          <div className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
             <h5 className="fw-semibold text-dark mb-0">All Tasks</h5>
             <div style={{ minWidth: '220px' }}>
               <select
@@ -276,8 +350,8 @@ const SupervisorTasks = () => {
                 onChange={(e) => setTaskFilter(e.target.value)}
               >
                 <option value="all">All Projects</option>
-                {myProjects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                {projects.map((p) => (
+                  <option key={p._id} value={p._id}>{p.title}</option>
                 ))}
               </select>
             </div>
@@ -302,23 +376,29 @@ const SupervisorTasks = () => {
                   </thead>
                   <tbody>
                     {filteredTasks.map((task, index) => (
-                      <tr key={task.id}>
+                      <tr key={task._id}>
                         <td className="px-4 py-3 text-muted small">{index + 1}</td>
                         <td className="px-4 py-3">
                           <p className="fw-medium text-dark small mb-1">{task.title}</p>
-                          <p className="text-muted small mb-0">{task.instructions.slice(0, 60)}...</p>
+                          {task.instructions && (
+                            <p className="text-muted small mb-0">
+                              {task.instructions.length > 60 ? task.instructions.slice(0, 60) + '...' : task.instructions}
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-3">
-                          <span className="badge rounded-pill" style={projectTagStyle}>{task.projectName}</span>
+                          <span className="badge rounded-pill" style={projectTagStyle}>
+                            {getProjectName(task)}
+                          </span>
                         </td>
-                        <td className="px-4 py-3 text-muted small">{task.openDate}</td>
-                        <td className="px-4 py-3 text-muted small">{task.dueDate}</td>
+                        <td className="px-4 py-3 text-muted small">{formatDate(task.openDate)}</td>
+                        <td className="px-4 py-3 text-muted small">{formatDate(task.dueDate)}</td>
                         <td className="px-4 py-3">
                           <span
                             className="badge rounded-pill px-3"
                             style={{ backgroundColor: '#e0e7ff', color: '#3730a3' }}
                           >
-                            {task.submissionsCount}
+                            {getSubsCountForTask(task._id)}
                           </span>
                         </td>
                       </tr>
@@ -334,9 +414,7 @@ const SupervisorTasks = () => {
       {/* ── SUBMISSIONS ── */}
       {activeTab === 'submissions' && (
         <div className="card shadow-sm border-0">
-          <div
-            className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-3"
-          >
+          <div className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
             <h5 className="fw-semibold text-dark mb-0">Task Submissions</h5>
             <div style={{ minWidth: '220px' }}>
               <select
@@ -345,14 +423,14 @@ const SupervisorTasks = () => {
                 onChange={(e) => setSubmissionFilter(e.target.value)}
               >
                 <option value="all">All Projects</option>
-                {myProjects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                {projects.map((p) => (
+                  <option key={p._id} value={p._id}>{p.title}</option>
                 ))}
               </select>
             </div>
           </div>
           <div className="card-body p-0">
-            {filteredSubmissions.length === 0 ? (
+            {filteredSubs.length === 0 ? (
               <div className="text-center py-5">
                 <p className="text-muted mb-0">No submissions for the selected project.</p>
               </div>
@@ -371,28 +449,30 @@ const SupervisorTasks = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredSubmissions.map(sub => {
+                    {filteredSubs.map((sub) => {
                       const badge = getStatusBadge(sub.status);
                       return (
-                        <tr key={sub.id}>
+                        <tr key={sub._id}>
                           <td className="px-4 py-3">
-                            <p className="fw-medium text-dark small mb-0">{sub.student}</p>
-                            <p className="text-muted small mb-0">{sub.rollNumber}</p>
+                            <p className="fw-medium text-dark small mb-0">{sub.submittedBy?.name || '—'}</p>
+                            <p className="text-muted small mb-0">{sub.submittedBy?.email || ''}</p>
                           </td>
-                          <td className="px-4 py-3 text-dark small">{sub.taskTitle}</td>
+                          <td className="px-4 py-3 text-dark small">{sub.taskId?.title || '—'}</td>
                           <td className="px-4 py-3">
-                            <span className="badge rounded-pill" style={projectTagStyle}>{sub.projectName}</span>
+                            <span className="badge rounded-pill" style={projectTagStyle}>
+                              {sub.projectId?.title || '—'}
+                            </span>
                           </td>
                           <td className="px-4 py-3">
                             <button
                               className="btn btn-link btn-sm p-0 text-primary text-decoration-none"
                               style={{ fontSize: '0.82rem' }}
-                              onClick={() => alert(`Downloading ${sub.submittedFile}`)}
+                              onClick={() => window.open(sub.fileUrl, '_blank')}
                             >
-                              📎 {sub.submittedFile}
+                              📎 {sub.fileName}
                             </button>
                           </td>
-                          <td className="px-4 py-3 text-muted small">{sub.submitDate}</td>
+                          <td className="px-4 py-3 text-muted small">{formatDate(sub.submittedAt)}</td>
                           <td className="px-4 py-3">
                             <span
                               className="badge rounded-pill px-3 py-2"
@@ -405,7 +485,7 @@ const SupervisorTasks = () => {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            {sub.status === 'submitted' && (
+                            {sub.status === 'pending' && (
                               <div className="d-flex gap-2">
                                 <button className="btn btn-success btn-sm px-3" onClick={() => openReview(sub, 'approved')}>✓ Accept</button>
                                 <button className="btn btn-danger btn-sm px-3"  onClick={() => openReview(sub, 'rejected')}>✕ Reject</button>
@@ -436,9 +516,9 @@ const SupervisorTasks = () => {
               </div>
               <div className="modal-body px-4 py-4">
                 <p className="text-muted small mb-3">
-                  Student: <strong className="text-dark">{reviewSubmission?.student}</strong><br />
-                  Task: <strong className="text-dark">{reviewSubmission?.taskTitle}</strong><br />
-                  Project: <strong className="text-dark">{reviewSubmission?.projectName}</strong>
+                  Student: <strong className="text-dark">{reviewSub?.submittedBy?.name}</strong><br />
+                  Task: <strong className="text-dark">{reviewSub?.taskId?.title}</strong><br />
+                  Project: <strong className="text-dark">{reviewSub?.projectId?.title}</strong>
                 </p>
                 <label className="form-label fw-medium text-dark small">Feedback *</label>
                 <textarea
@@ -454,7 +534,9 @@ const SupervisorTasks = () => {
                 <button
                   className={`btn px-4 fw-medium ${reviewDecision === 'approved' ? 'btn-success' : 'btn-danger'}`}
                   onClick={submitReview}
+                  disabled={reviewing}
                 >
+                  {reviewing ? <span className="spinner-border spinner-border-sm me-2" role="status" /> : null}
                   Confirm
                 </button>
               </div>

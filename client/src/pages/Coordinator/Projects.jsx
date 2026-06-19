@@ -1,217 +1,214 @@
-// 📁 FILE: src/pages/Coordinator/AssignSupervisor.jsx
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios'
-
-/*
-  COORDINATOR — ASSIGN SUPERVISOR TO STUDENT
-  This page shows ALL students.
-  Coordinator selects a supervisor for each student from a dropdown.
-  TODO (Backend): GET /api/coordinator/students
-  TODO (Backend): GET /api/coordinator/supervisors
-  TODO (Backend): PUT /api/coordinator/students/:id/assign-supervisor
-*/
 
 const Projects = () => {
-
-  // Projects list
   const [projects, setProjects] = useState([]);
-
-  const [savedAlert, setSavedAlert] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   const emptyForm = { title: '', description: '', maxStudents: '' };
   const [form, setForm] = useState(emptyForm);
   const [modalMode, setModalMode] = useState('create');
   const [showModal, setShowModal] = useState(false);
+  const [modalError, setModalError] = useState(null);
+  const [modalLoading, setModalLoading] = useState(false);
 
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [projectToDeleteId, setProjectToDeleteId] = useState(null);
-
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const navigate = useNavigate();
 
-  const openProjectDetail = (projectId) => {
-    navigate(`/coordinator/projects/${projectId}`);
-  };
+  const getHeaders = () => ({
+    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+    'Content-Type': 'application/json',
+  });
 
   const fetchProjects = async () => {
-    const token = localStorage.getItem('token');
     try {
-      const { data } = await axios.get(
-        "http://localhost:4000/api/projects",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          },
-        }
-      );
-      setProjects(data.projects);
-    } catch (error) {
-      console.error(error);
+      const res = await fetch('/api/projects', { headers: getHeaders() });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Failed to load projects');
+      setProjects(data.data || []);
+    } catch (err) {
+      setError(err.message || 'Failed to load projects.');
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
-  const handleSave = async (e) => {
-    e.preventDefault();
-    const token = localStorage.getItem('token');
-
-    if (modalMode === 'create') {
-      try {
-        const response = await axios.post(
-          "http://localhost:4000/api/projects",
-          {
-            title: form.title,
-            description: form.description,
-            maxStudents: form.maxStudents
-          },
-          {
-            headers: { Authorization: `Bearer ${token}` }
-          }
-        );
-
-        fetchProjects();
-
-      } catch (error) {
-        console.error(error);
-      }
-
-    } else {
-      try {
-
-        const body = {
-          title: form.title,
-          description: form.description,
-          maxStudents: form.maxStudents
-        }
-
-        const response = await axios.put(
-          `http://localhost:4000/api/projects/${selectedProjectId}`,
-          body,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
-        );
-
-        fetchProjects();
-      } catch (error) {
-        console.error(error);
-      }
-    }
-
-    setShowModal(false);
-    setForm(emptyForm);
-
-  }
+  useEffect(() => {
+    fetchProjects();
+  }, []);
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  useEffect(() => {
-    fetchProjects()
-  }, []);
+  const handleSave = async () => {
+    if (!form.title.trim()) {
+      setModalError('Project title is required.');
+      return;
+    }
+    if (!form.maxStudents || Number(form.maxStudents) < 1) {
+      setModalError('Max students must be at least 1.');
+      return;
+    }
 
-  // Get supervisor name by ID
-  const getSupervisorName = (id) => {
-    if (!id) return null;
-    const s = supervisors?.find(s => s._id === id);
-    return s ? s.name : null;
+    setModalLoading(true);
+    setModalError(null);
+
+    try {
+      const body = {
+        title: form.title.trim(),
+        description: form.description,
+        maxStudents: Number(form.maxStudents),
+      };
+
+      let res;
+      if (modalMode === 'create') {
+        res = await fetch('/api/projects', {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify(body),
+        });
+      } else {
+        res = await fetch(`/api/projects/${selectedProjectId}`, {
+          method: 'PUT',
+          headers: getHeaders(),
+          body: JSON.stringify(body),
+        });
+      }
+
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Operation failed');
+
+      setShowModal(false);
+      setForm(emptyForm);
+      await fetchProjects();
+    } catch (err) {
+      setModalError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setModalLoading(false);
+    }
   };
-
-  // Filter students by search
-  const filteredProjects = projects.filter(p =>
-    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.supervisorId?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.status.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // Count stats
-  const assignedCount = projects.filter(s => s.supervisorId).length;
-  const unassignedCount = projects.filter(s => !s.supervisorId).length;
 
   const openCreateModal = () => {
     setForm(emptyForm);
+    setModalError(null);
     setModalMode('create');
     setShowModal(true);
   };
 
   const openEditModal = async (id) => {
+    setModalError(null);
     try {
-      const token = localStorage.getItem('token');
-      const { data } = await axios.get(`http://localhost:4000/api/projects/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/projects/${id}`, { headers: getHeaders() });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Failed to load project');
 
-      setForm({ ...data.project });
+      const p = data.data;
+      setForm({ title: p.title || '', description: p.description || '', maxStudents: p.maxStudents || '' });
       setSelectedProjectId(id);
       setModalMode('edit');
       setShowModal(true);
-
     } catch (err) {
-      console.error('Fetch project error:', err);
-      const message = err.response?.data?.message || 'Failed to load project data.';
-      alert(message);
+      alert(err.message || 'Failed to load project data.');
     }
   };
 
-  // Just opens the modal
   const openDeleteConfirm = (id) => {
     setProjectToDeleteId(id);
     setShowDeleteConfirm(true);
   };
 
-  // Actually deletes
   const handleDelete = async () => {
+    setDeleteLoading(true);
     try {
-      const token = localStorage.getItem('token');
-
-      await axios.delete(`http://localhost:4000/api/projects/${projectToDeleteId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`/api/projects/${projectToDeleteId}`, {
+        method: 'DELETE',
+        headers: getHeaders(),
       });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Delete failed');
 
-      await fetchProjects();
       setShowDeleteConfirm(false);
       setProjectToDeleteId(null);
-
+      await fetchProjects();
     } catch (err) {
-      console.error('Delete project error:', err);
-      const message = err.response?.data?.message || 'Something went wrong. Please try again.';
-      alert(message);
+      alert(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setDeleteLoading(false);
     }
   };
+
+  const filteredProjects = projects.filter(p => {
+    const q = searchQuery.toLowerCase();
+    const titleMatch = (p.title || '').toLowerCase().includes(q);
+    const statusMatch = (p.status || '').toLowerCase().includes(q);
+    const supervisorName = (p.supervisors?.[0]?.name || '').toLowerCase();
+    const supervisorMatch = supervisorName.includes(q);
+    return titleMatch || statusMatch || supervisorMatch;
+  });
+
+  const assignedCount = projects.filter(p => p.supervisors?.length > 0).length;
+  const unassignedCount = projects.filter(p => !p.supervisors?.length).length;
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'active':           return 'bg-success';
+      case 'pending_proposal': return 'bg-warning text-dark';
+      case 'completed':        return 'bg-primary';
+      default:                 return 'bg-secondary';
+    }
+  };
+
+  const formatStatus = (status) => {
+    switch (status) {
+      case 'pending_proposal': return 'Pending Proposal';
+      case 'active':           return 'Active';
+      case 'completed':        return 'Completed';
+      default:                 return status || '—';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="d-flex align-items-center justify-content-center" style={{ minHeight: '300px' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="alert alert-danger border-0 shadow-sm">
+        <strong>Error:</strong> {error}
+      </div>
+    );
+  }
 
   return (
     <>
       <Breadcrumb pageName="Manage Projects" />
-
-      {/* Success Alert */}
-      {savedAlert && (
-        <div className="alert alert-success border-0 shadow-sm mb-4">
-          <strong>Saved!</strong> Supervisor assignments updated successfully.
-        </div>
-      )}
 
       <div className="card shadow-sm border-0">
 
         {/* Card Header */}
         <div className="card-header bg-white border-bottom py-3 px-4">
           <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-            <div>
-              <h5 className="fw-semibold text-dark mb-0">Projects</h5>
-            </div>
+            <h5 className="fw-semibold text-dark mb-0">Projects</h5>
             <div className="d-flex gap-2 flex-wrap align-items-center">
               <input
                 type="text"
                 className="form-control form-control-sm"
-                placeholder="Search project titles, supervisors and status"
+                placeholder="Search by title, supervisor or status"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ minWidth: '300px' }}
@@ -239,30 +236,31 @@ const Projects = () => {
               <tbody>
                 {filteredProjects.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="text-center text-muted py-5">
+                    <td colSpan="5" className="text-center text-muted py-5">
                       No projects found.
                     </td>
                   </tr>
                 ) : (
-                  filteredProjects?.map((project, index) => (
-                    <tr key={project._id} onClick={() => openProjectDetail(project._id)} style={{ cursor: 'pointer' }}>
-
-                      {/* # */}
+                  filteredProjects.map((project, index) => (
+                    <tr
+                      key={project._id}
+                      onClick={() => navigate(`/coordinator/projects/${project._id}`)}
+                      style={{ cursor: 'pointer' }}
+                    >
                       <td className="px-4 py-3 text-muted small">{index + 1}</td>
 
-                      {/* Student Name with avatar */}
+                      <td className="px-4 py-3 fw-medium text-dark small">{project.title}</td>
+
                       <td className="px-4 py-3">
-                        {project.title}
+                        <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(project.status)}`}>
+                          {formatStatus(project.status)}
+                        </span>
                       </td>
 
-                      {/* Status */}
-                      <td className="px-4 py-3 text-muted small">{project.status}</td>
-
-                      {/* Current Supervisor */}
                       <td className="px-4 py-3">
-                        {project.supervisorId?.name ? (
+                        {project.supervisors?.[0]?.name ? (
                           <span className="text-dark small fw-medium">
-                            {project.supervisorId.name}
+                            {project.supervisors[0].name}
                           </span>
                         ) : (
                           <span className="badge bg-warning text-dark rounded-pill px-2 small">
@@ -273,11 +271,20 @@ const Projects = () => {
 
                       <td className="px-4 py-3">
                         <div className="d-flex gap-2">
-                          <button className="btn btn-outline-primary btn-sm px-3" onClick={(e) => { e.stopPropagation(); openEditModal(project._id) }}>Edit</button>
-                          <button className="btn btn-outline-danger btn-sm px-3" onClick={(e) => { e.stopPropagation(); openDeleteConfirm(project._id) }}>Delete</button>
+                          <button
+                            className="btn btn-outline-primary btn-sm px-3"
+                            onClick={(e) => { e.stopPropagation(); openEditModal(project._id); }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn btn-outline-danger btn-sm px-3"
+                            onClick={(e) => { e.stopPropagation(); openDeleteConfirm(project._id); }}
+                          >
+                            Delete
+                          </button>
                         </div>
                       </td>
-
                     </tr>
                   ))
                 )}
@@ -298,36 +305,59 @@ const Projects = () => {
                   <button className="btn-close" onClick={() => setShowModal(false)} />
                 </div>
                 <div className="modal-body px-4 py-4">
-                  <form onSubmit={handleSave} id="projectForm">
-                    <div className="row g-3">
-                      <div className="col-12 col-md-6">
-                        <label className="form-label fw-medium text-dark small">Project Title *</label>
-                        <input type="text" name="title" value={form.title} onChange={handleFormChange} className="form-control" placeholder="Project Title" required />
-                      </div>
-                      <div className="col-12 col-md-6">
-                        <label className="form-label fw-medium text-dark small">Max Students *</label>
-                        <input
-                          type="number"
-                          name="maxStudents"
-                          value={form.maxStudents}
-                          onChange={handleFormChange}
-                          className="form-control"
-                          placeholder="Between 2 - 5"
-                          min="2"
-                          max="5"
-                          required
-                        />
-                      </div>
-                      <div className="col-12 col-md-6">
-                        <label className="form-label fw-medium text-dark small">Description</label>
-                        <textarea type="text" name="description" value={form.description} onChange={handleFormChange} className="form-control" />
-                      </div>
+                  {modalError && (
+                    <div className="alert alert-danger border-0 py-2 mb-3 small">{modalError}</div>
+                  )}
+                  <div className="row g-3">
+                    <div className="col-12 col-md-6">
+                      <label className="form-label fw-medium text-dark small">Project Title *</label>
+                      <input
+                        type="text"
+                        name="title"
+                        value={form.title}
+                        onChange={handleFormChange}
+                        className="form-control"
+                        placeholder="Enter project title"
+                      />
                     </div>
-                  </form>
+                    <div className="col-12 col-md-6">
+                      <label className="form-label fw-medium text-dark small">Max Students *</label>
+                      <input
+                        type="number"
+                        name="maxStudents"
+                        value={form.maxStudents}
+                        onChange={handleFormChange}
+                        className="form-control"
+                        placeholder="Between 2 - 5"
+                        min="1"
+                        max="5"
+                      />
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label fw-medium text-dark small">Description</label>
+                      <textarea
+                        name="description"
+                        value={form.description}
+                        onChange={handleFormChange}
+                        className="form-control"
+                        rows="3"
+                        placeholder="Optional project description"
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div className="modal-footer border-top px-4 py-3">
-                  <button className="btn btn-outline-secondary px-4" onClick={() => setShowModal(false)}>Cancel</button>
-                  <button type="submit" form="projectForm" className="btn btn-success px-4 fw-medium">
+                  <button className="btn btn-outline-secondary px-4" onClick={() => setShowModal(false)}>
+                    Cancel
+                  </button>
+                  <button
+                    className="btn btn-success px-4 fw-medium"
+                    onClick={handleSave}
+                    disabled={modalLoading}
+                  >
+                    {modalLoading
+                      ? <span className="spinner-border spinner-border-sm me-2" />
+                      : null}
                     {modalMode === 'create' ? 'Create Project' : 'Save Changes'}
                   </button>
                 </div>
@@ -356,8 +386,23 @@ const Projects = () => {
                   </p>
                 </div>
                 <div className="modal-footer border-top px-4 py-3 justify-content-center gap-3">
-                  <button className="btn btn-outline-secondary px-4" onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
-                  <button className="btn btn-danger px-4 fw-medium" onClick={handleDelete}>Yes, Delete</button>
+                  <button
+                    className="btn btn-outline-secondary px-4"
+                    onClick={() => setShowDeleteConfirm(false)}
+                    disabled={deleteLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="btn btn-danger px-4 fw-medium"
+                    onClick={handleDelete}
+                    disabled={deleteLoading}
+                  >
+                    {deleteLoading
+                      ? <span className="spinner-border spinner-border-sm me-2" />
+                      : null}
+                    Yes, Delete
+                  </button>
                 </div>
               </div>
             </div>
@@ -374,7 +419,7 @@ const Projects = () => {
               Assigned: <strong className="text-success">{assignedCount}</strong>
             </span>
             <span className="text-muted">
-              Not Assigned: <strong className="text-warning">{unassignedCount}</strong>
+              Unassigned: <strong className="text-warning">{unassignedCount}</strong>
             </span>
           </div>
         </div>
