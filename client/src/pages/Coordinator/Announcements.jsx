@@ -18,7 +18,7 @@ const CoordinatorAnnouncements = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const res = await fetch('/api/announcements', {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         });
@@ -42,7 +42,7 @@ const CoordinatorAnnouncements = () => {
     setPosting(true);
     setPostError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch('/api/announcements', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },

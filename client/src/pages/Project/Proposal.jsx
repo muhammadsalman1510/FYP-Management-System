@@ -26,7 +26,7 @@ const Proposal = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
         // Step 1: check if student already has an active project
@@ -124,7 +124,7 @@ const Proposal = () => {
     setSubmitError(null);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch('/api/proposals', {
         method:  'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },

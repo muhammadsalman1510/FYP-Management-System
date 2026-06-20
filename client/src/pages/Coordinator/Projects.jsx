@@ -23,7 +23,7 @@ const Projects = () => {
   const navigate = useNavigate();
 
   const getHeaders = () => ({
-    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+    'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
     'Content-Type': 'application/json',
   });
 

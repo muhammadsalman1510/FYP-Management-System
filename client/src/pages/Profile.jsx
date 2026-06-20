@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../components/Breadcrumbs/Breadcrumb';
+import Avatar from '../components/Avatar';
 
 const Profile = () => {
-  const storedRole = localStorage.getItem('role') || 'student';
+  const storedRole = sessionStorage.getItem('role') || 'student';
 
   const formatRole = (r) => {
     switch (r) {
@@ -14,8 +15,6 @@ const Profile = () => {
   };
   const displayRole = formatRole(storedRole);
 
-  const getInitials = (name) =>
-    name ? name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() : '??';
 
   // Safe defaults prevent crash before API loads
   const [profile, setProfile] = useState({
@@ -53,7 +52,7 @@ const Profile = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const res = await fetch('/api/users/me', {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         });
@@ -78,7 +77,7 @@ const Profile = () => {
           program:     prof?.program        || '',
         };
         setProfile(loaded);
-        localStorage.setItem('name', userData.name || '');
+        sessionStorage.setItem('name', userData.name || '');
       } catch (err) {
         setError(err.message);
       } finally {
@@ -108,7 +107,7 @@ const Profile = () => {
     setProfileSaving(true);
     setProfileError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const body = {
         name:     draft.name,
         email:    draft.email,
@@ -126,7 +125,7 @@ const Profile = () => {
         throw new Error(data.message || 'Failed to save profile');
       }
       setProfile((prev) => ({ ...prev, ...draft }));
-      localStorage.setItem('name', draft.name);
+      sessionStorage.setItem('name', draft.name);
       setEditMode(false);
       setProfileAlert(true);
       setTimeout(() => setProfileAlert(false), 3000);
@@ -153,7 +152,7 @@ const Profile = () => {
     setPhotoSaving(true);
     setPhotoError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const formData = new FormData();
       formData.append('photo', photoFile);
       const res = await fetch('/api/users/me/photo', {
@@ -166,6 +165,11 @@ const Profile = () => {
         throw new Error(data.message || 'Photo upload failed');
       }
       setProfile((prev) => ({ ...prev, photoUrl: data.data.photoUrl }));
+      try {
+        const stored = JSON.parse(sessionStorage.getItem('user') || '{}');
+        sessionStorage.setItem('user', JSON.stringify({ ...stored, photoUrl: data.data.photoUrl }));
+      } catch (_) {}
+      window.dispatchEvent(new CustomEvent('userPhotoUpdated'));
       setPhotoSaved(true);
       setPhotoFile(null);
       setPhotoPreview(null);
@@ -199,7 +203,7 @@ const Profile = () => {
     setPwSaving(true);
     setPwApiError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch('/api/users/me/password', {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -276,28 +280,7 @@ const Profile = () => {
               {/* Photo section */}
               <div className="d-flex flex-column flex-sm-row align-items-center align-items-sm-start gap-4 mb-4 pb-4 border-bottom">
                 <div className="d-flex flex-column align-items-center gap-2 flex-shrink-0">
-                  {photoPreview ? (
-                    <img
-                      src={photoPreview}
-                      alt="Profile"
-                      className="rounded-circle"
-                      style={{ width: '80px', height: '80px', objectFit: 'cover' }}
-                    />
-                  ) : profile.photoUrl ? (
-                    <img
-                      src={profile.photoUrl}
-                      alt="Profile"
-                      className="rounded-circle"
-                      style={{ width: '80px', height: '80px', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <div
-                      className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                      style={{ width: '80px', height: '80px', backgroundColor: '#3c50e0', fontSize: '1.6rem' }}
-                    >
-                      {getInitials(profile.name)}
-                    </div>
-                  )}
+                  <Avatar name={profile.name} photoUrl={photoPreview || profile.photoUrl} size={80} />
                   <div className="d-flex gap-2 flex-wrap justify-content-center">
                     <label className="btn btn-outline-primary btn-sm px-3" style={{ cursor: 'pointer', fontSize: '0.8rem' }}>
                       Upload Photo

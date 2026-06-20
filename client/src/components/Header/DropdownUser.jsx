@@ -1,25 +1,31 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ClickOutside from '../ClickOutside';
-import UserOne from '../../images/user/user-02.jpg';
+import Avatar from '../Avatar';
 
-// Read the logged-in user's name and role from localStorage.
-// SignIn stores 'name' and 'role' as individual keys, and also 'user' as JSON.
-// We prefer the individual keys; fall back to parsing 'user' JSON for resilience.
 const getUserInfo = () => {
-  const name = localStorage.getItem('name');
-  const role = localStorage.getItem('role');
+  const name = sessionStorage.getItem('name');
+  const role = sessionStorage.getItem('role');
 
   if (name && role) return { name, role };
 
   try {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     return {
       name: user?.name || 'Unknown User',
       role: user?.role || '',
     };
   } catch {
     return { name: 'Unknown User', role: '' };
+  }
+};
+
+const getPhotoUrl = () => {
+  try {
+    const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+    return user?.photoUrl || null;
+  } catch {
+    return null;
   }
 };
 
@@ -32,7 +38,6 @@ const formatRole = (role) => {
   }
 };
 
-// Returns the correct profile page path based on the user's role.
 const getProfilePath = (role) => {
   if (role === 'coordinator') return '/coordinator/profile';
   if (role === 'supervisor')  return '/supervisor/profile';
@@ -42,16 +47,24 @@ const getProfilePath = (role) => {
 const DropdownUser = () => {
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState(getPhotoUrl);
 
   const { name, role } = getUserInfo();
   const displayRole    = formatRole(role);
   const profilePath    = getProfilePath(role);
 
+  // Re-read photoUrl from sessionStorage whenever a Profile page fires 'userPhotoUpdated'
+  useEffect(() => {
+    const handleUserUpdated = () => setPhotoUrl(getPhotoUrl());
+    window.addEventListener('userPhotoUpdated', handleUserUpdated);
+    return () => window.removeEventListener('userPhotoUpdated', handleUserUpdated);
+  }, []);
+
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('name');
-    localStorage.removeItem('role');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('name');
+    sessionStorage.removeItem('role');
     navigate('/');
   };
 
@@ -69,16 +82,7 @@ const DropdownUser = () => {
           <span className="d-block text-muted" style={{ fontSize: '0.75rem' }}>{displayRole}</span>
         </span>
 
-        <span
-          className="rounded-circle overflow-hidden d-block flex-shrink-0"
-          style={{ width: '44px', height: '44px' }}
-        >
-          <img
-            src={UserOne}
-            alt={name}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-        </span>
+        <Avatar name={name} photoUrl={photoUrl} size={44} />
 
         <svg
           className="d-none d-sm-block text-dark"
@@ -101,7 +105,7 @@ const DropdownUser = () => {
             <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>{displayRole}</p>
           </div>
 
-          {/* Menu items — My Profile only, Account Settings removed */}
+          {/* Menu items */}
           <ul className="list-unstyled border-bottom px-3 py-3 d-flex flex-column gap-3 mb-0">
             <li>
               <Link

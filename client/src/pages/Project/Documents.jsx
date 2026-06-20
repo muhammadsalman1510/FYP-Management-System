@@ -14,7 +14,7 @@ const Documents = () => {
   useEffect(() => {
     const fetchDocuments = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const res = await fetch('/api/documents', {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         });
@@ -46,7 +46,7 @@ const Documents = () => {
     setUploadError(null);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const formData = new FormData();
       formData.append('file', selectedFile);
       formData.append('type', selectedType);

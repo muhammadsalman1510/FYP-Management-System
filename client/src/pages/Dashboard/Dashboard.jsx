@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import Avatar from '../../components/Avatar';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -15,7 +16,7 @@ const Dashboard = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
         const [projectRes, tasksRes, meetingsRes, announcementsRes] = await Promise.all([
@@ -95,8 +96,6 @@ const Dashboard = () => {
   const supervisor = project.supervisors?.[0] || project.supervisorId || null;
   const students   = project.students || [];
 
-  const getInitials = (name) =>
-    name ? name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() : '??';
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
@@ -313,12 +312,7 @@ const Dashboard = () => {
                   {students.map((s, i) => (
                     <div key={s._id || i} className="d-flex align-items-center gap-2 p-2 rounded"
                       style={{ backgroundColor: '#f8f9fa' }}>
-                      <div
-                        className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                        style={{ width: '32px', height: '32px', minWidth: '32px', backgroundColor: '#3c50e0', fontSize: '0.72rem' }}
-                      >
-                        {getInitials(s.name)}
-                      </div>
+                      <Avatar name={s.name} size={32} />
                       <div>
                         <p className="fw-medium text-dark mb-0" style={{ fontSize: '0.82rem' }}>{s.name}</p>
                         <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>{s.email}</p>
@@ -337,12 +331,7 @@ const Dashboard = () => {
               </div>
               <div className="card-body p-3">
                 <div className="d-flex align-items-center gap-2 mb-3">
-                  <div
-                    className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                    style={{ width: '38px', height: '38px', minWidth: '38px', backgroundColor: '#28a745', fontSize: '0.8rem' }}
-                  >
-                    {getInitials(supervisor.name)}
-                  </div>
+                  <Avatar name={supervisor.name} size={38} />
                   <div>
                     <p className="fw-medium text-dark mb-0 small">{supervisor.name}</p>
                     <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>{supervisor.email}</p>

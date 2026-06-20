@@ -11,7 +11,7 @@ const CoordinatorMeetingCalendar = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
         const res  = await fetch('/api/meetings', { headers });
         const data = await res.json();
@@ -43,7 +43,7 @@ const CoordinatorMeetingCalendar = () => {
   };
 
   const currentUserId = (() => {
-    try { const u = JSON.parse(localStorage.getItem('user') || '{}'); return String(u._id || u.id || ''); }
+    try { const u = JSON.parse(sessionStorage.getItem('user') || '{}'); return String(u._id || u.id || ''); }
     catch { return ''; }
   })();
 

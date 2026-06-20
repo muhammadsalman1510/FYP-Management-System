@@ -9,7 +9,7 @@ const SupervisorAnnouncements = () => {
   useEffect(() => {
     const fetchAnnouncements = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const res = await fetch('/api/announcements', {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         });

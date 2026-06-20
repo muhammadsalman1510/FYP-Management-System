@@ -141,6 +141,7 @@ export const getTasks = async (req, res) => {
                     { projectId: null, targetScope: 'all' },
                 ],
             })
+                .populate('projectId', 'title')
                 .populate('createdBy', 'name')
                 .sort({ dueDate: 1 });
         }
@@ -239,6 +240,27 @@ export const getSubmissions = async (req, res) => {
         return res.status(200).json({ success: true, data: submissions });
     } catch (err) {
         console.error('getSubmissions error:', err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// ─── GET /api/tasks/submissions/my ───────────────────────────────────────────
+export const getMySubmissions = async (req, res) => {
+    try {
+        const submissions = await TaskSubmission.find({ submittedBy: req.user._id })
+            .populate({
+                path: 'taskId',
+                select: 'title dueDate instructions createdBy targetScope projectId',
+                populate: [
+                    { path: 'createdBy', select: 'name' },
+                    { path: 'projectId', select: 'title' },
+                ],
+            })
+            .sort({ submittedAt: -1 });
+
+        return res.status(200).json({ success: true, data: submissions });
+    } catch (err) {
+        console.error('getMySubmissions error:', err);
         return res.status(500).json({ success: false, message: err.message });
     }
 };

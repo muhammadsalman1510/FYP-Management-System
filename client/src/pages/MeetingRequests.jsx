@@ -1,49 +1,126 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../components/Breadcrumbs/Breadcrumb';
 
-// TODO (Backend): Replace meetingRequests with GET /api/meetings?submittedBy=me
-// TODO (Backend): POST /api/meetings — submit new meeting request
-
 const MeetingRequests = () => {
+  const [project, setProject]   = useState(null);
+  const [meetings, setMeetings] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(null);
 
-  const meetingRequests = [
-    {
-      id: 1,
-      title: 'Project Proposal Discussion',
-      person: 'Mr. Shoaib Ahmed (Supervisor)',
-      date: '2024-02-15',
-      time: '14:00',
-      duration: 45,
-      status: 'approved',
-      submittedDate: '2024-02-10',
-      response: 'Meeting approved. Please bring your project documentation.',
-      responseDate: '2024-02-11',
-    },
-    {
-      id: 2,
-      title: 'Progress Review Meeting',
-      person: 'Mr. Omer Farooq (Coordinator)',
-      date: '2024-02-18',
-      time: '11:00',
-      duration: 30,
-      status: 'pending',
-      submittedDate: '2024-02-12',
-      response: '',
-      responseDate: '',
-    },
-    {
-      id: 3,
-      title: 'Technical Issues Discussion',
-      person: 'Mr. Shoaib Ahmed (Supervisor)',
-      date: '2024-02-20',
-      time: '15:30',
-      duration: 60,
-      status: 'rejected',
-      submittedDate: '2024-02-08',
-      response: 'Please reschedule for next week. I have a conflict at this time.',
-      responseDate: '2024-02-09',
-    },
-  ];
+  const currentUserId = (() => {
+    try { return JSON.parse(sessionStorage.getItem('user'))?._id || ''; }
+    catch { return ''; }
+  })();
+
+  const token   = sessionStorage.getItem('token');
+  const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+  // Modal state
+  const [showModal, setShowModal]       = useState(false);
+  const [meetWith, setMeetWith]         = useState('');
+  const [proposedDate, setProposedDate] = useState('');
+  const [proposedTime, setProposedTime] = useState('');
+  const [topic, setTopic]               = useState('');
+  const [modalError, setModalError]     = useState('');
+  const [submitting, setSubmitting]     = useState(false);
+
+  const loadMeetings = async () => {
+    const res  = await fetch('/api/meetings', { headers });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || 'Failed to load meetings');
+    return data.data;
+  };
+
+  useEffect(() => {
+    const fetchAll = async () => {
+      try {
+        const [meetingsRes, projectRes] = await Promise.all([
+          fetch('/api/meetings',     { headers }),
+          fetch('/api/projects/my', { headers }),
+        ]);
+
+        const meetingsData = await meetingsRes.json();
+        const projectData  = await projectRes.json();
+
+        if (!meetingsRes.ok || !meetingsData.success) {
+          throw new Error(meetingsData.message || 'Failed to load meetings');
+        }
+        setMeetings(meetingsData.data);
+
+        // 404 = student has no project yet — not a real error
+        if (projectRes.status === 404) {
+          setProject(null);
+        } else if (!projectRes.ok || !projectData.success) {
+          throw new Error(projectData.message || 'Failed to load project');
+        } else {
+          setProject(projectData.data);
+        }
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAll();
+  }, []);
+
+  const openModal = () => {
+    setMeetWith('');
+    setProposedDate('');
+    setProposedTime('');
+    setTopic('');
+    setModalError('');
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setModalError('');
+  };
+
+  const handleSubmit = async () => {
+    if (!meetWith)       { setModalError('Please select who you want to meet with.'); return; }
+    if (!proposedDate)   { setModalError('Please select a proposed date.'); return; }
+    if (!proposedTime)   { setModalError('Please select a proposed time.'); return; }
+    if (!topic.trim())   { setModalError('Please enter a topic or reason.'); return; }
+
+    // Resolve requestedTo to an actual User _id
+    let requestedTo = '';
+    if (meetWith === 'supervisor') {
+      requestedTo = project?.supervisors?.[0]?._id;
+      if (!requestedTo) { setModalError('No supervisor is assigned to your project.'); return; }
+    } else {
+      requestedTo = project?.coordinator?._id;
+      if (!requestedTo) { setModalError('No coordinator is assigned to your project.'); return; }
+    }
+
+    setModalError('');
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/meetings', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          requestedTo,
+          proposedDate,
+          proposedTime,
+          topic:     topic.trim(),
+          projectId: project._id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to submit meeting request');
+
+      // Re-fetch so the new meeting has populated requestedBy/requestedTo names
+      const fresh = await loadMeetings();
+      setMeetings(fresh);
+      closeModal();
+    } catch (err) {
+      setModalError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -59,51 +136,42 @@ const MeetingRequests = () => {
       case 'approved': return 'Approved';
       case 'pending':  return 'Pending Review';
       case 'rejected': return 'Rejected';
-      default:         return 'Unknown';
+      default:         return status;
     }
   };
 
-  const getResponseAlert = (status) =>
-    status === 'approved' ? 'alert-success' : 'alert-danger';
-
-  // ── New Meeting Request modal state ──
-  const [showModal, setShowModal]     = useState(false);
-  const [meetWith, setMeetWith]       = useState('');
-  const [proposedDate, setProposedDate] = useState('');
-  const [proposedTime, setProposedTime] = useState('');
-  const [topic, setTopic]             = useState('');
-  const [modalErrors, setModalErrors] = useState({});
-  const [submitSuccess, setSubmitSuccess] = useState(false);
-
-  const openModal = () => {
-    setMeetWith('');
-    setProposedDate('');
-    setProposedTime('');
-    setTopic('');
-    setModalErrors({});
-    setSubmitSuccess(false);
-    setShowModal(true);
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+    });
   };
 
-  const closeModal = () => setShowModal(false);
+  if (loading) {
+    return (
+      <>
+        <Breadcrumb pageName="Meeting Requests" />
+        <div className="d-flex justify-content-center align-items-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </>
+    );
+  }
 
-  const handleModalSubmit = () => {
-    const errors = {};
-    if (!meetWith)             errors.meetWith      = 'Please select who to meet with.';
-    if (!proposedDate)         errors.proposedDate  = 'Please select a date.';
-    if (!proposedTime)         errors.proposedTime  = 'Please select a time.';
-    if (!topic.trim())         errors.topic         = 'Please enter a topic or reason.';
+  if (error) {
+    return (
+      <>
+        <Breadcrumb pageName="Meeting Requests" />
+        <div className="alert alert-danger border-0">{error}</div>
+      </>
+    );
+  }
 
-    if (Object.keys(errors).length > 0) {
-      setModalErrors(errors);
-      return;
-    }
-
-    setModalErrors({});
-    // TODO (Backend): POST /api/meetings — { meetWith, proposedDate, proposedTime, topic }
-    setSubmitSuccess(true);
-    setTimeout(() => { setSubmitSuccess(false); closeModal(); }, 1800);
-  };
+  // Resolved names shown inline in the dropdown options
+  const supervisorName  = project?.supervisors?.[0]?.name || '';
+  const coordinatorName = project?.coordinator?.name       || '';
 
   return (
     <>
@@ -119,64 +187,96 @@ const MeetingRequests = () => {
               <button
                 className="btn btn-primary btn-sm px-3 fw-medium"
                 onClick={openModal}
+                disabled={!project}
+                title={!project ? 'You need an active project before requesting a meeting.' : ''}
               >
                 + New Meeting Request
               </button>
             </div>
 
-            {/* Card Body */}
-            <div className="card-body p-4">
-              <div className="d-flex flex-column gap-4">
-
-                {meetingRequests.map((request) => (
-                  <div key={request.id} className="border rounded p-4">
-
-                    {/* Top row: title + status badge */}
-                    <div className="d-flex justify-content-between align-items-start mb-3">
-                      <div>
-                        <h5 className="fw-semibold text-dark mb-1">{request.title}</h5>
-                        <p className="text-muted mb-1 small">With: {request.person}</p>
-                        <p className="text-muted mb-1 small">
-                          Requested for: {request.date} at {request.time} ({request.duration} minutes)
-                        </p>
-                        <p className="text-muted mb-0 small">
-                          Submitted on: {request.submittedDate}
-                        </p>
-                      </div>
-                      <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(request.status)}`}>
-                        {getStatusText(request.status)}
-                      </span>
-                    </div>
-
-                    {/* Response box */}
-                    {request.response && (
-                      <div className={`alert ${getResponseAlert(request.status)} mt-3`}>
-                        <div className="d-flex justify-content-between align-items-center mb-1">
-                          <span className="fw-semibold small">
-                            {request.status === 'approved' ? 'Approval Message' : 'Rejection Reason'}
-                          </span>
-                          {request.responseDate && (
-                            <span className="small">Responded on: {request.responseDate}</span>
-                          )}
-                        </div>
-                        <p className="mb-0 small">{request.response}</p>
-                      </div>
-                    )}
-
-                    {/* Reschedule button — rejected only */}
-                    {request.status === 'rejected' && (
-                      <div className="mt-3">
-                        <button className="btn btn-primary btn-sm px-4">
-                          Reschedule Meeting
-                        </button>
-                      </div>
-                    )}
-
-                  </div>
-                ))}
-
+            {/* No-project notice */}
+            {!project && (
+              <div className="alert alert-warning border-0 rounded-0 mb-0 px-4 py-3 small">
+                You need an active project before requesting a meeting. Once your proposal is approved,
+                you will be able to submit meeting requests here.
               </div>
+            )}
+
+            {/* Meeting list */}
+            <div className="card-body p-4">
+              {meetings.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-muted mb-0">No meeting requests yet.</p>
+                </div>
+              ) : (
+                <div className="d-flex flex-column gap-4">
+                  {meetings.map((m) => {
+                    const isOutgoing  = String(m.requestedBy?._id || m.requestedBy) === String(currentUserId);
+                    const otherPerson = isOutgoing ? m.requestedTo : m.requestedBy;
+                    const otherRole   = otherPerson?.role
+                      ? otherPerson.role.charAt(0).toUpperCase() + otherPerson.role.slice(1)
+                      : '';
+
+                    return (
+                      <div key={m._id} className="border rounded p-4">
+
+                        {/* Top row */}
+                        <div className="d-flex justify-content-between align-items-start mb-3">
+                          <div>
+                            <h5 className="fw-semibold text-dark mb-1">{m.topic}</h5>
+                            <p className="text-muted mb-1 small">
+                              {isOutgoing ? 'With' : 'From'}:{' '}
+                              <strong className="text-dark">{otherPerson?.name || '—'}</strong>
+                              {otherRole && (
+                                <span
+                                  className="ms-1 badge bg-secondary rounded-pill"
+                                  style={{ fontSize: '0.65rem' }}
+                                >
+                                  {otherRole}
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-muted mb-1 small">
+                              Proposed:{' '}
+                              <strong className="text-dark">{formatDate(m.proposedDate)}</strong>
+                              {' '}at{' '}
+                              <strong className="text-dark">{m.proposedTime}</strong>
+                            </p>
+                            {m.projectId?.title && (
+                              <p className="text-muted mb-1 small">
+                                Project: <strong className="text-dark">{m.projectId.title}</strong>
+                              </p>
+                            )}
+                            <p className="text-muted mb-0 small">
+                              Submitted: {formatDate(m.createdAt)}
+                            </p>
+                          </div>
+                          <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(m.status)}`}>
+                            {getStatusText(m.status)}
+                          </span>
+                        </div>
+
+                        {/* Response / notes */}
+                        {m.notes && (
+                          <div
+                            className={`alert py-2 px-3 mt-2 mb-0 ${m.status === 'approved' ? 'alert-success' : 'alert-danger'}`}
+                          >
+                            <p className="small mb-0">
+                              <strong>
+                                {m.status === 'approved' ? 'Approval Message' : 'Response'}:
+                              </strong>{' '}
+                              {m.notes}
+                            </p>
+                          </div>
+                        )}
+
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
+
           </div>
         </div>
       </div>
@@ -185,28 +285,22 @@ const MeetingRequests = () => {
       {showModal && (
         <div
           className="modal d-block"
-          tabIndex="-1"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
-          <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '480px' }}>
             <div className="modal-content border-0 shadow">
 
               <div className="modal-header border-bottom px-4 py-3">
                 <h5 className="modal-title fw-semibold text-dark">New Meeting Request</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={closeModal}
-                  aria-label="Close"
-                />
+                <button className="btn-close" onClick={closeModal} />
               </div>
 
               <div className="modal-body px-4 py-4">
 
-                {submitSuccess && (
-                  <div className="alert alert-success border-0 mb-3">
-                    Meeting request submitted successfully!
+                {modalError && (
+                  <div className="alert alert-danger border-0 py-2 px-3 small mb-3">
+                    {modalError}
                   </div>
                 )}
 
@@ -214,17 +308,24 @@ const MeetingRequests = () => {
                 <div className="mb-3">
                   <label className="form-label fw-medium text-dark small">Meet With *</label>
                   <select
-                    className={`form-select ${modalErrors.meetWith ? 'is-invalid' : ''}`}
+                    className="form-select"
                     value={meetWith}
-                    onChange={(e) => setMeetWith(e.target.value)}
+                    onChange={(e) => { setMeetWith(e.target.value); setModalError(''); }}
                   >
-                    <option value="">-- Select --</option>
-                    <option value="Supervisor">Supervisor</option>
-                    <option value="Coordinator">Coordinator</option>
+                    <option value="">— Select —</option>
+                    <option
+                      value="supervisor"
+                      disabled={!project?.supervisors?.length}
+                    >
+                      Supervisor{supervisorName ? ` — ${supervisorName}` : ''}
+                    </option>
+                    <option
+                      value="coordinator"
+                      disabled={!project?.coordinator}
+                    >
+                      Coordinator{coordinatorName ? ` — ${coordinatorName}` : ''}
+                    </option>
                   </select>
-                  {modalErrors.meetWith && (
-                    <div className="invalid-feedback">{modalErrors.meetWith}</div>
-                  )}
                 </div>
 
                 {/* Proposed Date */}
@@ -232,13 +333,10 @@ const MeetingRequests = () => {
                   <label className="form-label fw-medium text-dark small">Proposed Date *</label>
                   <input
                     type="date"
-                    className={`form-control ${modalErrors.proposedDate ? 'is-invalid' : ''}`}
+                    className="form-control"
                     value={proposedDate}
                     onChange={(e) => setProposedDate(e.target.value)}
                   />
-                  {modalErrors.proposedDate && (
-                    <div className="invalid-feedback">{modalErrors.proposedDate}</div>
-                  )}
                 </div>
 
                 {/* Proposed Time */}
@@ -246,45 +344,38 @@ const MeetingRequests = () => {
                   <label className="form-label fw-medium text-dark small">Proposed Time *</label>
                   <input
                     type="time"
-                    className={`form-control ${modalErrors.proposedTime ? 'is-invalid' : ''}`}
+                    className="form-control"
                     value={proposedTime}
                     onChange={(e) => setProposedTime(e.target.value)}
                   />
-                  {modalErrors.proposedTime && (
-                    <div className="invalid-feedback">{modalErrors.proposedTime}</div>
-                  )}
                 </div>
 
-                {/* Topic / Reason */}
+                {/* Topic */}
                 <div className="mb-0">
                   <label className="form-label fw-medium text-dark small">Topic / Reason *</label>
                   <input
                     type="text"
-                    className={`form-control ${modalErrors.topic ? 'is-invalid' : ''}`}
+                    className="form-control"
                     placeholder="e.g. Progress update discussion"
                     value={topic}
                     onChange={(e) => setTopic(e.target.value)}
                   />
-                  {modalErrors.topic && (
-                    <div className="invalid-feedback">{modalErrors.topic}</div>
-                  )}
                 </div>
 
               </div>
 
               <div className="modal-footer border-top px-4 py-3 gap-2">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary px-4"
-                  onClick={closeModal}
-                >
+                <button className="btn btn-outline-secondary px-4" onClick={closeModal}>
                   Cancel
                 </button>
                 <button
-                  type="button"
                   className="btn btn-primary px-4 fw-medium"
-                  onClick={handleModalSubmit}
+                  onClick={handleSubmit}
+                  disabled={submitting}
                 >
+                  {submitting && (
+                    <span className="spinner-border spinner-border-sm me-2" role="status" />
+                  )}
                   Submit Request
                 </button>
               </div>

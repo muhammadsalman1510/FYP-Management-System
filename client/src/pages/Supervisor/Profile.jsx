@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
+import Avatar from '../../components/Avatar';
 
 const SupervisorProfile = () => {
   const [profile, setProfile] = useState(null);
@@ -27,7 +28,7 @@ const SupervisorProfile = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const res = await fetch('/api/users/me', {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         });
@@ -49,7 +50,7 @@ const SupervisorProfile = () => {
         };
         setProfile(merged);
         setDraft(merged);
-        localStorage.setItem('name', u.name || '');
+        sessionStorage.setItem('name', u.name || '');
       } catch (err) {
         setError(err.message);
       } finally {
@@ -59,8 +60,6 @@ const SupervisorProfile = () => {
     fetchProfile();
   }, []);
 
-  const getInitials = (name) =>
-    name ? name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() : 'SV';
 
   const handleDraftChange = (e) => {
     const { name, value } = e.target;
@@ -82,7 +81,7 @@ const SupervisorProfile = () => {
     setProfileSaving(true);
     setProfileError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch('/api/users/me', {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -108,7 +107,7 @@ const SupervisorProfile = () => {
         designation: p?.designation || '',
       };
       setProfile(merged);
-      localStorage.setItem('name', u.name || '');
+      sessionStorage.setItem('name', u.name || '');
       setEditMode(false);
       setProfileSuccess(true);
       setTimeout(() => setProfileSuccess(false), 3000);
@@ -135,7 +134,7 @@ const SupervisorProfile = () => {
     setPhotoSaving(true);
     setPhotoError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const formData = new FormData();
       formData.append('photo', photoFile);
       const res = await fetch('/api/users/me/photo', {
@@ -147,6 +146,11 @@ const SupervisorProfile = () => {
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to upload photo');
 
       setProfile((prev) => ({ ...prev, photoUrl: data.data.photoUrl }));
+      try {
+        const stored = JSON.parse(sessionStorage.getItem('user') || '{}');
+        sessionStorage.setItem('user', JSON.stringify({ ...stored, photoUrl: data.data.photoUrl }));
+      } catch (_) {}
+      window.dispatchEvent(new CustomEvent('userPhotoUpdated'));
       setPhotoFile(null);
       setPhotoPreview(null);
       setPhotoSuccess(true);
@@ -176,7 +180,7 @@ const SupervisorProfile = () => {
     setPwSaving(true);
     setPwApiError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch('/api/users/me/password', {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -195,8 +199,6 @@ const SupervisorProfile = () => {
       setPwSaving(false);
     }
   };
-
-  const photoSrc = photoPreview || (profile?.photoUrl ? profile.photoUrl : null);
 
   if (loading) {
     return (
@@ -249,21 +251,7 @@ const SupervisorProfile = () => {
               {/* Photo section */}
               <div className="d-flex flex-column flex-sm-row align-items-center align-items-sm-start gap-4 mb-4 pb-4 border-bottom">
                 <div className="d-flex flex-column align-items-center gap-2 flex-shrink-0">
-                  {photoSrc ? (
-                    <img
-                      src={photoSrc}
-                      alt="Profile"
-                      className="rounded-circle"
-                      style={{ width: '80px', height: '80px', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <div
-                      className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                      style={{ width: '80px', height: '80px', backgroundColor: '#28a745', fontSize: '1.6rem' }}
-                    >
-                      {getInitials(profile?.name)}
-                    </div>
-                  )}
+                  <Avatar name={profile?.name} photoUrl={photoPreview || profile?.photoUrl} size={80} />
                   <div className="d-flex gap-2 flex-wrap justify-content-center">
                     <label className="btn btn-outline-success btn-sm px-3" style={{ cursor: 'pointer', fontSize: '0.8rem' }}>
                       Upload Photo

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../components/Breadcrumbs/Breadcrumb';
+import Avatar from '../components/Avatar';
 
 // student sees their supervisor's info here — read only, no editing
 // supervisor profile fields (department, designation) come from the populated user doc
@@ -12,7 +13,7 @@ const SupervisorView = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const res = await fetch('/api/projects/my', {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         });
@@ -33,8 +34,6 @@ const SupervisorView = () => {
     load();
   }, []);
 
-  const getInitials = (name) =>
-    name ? name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() : 'SV';
 
   if (loading) return (
     <>
@@ -68,21 +67,7 @@ const SupervisorView = () => {
 
               {/* avatar + name */}
               <div className="d-flex align-items-center gap-4 mb-4 pb-4 border-bottom">
-                {supervisor.photoUrl ? (
-                  <img
-                    src={supervisor.photoUrl.startsWith('http') ? supervisor.photoUrl : `http://localhost:4000${supervisor.photoUrl}`}
-                    alt="Supervisor"
-                    className="rounded-circle"
-                    style={{ width: '72px', height: '72px', objectFit: 'cover', minWidth: '72px' }}
-                  />
-                ) : (
-                  <div
-                    className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                    style={{ width: '72px', height: '72px', minWidth: '72px', backgroundColor: '#28a745', fontSize: '1.5rem' }}
-                  >
-                    {getInitials(supervisor.name)}
-                  </div>
-                )}
+                <Avatar name={supervisor.name} photoUrl={supervisor.photoUrl} size={72} />
                 <div>
                   <h5 className="fw-semibold text-dark mb-1">{supervisor.name}</h5>
                   {supervisor.profile?.designation && (

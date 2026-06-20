@@ -17,7 +17,7 @@ const SupervisorProposals = () => {
   useEffect(() => {
     const fetchProposals = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const res = await fetch('/api/proposals', {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         });
@@ -49,7 +49,7 @@ const SupervisorProposals = () => {
     setRecError(null);
     setRecSuccess(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch(`/api/proposals/${proposal._id}/supervisor-review`, {
         method:  'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },

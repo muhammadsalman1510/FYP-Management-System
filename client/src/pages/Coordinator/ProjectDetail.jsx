@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
+import Avatar from '../../components/Avatar';
 
 const docTypeColors = {
   'Proposal':          '#3c50e0',
@@ -39,7 +40,7 @@ const ProjectDetail = () => {
     setTimeout(() => setAlert({ show: false, message: '', type: 'success' }), 3500);
   };
 
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
   const authHeaders = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
   useEffect(() => {
@@ -341,12 +342,7 @@ const ProjectDetail = () => {
               <div className="card-body p-4">
                 {supervisor ? (
                   <div className="d-flex align-items-center gap-3">
-                    <div
-                      className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                      style={{ width: '44px', height: '44px', minWidth: '44px', backgroundColor: '#28a745', fontSize: '0.9rem' }}
-                    >
-                      {(supervisor.name || 'S').split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                    </div>
+                    <Avatar name={supervisor.name} size={44} />
                     <div>
                       <p className="fw-semibold text-dark mb-0 small">{supervisor.name}</p>
                       <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>{supervisor.email}</p>
@@ -388,12 +384,7 @@ const ProjectDetail = () => {
                         className="d-flex align-items-center justify-content-between p-2 rounded border"
                       >
                         <div className="d-flex align-items-center gap-2">
-                          <div
-                            className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                            style={{ width: '32px', height: '32px', minWidth: '32px', backgroundColor: '#3c50e0', fontSize: '0.72rem' }}
-                          >
-                            {(student.name || 'S').split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                          </div>
+                          <Avatar name={student.name} size={32} />
                           <div>
                             <p className="fw-medium text-dark mb-0" style={{ fontSize: '0.82rem' }}>{student.name}</p>
                             <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>{student.email}</p>

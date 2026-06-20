@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
+import Avatar from '../../components/Avatar';
 
 /*
   COORDINATOR — MANAGE SUPERVISORS
@@ -31,7 +32,7 @@ const CoordinatorSupervisors = () => {
   const [form, setForm] = useState(emptyForm);
 
   const fetchSupervisors = async () => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     try {
       const response = await axios.get(
         "http://localhost:4000/api/users",
@@ -62,7 +63,7 @@ const CoordinatorSupervisors = () => {
 
   const openEditModal = async (id) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       const { data } = await axios.get(`http://localhost:4000/api/users/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -87,7 +88,7 @@ const CoordinatorSupervisors = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     if (modalMode === 'create') {
       try {
@@ -155,7 +156,7 @@ const CoordinatorSupervisors = () => {
   // Actually deletes
   const handleDelete = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       await axios.delete(`http://localhost:4000/api/users/${supervisorToDeleteId}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -235,12 +236,7 @@ const CoordinatorSupervisors = () => {
                       <td className="px-4 py-3 text-muted small">{index + 1}</td>
                       <td className="px-4 py-3">
                         <div className="d-flex align-items-center gap-2">
-                          <div
-                            className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                            style={{ width: '36px', height: '36px', minWidth: '36px', backgroundColor: '#28a745', fontSize: '0.8rem' }}
-                          >
-                            {supervisor.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                          </div>
+                          <Avatar name={supervisor.name} size={36} />
                           <span className="fw-medium text-dark small">{supervisor.name}</span>
                         </div>
                       </td>

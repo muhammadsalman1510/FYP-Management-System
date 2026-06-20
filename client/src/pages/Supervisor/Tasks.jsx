@@ -27,7 +27,7 @@ const SupervisorTasks = () => {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
         const [projRes, tasksRes, subsRes] = await Promise.all([
@@ -78,7 +78,7 @@ const SupervisorTasks = () => {
     setCreating(true);
     setFormError('');
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const body = {
         title:        taskForm.title.trim(),
         instructions: taskForm.instructions.trim(),
@@ -119,7 +119,7 @@ const SupervisorTasks = () => {
     if (!reviewFeedback.trim()) { alert('Please provide feedback.'); return; }
     setReviewing(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch(`/api/tasks/submissions/${reviewSub._id}/review`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },

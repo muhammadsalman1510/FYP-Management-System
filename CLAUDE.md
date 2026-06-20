@@ -116,7 +116,7 @@ server/
 │   ├── project.controller.js     # populateProject() helper uses 'supervisors' not 'supervisorId'. getMyProject, getAssignedProjects, updateMilestone
 │   ├── announcements.controller.js  # coordinator-only POST, all-roles GET
 │   ├── proposal.controller.js    # createProposal (validates roll numbers + supervisor email), getProposals, getMyProposal, reviewProposal (auto-creates Project on approval, coordinator decision is final/absolute), submitSupervisorRecommendation (advisory only, locked once coordinator decides)
-│   ├── task.controller.js
+│   ├── task.controller.js        # createTask, getTasks, submitTask, getSubmissions (coordinator+supervisor), getMySubmissions (student, own submissions only), reviewSubmission
 │   ├── document.controller.js
 │   └── meeting.controller.js
 └── routes/
@@ -125,7 +125,7 @@ server/
     ├── project.routes.js         # /my and /assigned BEFORE /:id routes
     ├── announcements.routes.js
     ├── proposal.routes.js        # /my BEFORE /:id routes (NEW route added)
-    ├── task.routes.js            # /submissions and /submissions/:id BEFORE /:id
+    ├── task.routes.js            # /submissions/my, /submissions, /submissions/:id/review BEFORE any /:id
     ├── document.routes.js
     └── meeting.routes.js
 ```
@@ -161,8 +161,8 @@ client/
 
 ### Users
 - POST /api/users — coordinator only (checks duplicate email + duplicate rollNumber for students, returns clear 400 messages)
-- GET /api/users — coordinator only
-- GET /api/users/:id — coordinator only
+- GET /api/users — coordinator only. **FOOTGUN: response shape is `{ users: [...] }`, NOT `{ success: true, data: [...] }` like every other route.** Read `data.users` on the frontend, not `data.data`. This inconsistency has caused bugs twice already (Coordinator Dashboard stat counts, Coordinator ScheduleMeeting dropdowns) — always double check this specific route's shape before writing parsing code against it.
+- GET /api/users/:id — coordinator only. Supervisors and students do NOT have access to this route, and it should not be loosened to give them access. If a supervisor/student-facing page needs user data (e.g. Supervisor/StudentDetail.jsx), assemble it from routes that role already has access to (e.g. GET /api/projects/assigned, which has students populated) rather than expanding this route's permissions.
 - PUT /api/users/:id — coordinator only
 - DELETE /api/users/:id — coordinator only
 - GET /api/users/me — all roles
@@ -195,6 +195,7 @@ client/
 - GET /api/tasks — all roles (role-filtered)
 - POST /api/tasks/:id/submit — student only, Multer
 - GET /api/tasks/submissions — coordinator + supervisor
+- GET /api/tasks/submissions/my — student only. Returns the student's own TaskSubmission documents with taskId populated (title, dueDate, createdBy, projectId). Exists because students otherwise had no way to see their own submission history, which caused the Submitted tab to reset to empty on every page refresh even after a real submission. Declared BEFORE /submissions/:id/review.
 - PUT /api/tasks/submissions/:id/review — coordinator + supervisor
 
 ### Documents
@@ -212,14 +213,27 @@ client/
 
 ---
 
-## localStorage Keys
+## Session Storage — sessionStorage, NOT localStorage (IMPORTANT — do not revert)
+
+Auth session data (token, user, name, role) is stored in **sessionStorage**, not localStorage. This was a deliberate migration — do not change it back without understanding why.
+
+**Why:** localStorage is shared across every tab on the same origin. With localStorage, logging in as a different role in one tab silently overwrote the session for ALL open tabs, so a coordinator logging in in Tab 2 would cause Tab 1 (showing a student session) to suddenly redirect to the coordinator dashboard on its next refresh or navigation. sessionStorage is private per-tab by browser design, which fixes this completely — each tab keeps its own independent login.
 
 ```js
-localStorage.setItem('token', data.token)
-localStorage.setItem('user',  JSON.stringify(data.user))
-localStorage.setItem('name',  data.user.name)
-localStorage.setItem('role',  data.user.role)
+sessionStorage.setItem('token', data.token)
+sessionStorage.setItem('user',  JSON.stringify(data.user))
+sessionStorage.setItem('name',  data.user.name)
+sessionStorage.setItem('role',  data.user.role)
 ```
+
+**Known sessionStorage behavior (not a bug, expected):**
+- A brand new tab opened via Ctrl+T and manually navigating to the URL will NOT have a session — sessionStorage only carries over to true duplicate tabs (e.g. "Duplicate Tab", or a tab opened via a link/window.open from an already-authenticated page).
+- Closing the browser entirely clears all sessions — this is correct, standard secure behavior, not a regression.
+- This enables testing/demoing multiple roles simultaneously in separate tabs without constantly logging in and out — this was the explicit reason for the migration.
+
+**Other localStorage usage in the app is intentionally NOT part of this migration** and should stay as localStorage since it's meant to persist across browser restarts: theme preference (useColorMode.jsx), sidebar collapsed/expanded state, toast notification settings (fireToast.jsx), and the generic useLocalStorage.jsx hook itself. Only the 4 auth keys (token, user, name, role) were migrated.
+
+If a future change needs to read/write the session, always use sessionStorage for these 4 keys specifically — grep for `sessionStorage.getItem('token')` patterns already established across the 36 files that already follow this convention.
 
 ---
 
@@ -242,6 +256,7 @@ Has 0 or 1 project. If 0 projects: submits a Project Proposal (the form that cre
 - Dashboard stat cards should be clickable where a corresponding list page exists (e.g. Total Students card → navigates to Manage Students). Use useNavigate() + onClick + cursor: pointer style.
 - Supervisor meeting request UI: one form with a "Meet With" dropdown (Student or Coordinator), not two separate buttons. Selecting Student shows a student picker and the submit button reads "Create Meeting". Selecting Coordinator shows the project picker (to resolve which coordinator) and the submit button reads "Request Meeting". The page-level button that opens this modal should be a neutral label like "+ New Meeting" since it can lead to either action.
 - Error display in modals: never let a backend 400 error fail silently (console.error only). Always surface data.message in a visible alert-danger inside the relevant modal, keep the modal open, and preserve the user's entered form data so they can correct and resubmit.
+- A page can LOOK fully built (real-looking layout, real-looking data, a working-looking submit button) while actually being 100% disconnected from the backend — hardcoded arrays, a submit handler that only sets local state and fakes a success message, no useEffect fetch on mount. This was found in MeetingRequests.jsx (student), Calendar.jsx, Coordinator/MeetingRequests.jsx, Coordinator/ScheduleMeeting.jsx, and Supervisor/StudentDetail.jsx — all looked finished but had zero real API calls. When wiring or auditing any page, do not assume a page is done just because it renders correctly — check for an actual fetch()/useEffect pair and a real submit handler before marking it complete.
 
 ---
 
@@ -260,7 +275,7 @@ const res = await fetch('/api/documents', {
 ## Standard Auth Header Pattern (all JSON requests)
 
 ```js
-const token = localStorage.getItem('token');
+const token = sessionStorage.getItem('token');
 const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 ```
 
@@ -299,7 +314,7 @@ const [error, setError] = useState(null);
 7. Never use Tailwind — Bootstrap 5 and inline styles only.
 8. Do not change routing or URL paths unless explicitly asked.
 9. For file uploads use FormData — do NOT set Content-Type header manually.
-10. Token is always read from localStorage.getItem('token').
+10. Token is always read from sessionStorage.getItem('token') (NOT localStorage — see Session Storage section above).
 11. Always double-check the actual backend response shape (read the controller) before writing .data parsing logic on the frontend.
 
 ### Backend rules:

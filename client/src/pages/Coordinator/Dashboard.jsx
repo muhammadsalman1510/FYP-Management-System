@@ -17,7 +17,7 @@ const CoordinatorDashboard = () => {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
         const [studentsRes, supervisorsRes, proposalsRes, submissionsRes, meetingsRes] = await Promise.all([

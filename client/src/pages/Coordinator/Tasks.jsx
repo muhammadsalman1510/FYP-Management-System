@@ -16,7 +16,7 @@ const CoordinatorTasks = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
         const [tasksRes, subsRes, projectsRes] = await Promise.all([
@@ -95,7 +95,7 @@ const CoordinatorTasks = () => {
     setCreating(true);
     setFormError('');
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -144,7 +144,7 @@ const CoordinatorTasks = () => {
     setReviewing(true);
     setReviewError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch(`/api/tasks/submissions/${reviewSub._id}/review`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },

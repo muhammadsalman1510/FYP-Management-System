@@ -12,7 +12,7 @@ const SupervisorMeetingCalendar = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
         const res  = await fetch('/api/meetings', { headers });
         const data = await res.json();
@@ -38,7 +38,7 @@ const SupervisorMeetingCalendar = () => {
   const goToNext = () => { if (currentMonth === 11) { setCurrentMonth(0);  setCurrentYear((y) => y + 1); } else setCurrentMonth((m) => m + 1); };
 
   const currentUserId = (() => {
-    try { const u = JSON.parse(localStorage.getItem('user') || '{}'); return String(u._id || u.id || ''); }
+    try { const u = JSON.parse(sessionStorage.getItem('user') || '{}'); return String(u._id || u.id || ''); }
     catch { return ''; }
   })();
 

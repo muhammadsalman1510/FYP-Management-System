@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
+import Avatar from '../../components/Avatar';
 
 const statusConfig = {
   active:    { label: 'Active',    bg: '#28a74520', color: '#28a745', dot: '#28a745' },
@@ -9,10 +10,6 @@ const statusConfig = {
   available: { label: 'Available', bg: '#ffc10720', color: '#d39e00', dot: '#ffc107' },
 };
 
-const getInitials = (name) =>
-  name ? name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() : '??';
-
-const avatarColors = ['#3c50e0', '#28a745', '#17a2b8', '#e83e8c', '#fd7e14'];
 
 const Projects = () => {
   const navigate = useNavigate();
@@ -26,7 +23,7 @@ const Projects = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
         const [projectsRes, subsRes] = await Promise.all([
@@ -263,21 +260,18 @@ const Projects = () => {
                       <div className="d-flex align-items-center gap-2">
                         <div className="d-flex">
                           {students.map((s, i) => (
-                            <div
+                            <Avatar
                               key={s._id || i}
+                              name={s.name}
+                              size={30}
                               title={s.name}
-                              className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
                               style={{
-                                width: '30px', height: '30px',
-                                fontSize: '0.65rem',
-                                backgroundColor: avatarColors[i % avatarColors.length],
                                 marginLeft: i > 0 ? '-8px' : '0',
                                 border: '2px solid #fff',
                                 zIndex: students.length - i,
+                                position: 'relative',
                               }}
-                            >
-                              {getInitials(s.name)}
-                            </div>
+                            />
                           ))}
                         </div>
                         <span className="text-muted" style={{ fontSize: '0.78rem' }}>

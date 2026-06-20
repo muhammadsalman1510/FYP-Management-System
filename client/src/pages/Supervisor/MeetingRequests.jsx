@@ -9,7 +9,7 @@ const SupervisorMeetingRequests = () => {
   const [error, setError]         = useState(null);
 
   const currentUserId = (() => {
-    try { return JSON.parse(localStorage.getItem('user'))?._id || ''; }
+    try { return JSON.parse(sessionStorage.getItem('user'))?._id || ''; }
     catch { return ''; }
   })();
 
@@ -37,7 +37,7 @@ const SupervisorMeetingRequests = () => {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
         const [meetingsRes, projectsRes] = await Promise.all([
@@ -96,7 +96,7 @@ const SupervisorMeetingRequests = () => {
     if (!respondNotes.trim()) { alert('Please provide a response message.'); return; }
     setResponding(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch(`/api/meetings/${respondMeeting._id}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -162,7 +162,7 @@ const SupervisorMeetingRequests = () => {
 
     setReqSending(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const body = {
         requestedTo:  requestedToId,
         proposedDate: reqForm.proposedDate,

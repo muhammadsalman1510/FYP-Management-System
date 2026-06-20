@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
+import Avatar from '../../components/Avatar';
 
-const getInitials = (name) =>
-  name ? name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() : '??';
-
-const avatarColors = ['#3c50e0', '#28a745', '#17a2b8', '#e83e8c', '#fd7e14'];
 
 const docTypeColors = {
   'Proposal':         '#3c50e0',
@@ -38,7 +35,7 @@ const SupervisorProjectDetail = () => {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
         const [projRes, tasksRes, subsRes, docsRes] = await Promise.all([
@@ -95,7 +92,7 @@ const SupervisorProjectDetail = () => {
     if (!reviewFeedback.trim()) { alert('Please provide feedback.'); return; }
     setReviewing(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch(`/api/tasks/submissions/${reviewSub._id}/review`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -329,12 +326,7 @@ const SupervisorProjectDetail = () => {
                   {students.map((student, i) => (
                     <div key={student._id || i} className="col-12 col-md-6">
                       <div className="d-flex align-items-center gap-3 p-3 border rounded">
-                        <div
-                          className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold flex-shrink-0"
-                          style={{ width: '42px', height: '42px', backgroundColor: avatarColors[i % avatarColors.length], fontSize: '0.85rem' }}
-                        >
-                          {getInitials(student.name)}
-                        </div>
+                        <Avatar name={student.name} size={42} />
                         <div>
                           <p className="fw-semibold text-dark mb-0 small">{student.name}</p>
                           <p className="text-muted mb-0" style={{ fontSize: '0.73rem' }}>{student.email}</p>
@@ -355,12 +347,7 @@ const SupervisorProjectDetail = () => {
               </div>
               <div className="card-body p-4">
                 <div className="d-flex align-items-center gap-3">
-                  <div
-                    className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                    style={{ width: '48px', height: '48px', backgroundColor: '#3c50e0', fontSize: '1rem' }}
-                  >
-                    {getInitials(coordinator.name)}
-                  </div>
+                  <Avatar name={coordinator.name} size={48} />
                   <div>
                     <p className="fw-semibold text-dark mb-0">{coordinator.name}</p>
                     <p className="text-muted small mb-0">Coordinator</p>

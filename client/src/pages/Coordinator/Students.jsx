@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Avatar from '../../components/Avatar';
 
 const CoordinatorStudents = () => {
   const [students, setStudents] = useState([]);
@@ -23,7 +24,7 @@ const CoordinatorStudents = () => {
   const [form, setForm] = useState(emptyForm);
 
   const getHeaders = () => ({
-    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+    'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
     'Content-Type': 'application/json',
   });
 
@@ -238,12 +239,7 @@ const CoordinatorStudents = () => {
                     <td className="px-4 py-3 text-muted small">{index + 1}</td>
                     <td className="px-4 py-3">
                       <div className="d-flex align-items-center gap-2">
-                        <div
-                          className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
-                          style={{ width: '36px', height: '36px', minWidth: '36px', backgroundColor: '#3c50e0', fontSize: '0.8rem' }}
-                        >
-                          {(student.name || '?').split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
-                        </div>
+                        <Avatar name={student.name} size={36} />
                         <div>
                           <p className="fw-medium text-dark mb-0 small">{student.name}</p>
                           <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>

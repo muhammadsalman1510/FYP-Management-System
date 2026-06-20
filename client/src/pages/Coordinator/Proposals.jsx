@@ -19,7 +19,7 @@ const CoordinatorProposals = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const res = await fetch('/api/proposals', {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         });
@@ -86,7 +86,7 @@ const CoordinatorProposals = () => {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const res = await fetch(`/api/proposals/${reviewProposal._id}/review`, {
         method:  'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },

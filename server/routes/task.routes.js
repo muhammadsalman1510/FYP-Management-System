@@ -6,12 +6,14 @@ import {
     getTasks,
     submitTask,
     getSubmissions,
+    getMySubmissions,
     reviewSubmission,
 } from '../controllers/task.controller.js';
 
 const router = express.Router();
 
-// Fixed-path routes first to avoid /:id wildcard conflicts
+// Static routes first — must appear before any /:id wildcard routes
+router.get('/submissions/my', authenticate, authorize('student'), getMySubmissions);
 router.get('/submissions', authenticate, authorize('coordinator', 'supervisor'), getSubmissions);
 router.put(
     '/submissions/:id/review',
@@ -20,7 +22,6 @@ router.put(
     reviewSubmission
 );
 
-// General task routes
 router.post('/', authenticate, authorize('coordinator', 'supervisor'), createTask);
 router.get('/', authenticate, getTasks);
 router.post('/:id/submit', authenticate, authorize('student'), upload.single('file'), submitTask);

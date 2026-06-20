@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../components/Breadcrumbs/Breadcrumb';
+import Avatar from '../components/Avatar';
 
 // student sees their coordinator's info here — read only
 // coordinator details come from project.coordinator (populated user doc)
@@ -12,7 +13,7 @@ const CoordinatorView = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const res = await fetch('/api/projects/my', {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         });
@@ -31,8 +32,6 @@ const CoordinatorView = () => {
     load();
   }, []);
 
-  const getInitials = (name) =>
-    name ? name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() : 'CO';
 
   if (loading) return (
     <>
@@ -66,21 +65,7 @@ const CoordinatorView = () => {
 
               {/* avatar + name */}
               <div className="d-flex align-items-center gap-4 mb-4 pb-4 border-bottom">
-                {coordinator.photoUrl ? (
-                  <img
-                    src={coordinator.photoUrl.startsWith('http') ? coordinator.photoUrl : `http://localhost:4000${coordinator.photoUrl}`}
-                    alt="Coordinator"
-                    className="rounded-circle"
-                    style={{ width: '72px', height: '72px', objectFit: 'cover', minWidth: '72px' }}
-                  />
-                ) : (
-                  <div
-                    className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                    style={{ width: '72px', height: '72px', minWidth: '72px', backgroundColor: '#3c50e0', fontSize: '1.5rem' }}
-                  >
-                    {getInitials(coordinator.name)}
-                  </div>
-                )}
+                <Avatar name={coordinator.name} photoUrl={coordinator.photoUrl} size={72} />
                 <div>
                   <h5 className="fw-semibold text-dark mb-1">{coordinator.name}</h5>
                   <p className="text-muted small mb-1">Project Coordinator</p>

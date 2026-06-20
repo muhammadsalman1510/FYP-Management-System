@@ -51,13 +51,13 @@ import SupervisorMeetingRequests from './pages/Supervisor/MeetingRequests';
 import SupervisorAnnouncements from './pages/Supervisor/Announcements';
 import SupervisorProfile from './pages/Supervisor/Profile';
 
-// Reads the user's role from localStorage.
+// Reads the user's role from sessionStorage.
 // Prefers the explicit 'role' key; falls back to parsing the 'user' JSON object.
 const getStoredRole = () => {
-  const explicit = localStorage.getItem('role');
+  const explicit = sessionStorage.getItem('role');
   if (explicit) return explicit;
   try {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     return user?.role || null;
   } catch {
     return null;
@@ -65,10 +65,10 @@ const getStoredRole = () => {
 };
 
 // Redirects already-authenticated users away from the login page to their dashboard.
-// Only redirects if both a token and a role are present in localStorage.
+// Only redirects if both a token and a role are present in sessionStorage.
 const AuthRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
-  const role = localStorage.getItem('role');
+  const token = sessionStorage.getItem('token');
+  const role = sessionStorage.getItem('role');
   if (token && role) {
     if (role === 'coordinator') return <Navigate to="/coordinator/dashboard" replace />;
     if (role === 'supervisor')  return <Navigate to="/supervisor/dashboard" replace />;
@@ -79,7 +79,7 @@ const AuthRoute = ({ children }) => {
 
 // Guards a route. Redirects to login if no token; redirects to own dashboard if wrong role.
 const ProtectedRoute = ({ children, role }) => {
-  const token    = localStorage.getItem('token');
+  const token    = sessionStorage.getItem('token');
   const userRole = getStoredRole();
 
   if (!token) return <Navigate to="/" replace />;

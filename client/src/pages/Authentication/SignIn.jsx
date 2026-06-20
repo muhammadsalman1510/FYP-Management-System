@@ -25,10 +25,10 @@ const SignIn = () => {
       });
 
       // Store token + full user object + individual keys for Header and ProtectedRoute
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user',  JSON.stringify(data.user));
-      localStorage.setItem('name',  data.user.name);
-      localStorage.setItem('role',  data.user.role);
+      sessionStorage.setItem('token', data.token);
+      sessionStorage.setItem('user',  JSON.stringify(data.user));
+      sessionStorage.setItem('name',  data.user.name);
+      sessionStorage.setItem('role',  data.user.role);
 
       // Navigate based on role
       switch (data.user.role) {

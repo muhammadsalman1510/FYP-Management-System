@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
+import Avatar from '../../components/Avatar';
 
 const Status = () => {
   const [project, setProject] = useState(null);
@@ -8,7 +9,7 @@ const Status = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
     const fetchData = async () => {
@@ -45,8 +46,6 @@ const Status = () => {
     });
   };
 
-  const getInitials = (name) =>
-    name ? name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() : '??';
 
   if (loading) {
     return (
@@ -270,15 +269,7 @@ const Status = () => {
                 {students.map((member, i) => (
                   <div key={member._id || i} className="col-12 col-md-6">
                     <div className="d-flex align-items-center gap-3 p-3 border rounded">
-                      <div
-                        className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                        style={{
-                          width: '40px', height: '40px', minWidth: '40px',
-                          backgroundColor: '#3c50e0', fontSize: '0.85rem',
-                        }}
-                      >
-                        {getInitials(member.name)}
-                      </div>
+                      <Avatar name={member.name} size={40} />
                       <div>
                         <p className="fw-semibold text-dark mb-0 small">{member.name}</p>
                         <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>{member.email}</p>
@@ -307,12 +298,7 @@ const Status = () => {
                   supervisors.map((sup, i) => (
                     <div key={sup._id || i} className={i > 0 ? 'mt-3 pt-3 border-top' : 'mb-3'}>
                       <div className="d-flex align-items-center gap-3 mb-2">
-                        <div
-                          className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                          style={{ width: '48px', height: '48px', minWidth: '48px', backgroundColor: '#28a745', fontSize: '1rem' }}
-                        >
-                          {getInitials(sup.name)}
-                        </div>
+                        <Avatar name={sup.name} size={48} />
                         <div>
                           <p className="fw-semibold text-dark mb-0">{sup.name}</p>
                           <p className="text-muted small mb-0">Supervisor</p>
@@ -341,12 +327,7 @@ const Status = () => {
                 {coordinator ? (
                   <>
                     <div className="d-flex align-items-center gap-3 mb-3">
-                      <div
-                        className="d-flex align-items-center justify-content-center rounded-circle text-white fw-bold"
-                        style={{ width: '48px', height: '48px', minWidth: '48px', backgroundColor: '#3c50e0', fontSize: '1rem' }}
-                      >
-                        {getInitials(coordinator.name)}
-                      </div>
+                      <Avatar name={coordinator.name} size={48} />
                       <div>
                         <p className="fw-semibold text-dark mb-0">{coordinator.name}</p>
                         <p className="text-muted small mb-0">Coordinator</p>
