@@ -9,6 +9,10 @@ const SupervisorMeetingRequests = () => {
   const [error, setError]         = useState(null);
   const [cancelError, setCancelError] = useState('');
 
+  // Per-card reply state for coordinator-originated meetings
+  // shape: { [meetingId]: { text, sending, success, error } }
+  const [replyStates, setReplyStates] = useState({});
+
   const currentUserId = (() => {
     try { return JSON.parse(sessionStorage.getItem('user'))?._id || ''; }
     catch { return ''; }
@@ -62,9 +66,41 @@ const SupervisorMeetingRequests = () => {
     fetchAll();
   }, []);
 
-  const pendingCount       = meetings.filter((m) => m.status === 'pending').length;
-  const displayedMeetings  = activeTab === 'all' ? meetings : meetings.filter((m) => m.status === 'pending');
+  const pendingCount      = meetings.filter((m) => m.status === 'pending').length;
+  const displayedMeetings = activeTab === 'all' ? meetings : meetings.filter((m) => m.status === 'pending');
 
+  // ── Reply state helpers ───────────────────────────────────────────────────
+  const getRS = (id) =>
+    replyStates[String(id)] || { text: '', sending: false, success: false, error: '' };
+
+  const setRS = (id, updates) =>
+    setReplyStates((prev) => ({
+      ...prev,
+      [String(id)]: { ...(prev[String(id)] || { text: '', sending: false, success: false, error: '' }), ...updates },
+    }));
+
+  const sendReply = async (meetingId) => {
+    const rs = getRS(meetingId);
+    if (!rs.text.trim()) { setRS(meetingId, { error: 'Please enter a reply.' }); return; }
+    setRS(meetingId, { sending: true, error: '' });
+    try {
+      const res = await fetch(`/api/meetings/${meetingId}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ studentReply: rs.text.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to send reply');
+      setMeetings((prev) =>
+        prev.map((m) => m._id === meetingId ? { ...m, studentReply: rs.text.trim() } : m)
+      );
+      setRS(meetingId, { sending: false, success: true, text: '' });
+    } catch (err) {
+      setRS(meetingId, { sending: false, error: err.message });
+    }
+  };
+
+  // ── Respond to student meeting request ───────────────────────────────────
   const openRespond = (meeting, decision) => {
     setRespondMeeting(meeting);
     setRespondDecision(decision);
@@ -145,8 +181,8 @@ const SupervisorMeetingRequests = () => {
     if (reqForm.meetWith === 'coordinator') {
       const coordinatorId = selectedProject?.coordinator?._id;
       if (!coordinatorId) { setReqError('No coordinator assigned to this project.'); return; }
-      body.requestedTo  = coordinatorId;
-      body.meetingType  = 'requested';
+      body.requestedTo = coordinatorId;
+      body.meetingType = 'requested';
     } else {
       // student path — schedule meeting for all students in the project
       body.meetWith = 'project';
@@ -283,13 +319,18 @@ const SupervisorMeetingRequests = () => {
           </div>
         ) : (
           displayedMeetings.map((m) => {
-            const isOutgoing   = String(m.requestedBy?._id || m.requestedBy) === String(currentUserId);
-            const otherPerson  = isOutgoing ? m.requestedTo : m.requestedBy;
-            const canRespond   = m.status === 'pending' && !isOutgoing;
+            const isOutgoing        = String(m.requestedBy?._id || m.requestedBy) === String(currentUserId);
+            const otherPerson       = isOutgoing ? m.requestedTo : m.requestedBy;
+            // Only student-originated incoming requests get Approve/Reject buttons
+            const canRespond        = m.status === 'pending' && !isOutgoing && m.requestedBy?.role === 'student';
+            // Incoming meeting from coordinator — show reply box instead of approve/reject
+            const isCoordinatorMtg  = !isOutgoing && m.requestedBy?.role === 'coordinator';
             // Supervisor can only cancel meetings they created with students
-            const canCancel    = isOutgoing &&
-                                 m.meetingType === 'scheduled' &&
-                                 m.requestedTo?.role === 'student';
+            const canCancel         = isOutgoing &&
+                                      m.meetingType === 'scheduled' &&
+                                      m.requestedTo?.role === 'student';
+
+            const rs = getRS(m._id);
 
             return (
               <div key={m._id} className="card shadow-sm border-0">
@@ -300,7 +341,7 @@ const SupervisorMeetingRequests = () => {
                         {otherPerson?.role && (
                           <span
                             className={`badge rounded-pill px-2 small ${
-                              otherPerson.role === 'student' ? 'bg-primary' :
+                              otherPerson.role === 'student'     ? 'bg-primary' :
                               otherPerson.role === 'coordinator' ? 'bg-secondary' : 'bg-info text-dark'
                             }`}
                           >
@@ -345,7 +386,8 @@ const SupervisorMeetingRequests = () => {
                     </div>
                   )}
 
-                  {m.studentReply && (
+                  {/* Student's reply — shown for student meetings only */}
+                  {m.studentReply && !isCoordinatorMtg && (
                     <div className="alert alert-secondary py-2 px-3 mt-2 mb-2">
                       <p className="small mb-0">
                         <strong>Student's reply:</strong> {m.studentReply}
@@ -353,6 +395,57 @@ const SupervisorMeetingRequests = () => {
                     </div>
                   )}
 
+                  {/* Reply section for coordinator-originated meetings */}
+                  {isCoordinatorMtg && (
+                    <div className="mt-3">
+                      {m.studentReply ? (
+                        <div className="alert alert-light border py-2 px-3 mb-0">
+                          <p className="small mb-0">
+                            <strong>Your Reply:</strong> {m.studentReply}
+                          </p>
+                          {rs.success && (
+                            <p className="text-success small mt-1 mb-0">✓ Reply sent.</p>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          {rs.error && (
+                            <div className="alert alert-danger border-0 py-2 px-3 small mb-2">{rs.error}</div>
+                          )}
+                          {rs.success ? (
+                            <div className="alert alert-success border-0 py-2 px-3 small mb-0">
+                              ✓ Reply sent successfully.
+                            </div>
+                          ) : (
+                            <div className="d-flex flex-column gap-2">
+                              <label className="form-label fw-medium text-dark small mb-0">Your Reply</label>
+                              <textarea
+                                className="form-control"
+                                rows={2}
+                                placeholder="Type your reply…"
+                                value={rs.text}
+                                onChange={(e) => setRS(m._id, { text: e.target.value, error: '' })}
+                              />
+                              <div>
+                                <button
+                                  className="btn btn-primary btn-sm px-4 fw-medium"
+                                  onClick={() => sendReply(m._id)}
+                                  disabled={rs.sending}
+                                >
+                                  {rs.sending && (
+                                    <span className="spinner-border spinner-border-sm me-2" role="status" />
+                                  )}
+                                  Send Reply
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Approve/Reject/Cancel buttons — student meetings only */}
                   {(canRespond || canCancel) && (
                     <div className="d-flex gap-2 mt-3">
                       {canRespond && (

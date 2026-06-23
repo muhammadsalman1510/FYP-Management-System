@@ -29,7 +29,7 @@ export const createMeeting = async (req, res) => {
             }
         }
 
-        // ── Coordinator scheduling for an entire project ─────────────────────
+        // ── Coordinator/supervisor scheduling for an entire project ───────────
         if (meetWith === 'project') {
             if (!projectId) {
                 return res.status(400).json({ success: false, message: 'projectId is required for project meetings' });
@@ -84,6 +84,52 @@ export const createMeeting = async (req, res) => {
 
 export const getMeetings = async (req, res) => {
     try {
+        if (req.user.role === 'student') {
+            // Own meetings (any status)
+            const ownConditions = [
+                { requestedBy: req.user._id },
+                { requestedTo: req.user._id },
+            ];
+
+            // Find groupmates from the same project
+            const project = await Project.findOne({ students: req.user._id })
+                .select('students')
+                .lean();
+
+            const groupmateIds = project
+                ? project.students
+                    .map((id) => id.toString())
+                    .filter((id) => id !== req.user._id.toString())
+                : [];
+
+            const orConditions = [...ownConditions];
+            if (groupmateIds.length > 0) {
+                // Include groupmates' approved meetings so students can see group activity
+                orConditions.push(
+                    { requestedTo: { $in: groupmateIds }, status: 'approved' },
+                    { requestedBy: { $in: groupmateIds }, status: 'approved' },
+                );
+            }
+
+            const meetings = await Meeting.find({ $or: orConditions })
+                .populate('requestedBy', 'name email role')
+                .populate('requestedTo', 'name email role')
+                .populate('projectId', 'title')
+                .sort({ createdAt: -1 });
+
+            // Deduplicate by _id (safety net — MongoDB $or never returns dupes)
+            const seen = new Set();
+            const deduped = meetings.filter((m) => {
+                const id = m._id.toString();
+                if (seen.has(id)) return false;
+                seen.add(id);
+                return true;
+            });
+
+            return res.status(200).json({ success: true, data: deduped });
+        }
+
+        // Non-student roles: unchanged
         const meetings = await Meeting.find({
             $or: [{ requestedBy: req.user._id }, { requestedTo: req.user._id }],
         })
@@ -134,7 +180,7 @@ export const updateMeeting = async (req, res) => {
             meeting.notes = notes !== undefined ? notes : (meeting.notes || '');
         }
 
-        // Student reply — any party to the meeting
+        // Reply — any party to the meeting
         if (studentReply !== undefined) {
             meeting.studentReply = studentReply;
         }
@@ -155,16 +201,13 @@ export const deleteMeeting = async (req, res) => {
         }
 
         if (req.user.role === 'coordinator') {
-            // Can delete any meeting they created
             if (meeting.requestedBy.toString() !== req.user._id.toString()) {
                 return res.status(403).json({ success: false, message: 'You can only cancel meetings you created.' });
             }
         } else if (req.user.role === 'supervisor') {
-            // Must have created it
             if (meeting.requestedBy.toString() !== req.user._id.toString()) {
                 return res.status(403).json({ success: false, message: 'You can only cancel meetings you created.' });
             }
-            // Recipient must be a student
             const recipientRole = meeting.requestedTo?.role;
             if (recipientRole !== 'student') {
                 return res.status(403).json({ success: false, message: 'You can only cancel meetings with students.' });

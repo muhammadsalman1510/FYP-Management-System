@@ -151,6 +151,11 @@ const MeetingRequests = () => {
     return 'bg-secondary';
   };
 
+  // Classify each meeting
+  const isOwnMeeting = (m) =>
+    String(m.requestedBy?._id || m.requestedBy) === String(currentUserId) ||
+    String(m.requestedTo?._id  || m.requestedTo) === String(currentUserId);
+
   if (loading) {
     return (
       <>
@@ -172,13 +177,6 @@ const MeetingRequests = () => {
       </>
     );
   }
-
-  // Show all meetings where student is involved (both outgoing and incoming)
-  const myMeetings = meetings.filter(
-    (m) =>
-      String(m.requestedBy?._id || m.requestedBy) === String(currentUserId) ||
-      String(m.requestedTo?._id  || m.requestedTo)  === String(currentUserId)
-  );
 
   const supervisorName  = project?.supervisors?.[0]?.name || '';
   const coordinatorName = project?.coordinator?.name       || '';
@@ -211,13 +209,82 @@ const MeetingRequests = () => {
             )}
 
             <div className="card-body p-4">
-              {myMeetings.length === 0 ? (
+              {meetings.length === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-muted mb-0">No meetings yet.</p>
                 </div>
               ) : (
                 <div className="d-flex flex-column gap-4">
-                  {myMeetings.map((m) => {
+                  {meetings.map((m) => {
+                    const own = isOwnMeeting(m);
+
+                    if (!own) {
+                      // ── Groupmate meeting card ──────────────────────────────
+                      // One of requestedBy/requestedTo is the groupmate (student),
+                      // the other is the supervisor/coordinator they met with.
+                      const groupmate = m.requestedTo?.role === 'student'
+                        ? m.requestedTo
+                        : m.requestedBy;
+                      const withPerson = m.requestedTo?.role !== 'student'
+                        ? m.requestedTo
+                        : m.requestedBy;
+
+                      return (
+                        <div key={m._id} className="border rounded p-4" style={{ borderLeft: '3px solid #6f42c1 !important' }}>
+                          <div className="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                              <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                                <span
+                                  className="badge rounded-pill px-2"
+                                  style={{ backgroundColor: '#6f42c1', color: '#fff', fontSize: '0.65rem' }}
+                                >
+                                  Group
+                                </span>
+                                <h5 className="fw-semibold text-dark mb-0">{m.topic}</h5>
+                              </div>
+
+                              <p className="text-muted mb-1 small">
+                                Group Meeting —{' '}
+                                <strong className="text-dark">{groupmate?.name || '—'}</strong>
+                                <span className="ms-1 badge rounded-pill bg-secondary" style={{ fontSize: '0.65rem' }}>
+                                  Student
+                                </span>
+                              </p>
+
+                              <p className="text-muted mb-1 small">
+                                With:{' '}
+                                <strong className="text-dark">{withPerson?.name || '—'}</strong>
+                                {withPerson?.role && (
+                                  <span className={`ms-1 badge rounded-pill ${getRoleBadgeClass(withPerson.role)}`} style={{ fontSize: '0.65rem' }}>
+                                    {withPerson.role.charAt(0).toUpperCase() + withPerson.role.slice(1)}
+                                  </span>
+                                )}
+                              </p>
+
+                              <p className="text-muted mb-1 small">
+                                Date:{' '}
+                                <strong className="text-dark">{formatDate(m.proposedDate)}</strong>
+                                {' '}at{' '}
+                                <strong className="text-dark">{m.proposedTime}</strong>
+                              </p>
+                              {m.location && (
+                                <p className="text-muted mb-1 small">
+                                  Location: <strong className="text-dark">📍 {m.location}</strong>
+                                </p>
+                              )}
+                              {m.projectId?.title && (
+                                <p className="text-muted mb-0 small">
+                                  Project: <strong className="text-dark">{m.projectId.title}</strong>
+                                </p>
+                              )}
+                            </div>
+                            <span className="badge rounded-pill px-3 py-2 bg-success">Approved</span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // ── Own meeting card ──────────────────────────────────────
                     const isOutgoing  = String(m.requestedBy?._id || m.requestedBy) === String(currentUserId);
                     const otherPerson = isOutgoing ? m.requestedTo : m.requestedBy;
                     const otherRole   = otherPerson?.role || '';
@@ -283,7 +350,6 @@ const MeetingRequests = () => {
                           </span>
                         </div>
 
-                        {/* Response / approval notes from coordinator or supervisor */}
                         {m.notes && (
                           <div className={`alert py-2 px-3 mt-2 mb-2 ${m.status === 'approved' ? 'alert-success' : 'alert-danger'}`}>
                             <p className="small mb-0">
@@ -293,7 +359,7 @@ const MeetingRequests = () => {
                           </div>
                         )}
 
-                        {/* Student's own reply (read-only here — reply is sent from Calendar) */}
+                        {/* Student's own reply — read-only here; reply sent from Calendar */}
                         {m.studentReply && (
                           <div className="alert alert-light border py-2 px-3 mt-2 mb-0">
                             <p className="small mb-0">

@@ -31,12 +31,9 @@ const Calendar = () => {
         const res  = await fetch('/api/meetings', { headers });
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.message || 'Failed to load meetings');
-        // Student sees only meetings they are requestedTo with status=approved
-        const filtered = (data.data || []).filter(
-          (m) =>
-            m.status === 'approved' &&
-            String(m.requestedTo?._id || m.requestedTo) === currentUserId
-        );
+        // Backend already returns only meetings relevant to this student.
+        // Show all approved meetings — own (requestedBy or requestedTo) + groupmates'.
+        const filtered = (data.data || []).filter((m) => m.status === 'approved');
         setMeetings(filtered);
       } catch (err) {
         setError(err.message);
@@ -62,9 +59,11 @@ const Calendar = () => {
     else setCurrentMonth((m) => m + 1);
   };
 
+  // Find the non-student party to determine color regardless of direction or groupmate meetings
   const getMeetingColor = (meeting) => {
-    const sender = meeting.requestedBy;
-    return sender?.role === 'supervisor' ? '#3c50e0' : '#28a745';
+    const parties = [meeting.requestedBy, meeting.requestedTo];
+    const nonStudent = parties.find((p) => p?.role && p.role !== 'student');
+    return nonStudent?.role === 'supervisor' ? '#3c50e0' : '#28a745';
   };
 
   const getMeetingsForDay = (day) =>
@@ -129,13 +128,21 @@ const Calendar = () => {
 
   const getRoleBadge = (role) => {
     if (!role) return null;
-    const colors = { supervisor: 'bg-info text-dark', coordinator: 'bg-primary' };
+    const colors = { supervisor: 'bg-info text-dark', coordinator: 'bg-primary', student: 'bg-secondary' };
     return (
       <span className={`badge rounded-pill px-2 ms-1 ${colors[role] || 'bg-secondary'}`} style={{ fontSize: '0.65rem' }}>
         {role.charAt(0).toUpperCase() + role.slice(1)}
       </span>
     );
   };
+
+  // For the selected meeting modal
+  const isOwnSelected = selectedMeeting && (
+    String(selectedMeeting.requestedBy?._id || selectedMeeting.requestedBy) === currentUserId ||
+    String(selectedMeeting.requestedTo?._id  || selectedMeeting.requestedTo) === currentUserId
+  );
+  const isOutgoingSelected = selectedMeeting &&
+    String(selectedMeeting.requestedBy?._id || selectedMeeting.requestedBy) === currentUserId;
 
   return (
     <>
@@ -203,7 +210,9 @@ const Calendar = () => {
                                 </span>
                                 <div className="d-flex flex-column gap-1">
                                   {dayMeetings.map((m) => {
-                                    const sender = m.requestedBy;
+                                    const nonStudentParty = [m.requestedBy, m.requestedTo].find(
+                                      (p) => p?.role && p.role !== 'student'
+                                    );
                                     const locationStr = m.location ? ` | 📍 ${m.location}` : '';
                                     return (
                                       <div
@@ -216,7 +225,7 @@ const Calendar = () => {
                                           lineHeight: '1.3',
                                           cursor: 'pointer',
                                         }}
-                                        title={`${m.topic} — ${sender?.name || '—'} at ${m.proposedTime}${locationStr}`}
+                                        title={`${m.topic} — ${nonStudentParty?.name || '—'} at ${m.proposedTime}${locationStr}`}
                                         onClick={() => openMeetingModal(m)}
                                       >
                                         <div className="fw-semibold">{m.topic}</div>
@@ -273,23 +282,60 @@ const Calendar = () => {
                 style={{ backgroundColor: getMeetingColor(selectedMeeting), color: '#fff' }}
               >
                 <h5 className="modal-title fw-semibold mb-0">{selectedMeeting.topic}</h5>
-                <button
-                  className="btn-close btn-close-white"
-                  onClick={closeMeetingModal}
-                />
+                <button className="btn-close btn-close-white" onClick={closeMeetingModal} />
               </div>
 
               <div className="modal-body px-4 py-4">
 
+                {/* Group meeting notice */}
+                {!isOwnSelected && (
+                  <div className="alert alert-info border-0 py-2 px-3 small mb-3">
+                    This is a groupmate's meeting. You can view it but cannot send a reply.
+                  </div>
+                )}
+
                 <div className="mb-4">
                   <div className="d-flex flex-column gap-2">
-                    <div className="d-flex gap-2 small">
-                      <span className="text-muted" style={{ minWidth: '70px' }}>From:</span>
-                      <span className="fw-medium text-dark">
-                        {selectedMeeting.requestedBy?.name || '—'}
-                        {getRoleBadge(selectedMeeting.requestedBy?.role)}
-                      </span>
-                    </div>
+                    {isOwnSelected ? (
+                      <div className="d-flex gap-2 small">
+                        <span className="text-muted" style={{ minWidth: '70px' }}>
+                          {isOutgoingSelected ? 'To:' : 'From:'}
+                        </span>
+                        <span className="fw-medium text-dark">
+                          {isOutgoingSelected
+                            ? (selectedMeeting.requestedTo?.name || '—')
+                            : (selectedMeeting.requestedBy?.name || '—')}
+                          {getRoleBadge(isOutgoingSelected
+                            ? selectedMeeting.requestedTo?.role
+                            : selectedMeeting.requestedBy?.role)}
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="d-flex gap-2 small">
+                          <span className="text-muted" style={{ minWidth: '70px' }}>Groupmate:</span>
+                          <span className="fw-medium text-dark">
+                            {selectedMeeting.requestedTo?.role === 'student'
+                              ? selectedMeeting.requestedTo?.name
+                              : selectedMeeting.requestedBy?.name}
+                            {getRoleBadge('student')}
+                          </span>
+                        </div>
+                        <div className="d-flex gap-2 small">
+                          <span className="text-muted" style={{ minWidth: '70px' }}>With:</span>
+                          <span className="fw-medium text-dark">
+                            {selectedMeeting.requestedTo?.role !== 'student'
+                              ? selectedMeeting.requestedTo?.name
+                              : selectedMeeting.requestedBy?.name}
+                            {getRoleBadge(
+                              selectedMeeting.requestedTo?.role !== 'student'
+                                ? selectedMeeting.requestedTo?.role
+                                : selectedMeeting.requestedBy?.role
+                            )}
+                          </span>
+                        </div>
+                      </>
+                    )}
                     <div className="d-flex gap-2 small">
                       <span className="text-muted" style={{ minWidth: '70px' }}>Date:</span>
                       <span className="fw-medium text-dark">{formatDate(selectedMeeting.proposedDate)}</span>
@@ -313,49 +359,52 @@ const Calendar = () => {
                   </div>
                 </div>
 
-                <hr className="my-3" />
-
-                {/* Reply section */}
-                {selectedMeeting.studentReply ? (
-                  <div>
-                    <p className="fw-medium text-dark small mb-2">Your reply:</p>
-                    <div className="alert alert-success border-0 py-2 px-3 mb-0">
-                      <p className="small mb-0">{selectedMeeting.studentReply}</p>
-                    </div>
-                    {replySuccess && (
-                      <p className="text-success small mt-2 mb-0">✓ Reply sent successfully.</p>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <label className="form-label fw-medium text-dark small">Send a Reply</label>
-                    {replyError && (
-                      <div className="alert alert-danger border-0 py-2 px-3 small mb-2">{replyError}</div>
-                    )}
-                    {replySuccess ? (
-                      <div className="alert alert-success border-0 py-2 px-3 small mb-0">
-                        ✓ Reply sent successfully.
+                {/* Reply section — own meetings only */}
+                {isOwnSelected && (
+                  <>
+                    <hr className="my-3" />
+                    {selectedMeeting.studentReply ? (
+                      <div>
+                        <p className="fw-medium text-dark small mb-2">Your reply:</p>
+                        <div className="alert alert-success border-0 py-2 px-3 mb-0">
+                          <p className="small mb-0">{selectedMeeting.studentReply}</p>
+                        </div>
+                        {replySuccess && (
+                          <p className="text-success small mt-2 mb-0">✓ Reply sent successfully.</p>
+                        )}
                       </div>
                     ) : (
-                      <>
-                        <textarea
-                          className="form-control mb-2"
-                          rows={3}
-                          placeholder="Type your reply here…"
-                          value={replyText}
-                          onChange={(e) => { setReplyText(e.target.value); setReplyError(''); }}
-                        />
-                        <button
-                          className="btn btn-primary btn-sm px-4 fw-medium"
-                          onClick={handleSendReply}
-                          disabled={replySending}
-                        >
-                          {replySending && <span className="spinner-border spinner-border-sm me-2" role="status" />}
-                          Send Reply
-                        </button>
-                      </>
+                      <div>
+                        <label className="form-label fw-medium text-dark small">Send a Reply</label>
+                        {replyError && (
+                          <div className="alert alert-danger border-0 py-2 px-3 small mb-2">{replyError}</div>
+                        )}
+                        {replySuccess ? (
+                          <div className="alert alert-success border-0 py-2 px-3 small mb-0">
+                            ✓ Reply sent successfully.
+                          </div>
+                        ) : (
+                          <>
+                            <textarea
+                              className="form-control mb-2"
+                              rows={3}
+                              placeholder="Type your reply here…"
+                              value={replyText}
+                              onChange={(e) => { setReplyText(e.target.value); setReplyError(''); }}
+                            />
+                            <button
+                              className="btn btn-primary btn-sm px-4 fw-medium"
+                              onClick={handleSendReply}
+                              disabled={replySending}
+                            >
+                              {replySending && <span className="spinner-border spinner-border-sm me-2" role="status" />}
+                              Send Reply
+                            </button>
+                          </>
+                        )}
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
 
               </div>
