@@ -28,7 +28,7 @@ const SupervisorMeetingRequests = () => {
   // New meeting modal
   const [requestModal, setRequestModal] = useState(false);
   const [reqForm, setReqForm] = useState({
-    meetWith: '', studentId: '', projectId: '',
+    meetWith: '', projectId: '',
     proposedDate: '', proposedTime: '', topic: '', location: '',
   });
   const [reqError, setReqError]     = useState('');
@@ -62,18 +62,8 @@ const SupervisorMeetingRequests = () => {
     fetchAll();
   }, []);
 
-  const allStudents = projects.reduce((acc, project) => {
-    (project.students || []).forEach((student) => {
-      if (!student || !student._id) return;
-      if (!acc.find((s) => String(s._id) === String(student._id))) acc.push(student);
-    });
-    return acc;
-  }, []);
-
-  const pendingCount = meetings.filter((m) => m.status === 'pending').length;
-  const displayedMeetings = activeTab === 'all'
-    ? meetings
-    : meetings.filter((m) => m.status === 'pending');
+  const pendingCount       = meetings.filter((m) => m.status === 'pending').length;
+  const displayedMeetings  = activeTab === 'all' ? meetings : meetings.filter((m) => m.status === 'pending');
 
   const openRespond = (meeting, decision) => {
     setRespondMeeting(meeting);
@@ -123,7 +113,7 @@ const SupervisorMeetingRequests = () => {
   };
 
   const openRequestModal = () => {
-    setReqForm({ meetWith: '', studentId: '', projectId: '', proposedDate: '', proposedTime: '', topic: '', location: '' });
+    setReqForm({ meetWith: '', projectId: '', proposedDate: '', proposedTime: '', topic: '', location: '' });
     setReqError('');
     setReqSuccess(false);
     setRequestModal(true);
@@ -137,45 +127,33 @@ const SupervisorMeetingRequests = () => {
 
   const handleSendRequest = async () => {
     setReqError('');
-    if (!reqForm.meetWith)       { setReqError('Please select who you want to meet with.'); return; }
-    if (!reqForm.proposedDate)   { setReqError('Please select a date.'); return; }
-    if (!reqForm.proposedTime)   { setReqError('Please select a time.'); return; }
-    if (!reqForm.topic.trim())   { setReqError('Please enter a topic.'); return; }
+    if (!reqForm.meetWith)     { setReqError('Please select who you want to meet with.'); return; }
+    if (!reqForm.proposedDate) { setReqError('Please select a date.'); return; }
+    if (!reqForm.proposedTime) { setReqError('Please select a time.'); return; }
+    if (!reqForm.topic.trim()) { setReqError('Please enter a topic.'); return; }
+    if (!reqForm.projectId)    { setReqError('Please select a project.'); return; }
 
-    let requestedToId = '';
-    let projectId     = null;
-    let meetingType   = undefined; // let backend decide for student; send 'requested' for coordinator
+    const selectedProject = projects.find((p) => p._id === reqForm.projectId);
+    let body = {
+      proposedDate: reqForm.proposedDate,
+      proposedTime: reqForm.proposedTime,
+      topic:        reqForm.topic.trim(),
+      location:     reqForm.location.trim(),
+      projectId:    reqForm.projectId,
+    };
 
     if (reqForm.meetWith === 'coordinator') {
-      if (!reqForm.projectId) { setReqError('Please select a project.'); return; }
-      const selectedProject = projects.find((p) => p._id === reqForm.projectId);
       const coordinatorId = selectedProject?.coordinator?._id;
       if (!coordinatorId) { setReqError('No coordinator assigned to this project.'); return; }
-      requestedToId = coordinatorId;
-      projectId     = reqForm.projectId;
-      meetingType   = 'requested';
+      body.requestedTo  = coordinatorId;
+      body.meetingType  = 'requested';
     } else {
-      if (!reqForm.studentId) { setReqError('Please select a student.'); return; }
-      requestedToId = reqForm.studentId;
-      const proj = projects.find((p) =>
-        (p.students || []).some((s) => String(s._id || s) === String(reqForm.studentId))
-      );
-      if (proj) projectId = proj._id;
-      // no meetingType → backend defaults to 'scheduled' for supervisor
+      // student path — schedule meeting for all students in the project
+      body.meetWith = 'project';
     }
 
     setReqSending(true);
     try {
-      const body = {
-        requestedTo:  requestedToId,
-        proposedDate: reqForm.proposedDate,
-        proposedTime: reqForm.proposedTime,
-        topic:        reqForm.topic.trim(),
-        location:     reqForm.location.trim(),
-      };
-      if (projectId)   body.projectId   = projectId;
-      if (meetingType) body.meetingType  = meetingType;
-
       const res = await fetch('/api/meetings', {
         method: 'POST',
         headers,
@@ -184,7 +162,8 @@ const SupervisorMeetingRequests = () => {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to send meeting request');
 
-      setMeetings((prev) => [data.data, ...prev]);
+      const newData = Array.isArray(data.data) ? data.data : [data.data];
+      setMeetings((prev) => [...newData, ...prev]);
       setReqSuccess(true);
       setTimeout(() => {
         setReqSuccess(false);
@@ -213,7 +192,7 @@ const SupervisorMeetingRequests = () => {
   };
 
   const modalTitle = () => {
-    if (reqForm.meetWith === 'student')     return 'Create Meeting with Student';
+    if (reqForm.meetWith === 'student')     return 'Schedule Meeting with Students';
     if (reqForm.meetWith === 'coordinator') return 'Request Meeting with Coordinator';
     return 'New Meeting';
   };
@@ -468,7 +447,7 @@ const SupervisorMeetingRequests = () => {
 
                 {reqSuccess && (
                   <div className="alert alert-success border-0 small py-2 mb-3">
-                    <strong>{reqForm.meetWith === 'student' ? 'Meeting scheduled!' : 'Request sent!'}</strong>
+                    <strong>{reqForm.meetWith === 'student' ? 'Meeting scheduled for all students!' : 'Request sent!'}</strong>
                   </div>
                 )}
                 {reqError && (
@@ -482,39 +461,17 @@ const SupervisorMeetingRequests = () => {
                     className="form-select"
                     value={reqForm.meetWith}
                     onChange={(e) => setReqForm((prev) => ({
-                      ...prev, meetWith: e.target.value, studentId: '', projectId: '',
+                      ...prev, meetWith: e.target.value, projectId: '',
                     }))}
                   >
                     <option value="">— Select —</option>
-                    <option value="student">Student</option>
+                    <option value="student">Student(s)</option>
                     <option value="coordinator">Coordinator</option>
                   </select>
                 </div>
 
-                {/* Student picker */}
-                {reqForm.meetWith === 'student' && (
-                  <div className="mb-3">
-                    <label className="form-label fw-medium text-dark small">Select Student *</label>
-                    <select
-                      className="form-select"
-                      value={reqForm.studentId}
-                      onChange={(e) => setReqForm((prev) => ({ ...prev, studentId: e.target.value }))}
-                    >
-                      <option value="">— Select a student —</option>
-                      {allStudents.map((s) => (
-                        <option key={s._id} value={s._id}>
-                          {s.name}{s.email ? ` (${s.email})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    {allStudents.length === 0 && (
-                      <p className="text-muted small mt-1 mb-0">No students found on your assigned projects.</p>
-                    )}
-                  </div>
-                )}
-
-                {/* Project picker (coordinator path) */}
-                {reqForm.meetWith === 'coordinator' && (
+                {/* Project picker — shown for BOTH student and coordinator paths */}
+                {reqForm.meetWith !== '' && (
                   <div className="mb-3">
                     <label className="form-label fw-medium text-dark small">Select Project *</label>
                     <select
@@ -524,12 +481,33 @@ const SupervisorMeetingRequests = () => {
                     >
                       <option value="">— Select a project —</option>
                       {projects.map((p) => (
-                        <option key={p._id} value={p._id} disabled={!p.coordinator}>
-                          {p.title}{!p.coordinator ? ' (no coordinator)' : ''}
+                        <option
+                          key={p._id}
+                          value={p._id}
+                          disabled={reqForm.meetWith === 'coordinator' && !p.coordinator}
+                        >
+                          {p.title}
+                          {reqForm.meetWith === 'coordinator' && !p.coordinator ? ' (no coordinator)' : ''}
                         </option>
                       ))}
                     </select>
-                    {reqForm.projectId && (() => {
+
+                    {/* Preview for student path */}
+                    {reqForm.meetWith === 'student' && reqForm.projectId && (() => {
+                      const proj = projects.find((p) => p._id === reqForm.projectId);
+                      const names = (proj?.students || []).map((s) => s.name).filter(Boolean).join(', ');
+                      return names ? (
+                        <p className="text-muted small mt-1 mb-0">
+                          This meeting will be sent to:{' '}
+                          <strong className="text-dark">{names}</strong>
+                        </p>
+                      ) : (
+                        <p className="text-muted small mt-1 mb-0">No students assigned to this project yet.</p>
+                      );
+                    })()}
+
+                    {/* Preview for coordinator path */}
+                    {reqForm.meetWith === 'coordinator' && reqForm.projectId && (() => {
                       const proj = projects.find((p) => p._id === reqForm.projectId);
                       return proj?.coordinator ? (
                         <p className="text-muted small mt-1 mb-0">
@@ -592,7 +570,7 @@ const SupervisorMeetingRequests = () => {
                   disabled={reqSending}
                 >
                   {reqSending && <span className="spinner-border spinner-border-sm me-2" role="status" />}
-                  {reqForm.meetWith === 'student' ? 'Create Meeting' : 'Request Meeting'}
+                  {reqForm.meetWith === 'student' ? 'Schedule Meeting' : 'Request Meeting'}
                 </button>
               </div>
             </div>

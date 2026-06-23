@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
 
+// Group meetings by topic + date + time + projectId.
+// Non-project meetings (no projectId) each get a unique key and stay ungrouped.
+const groupMeetingsByProject = (meetings) => {
+  const groupMap = {};
+  meetings.forEach((m) => {
+    const projId = m.projectId?._id || (typeof m.projectId === 'string' ? m.projectId : '') || '';
+    const dateStr = m.proposedDate ? new Date(m.proposedDate).toISOString().split('T')[0] : '';
+    const key = projId ? `${m.topic}|${dateStr}|${m.proposedTime}|${projId}` : m._id;
+    if (!groupMap[key]) groupMap[key] = [];
+    groupMap[key].push(m);
+  });
+  return Object.values(groupMap);
+};
+
 const CoordinatorMeetingCalendar = () => {
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -59,17 +73,19 @@ const CoordinatorMeetingCalendar = () => {
       : { bg: '#28a745', text: '#fff' };
   };
 
-  const getMeetingsForDay = (day) =>
-    meetings.filter((m) => {
+  const getGroupedMeetingsForDay = (day) => {
+    const dayMeetings = meetings.filter((m) => {
       const d = new Date(m.proposedDate);
       return d.getFullYear() === currentYear && d.getMonth() === currentMonth && d.getDate() === day;
     });
+    return groupMeetingsByProject(dayMeetings);
+  };
 
   const isToday = (day) =>
     day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
 
-  const totalCells  = firstDayOfMonth + daysInMonth;
-  const totalRows   = Math.ceil(totalCells / 7);
+  const totalCells   = firstDayOfMonth + daysInMonth;
+  const totalRows    = Math.ceil(totalCells / 7);
   const calendarDays = [];
   for (let i = 0; i < totalRows * 7; i++) {
     const day = i - firstDayOfMonth + 1;
@@ -124,7 +140,7 @@ const CoordinatorMeetingCalendar = () => {
                   {calendarRows.map((row, ri) => (
                     <tr key={ri}>
                       {row.map((day, ci) => {
-                        const dayMeetings = day ? getMeetingsForDay(day) : [];
+                        const groups = day ? getGroupedMeetingsForDay(day) : [];
                         return (
                           <td key={ci} className="align-top p-2"
                             style={{ minHeight: '100px', height: '100px', backgroundColor: day && isToday(day) ? '#eef0fd' : 'transparent' }}>
@@ -134,20 +150,52 @@ const CoordinatorMeetingCalendar = () => {
                                   {day}
                                 </span>
                                 <div className="d-flex flex-column gap-1">
-                                  {dayMeetings.map((meeting) => {
-                                    const colors    = getMeetingColor(meeting);
-                                    const other     = getOtherParty(meeting);
-                                    const otherName = other?.name || '—';
-                                    const locationStr = meeting.location ? ` | 📍 ${meeting.location}` : '';
+                                  {groups.map((group) => {
+                                    const rep    = group[0];
+                                    const colors = getMeetingColor(rep);
+
+                                    if (group.length >= 2) {
+                                      // Grouped project meeting block
+                                      const projTitle    = rep.projectId?.title || '';
+                                      const studentCount = group.length;
+                                      const locationStr  = rep.location ? ` | 📍 ${rep.location}` : '';
+                                      const tooltipText  = `${rep.topic} — ${projTitle} (${studentCount} students) at ${rep.proposedTime}${locationStr}`;
+                                      return (
+                                        <div
+                                          key={`group-${rep._id}`}
+                                          className="rounded px-2 py-1"
+                                          style={{ backgroundColor: colors.bg, color: colors.text, fontSize: '0.7rem', lineHeight: '1.3' }}
+                                          title={tooltipText}
+                                        >
+                                          <div className="fw-semibold">{rep.topic}</div>
+                                          <div style={{ opacity: 0.9 }}>{rep.proposedTime}</div>
+                                          {projTitle && (
+                                            <div style={{ opacity: 0.85, fontSize: '0.65rem' }}>{projTitle}</div>
+                                          )}
+                                          <div style={{ opacity: 0.8, fontSize: '0.63rem' }}>{studentCount} students</div>
+                                          {rep.location && (
+                                            <div style={{ opacity: 0.85, fontSize: '0.63rem' }}>📍 {rep.location}</div>
+                                          )}
+                                        </div>
+                                      );
+                                    }
+
+                                    // Single meeting block
+                                    const other       = getOtherParty(rep);
+                                    const otherName   = other?.name || '—';
+                                    const locationStr = rep.location ? ` | 📍 ${rep.location}` : '';
                                     return (
                                       <div
-                                        key={meeting._id}
+                                        key={rep._id}
                                         className="rounded px-2 py-1"
-                                        style={{ backgroundColor: colors.bg, color: colors.text, fontSize: '0.7rem', lineHeight: '1.3', cursor: 'pointer' }}
-                                        title={`${meeting.topic} — ${otherName} at ${meeting.proposedTime}${locationStr}`}
+                                        style={{ backgroundColor: colors.bg, color: colors.text, fontSize: '0.7rem', lineHeight: '1.3' }}
+                                        title={`${rep.topic} — ${otherName} at ${rep.proposedTime}${locationStr}`}
                                       >
-                                        <div className="fw-semibold">{meeting.topic}</div>
-                                        <div style={{ opacity: 0.9 }}>{meeting.proposedTime}</div>
+                                        <div className="fw-semibold">{rep.topic}</div>
+                                        <div style={{ opacity: 0.9 }}>{rep.proposedTime}</div>
+                                        {rep.location && (
+                                          <div style={{ opacity: 0.85, fontSize: '0.63rem' }}>📍 {rep.location}</div>
+                                        )}
                                       </div>
                                     );
                                   })}
@@ -170,7 +218,7 @@ const CoordinatorMeetingCalendar = () => {
             <span className="small fw-medium text-muted">Legend:</span>
             <div className="d-flex align-items-center gap-2">
               <span className="rounded" style={{ width: '14px', height: '14px', backgroundColor: '#3c50e0', display: 'inline-block' }}></span>
-              <span className="small text-muted">Meeting with Student</span>
+              <span className="small text-muted">Meeting with Student(s)</span>
             </div>
             <div className="d-flex align-items-center gap-2">
               <span className="rounded" style={{ width: '14px', height: '14px', backgroundColor: '#28a745', display: 'inline-block' }}></span>

@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 
+// Group meetings by topic + date + time + projectId.
+// Non-project meetings each stay ungrouped (keyed by _id).
+const groupMeetingCards = (meetings) => {
+  const groupMap = {};
+  meetings.forEach((m) => {
+    const projId = m.projectId?._id || (typeof m.projectId === 'string' ? m.projectId : '') || '';
+    const dateStr = m.proposedDate ? new Date(m.proposedDate).toISOString().split('T')[0] : '';
+    const key = projId ? `${m.topic}|${dateStr}|${m.proposedTime}|${projId}` : m._id;
+    if (!groupMap[key]) groupMap[key] = [];
+    groupMap[key].push(m);
+  });
+  return Object.values(groupMap);
+};
+
 const CoordinatorMeetingRequests = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [meetings, setMeetings]   = useState([]);
@@ -40,10 +54,9 @@ const CoordinatorMeetingRequests = () => {
     fetchMeetings();
   }, []);
 
-  const pendingCount = meetings.filter((m) => m.status === 'pending').length;
-  const displayedMeetings = activeTab === 'all'
-    ? meetings
-    : meetings.filter((m) => m.status === 'pending');
+  const pendingCount       = meetings.filter((m) => m.status === 'pending').length;
+  const displayedMeetings  = activeTab === 'all' ? meetings : meetings.filter((m) => m.status === 'pending');
+  const groupedDisplayed   = groupMeetingCards(displayedMeetings);
 
   const openRespond = (meeting, decision) => {
     setRespondMeeting(meeting);
@@ -90,6 +103,23 @@ const CoordinatorMeetingRequests = () => {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to cancel meeting');
       setMeetings((prev) => prev.filter((m) => m._id !== meetingId));
+    } catch (err) {
+      setCancelError(err.message);
+    }
+  };
+
+  const cancelMeetingGroup = async (meetingIds) => {
+    if (!window.confirm(`Cancel all ${meetingIds.length} meeting(s) in this group? This cannot be undone.`)) return;
+    setCancelError('');
+    try {
+      const results = await Promise.all(
+        meetingIds.map((id) =>
+          fetch(`/api/meetings/${id}`, { method: 'DELETE', headers }).then((r) => r.json())
+        )
+      );
+      const failed = results.filter((r) => !r.success);
+      if (failed.length > 0) throw new Error(failed[0].message || 'Failed to cancel some meetings');
+      setMeetings((prev) => prev.filter((m) => !meetingIds.includes(String(m._id))));
     } catch (err) {
       setCancelError(err.message);
     }
@@ -175,7 +205,7 @@ const CoordinatorMeetingRequests = () => {
 
       {/* Meeting cards */}
       <div className="d-flex flex-column gap-3">
-        {displayedMeetings.length === 0 ? (
+        {groupedDisplayed.length === 0 ? (
           <div className="card shadow-sm border-0">
             <div className="card-body text-center py-5">
               <p className="text-muted mb-0">
@@ -184,11 +214,85 @@ const CoordinatorMeetingRequests = () => {
             </div>
           </div>
         ) : (
-          displayedMeetings.map((m) => {
-            const isOutgoing = String(m.requestedBy?._id || m.requestedBy) === String(currentUserId);
+          groupedDisplayed.map((group) => {
+            const rep        = group[0];
+            const isOutgoing = String(rep.requestedBy?._id || rep.requestedBy) === String(currentUserId);
+
+            // ── Grouped project meeting card (2+ meetings) ──
+            if (group.length >= 2) {
+              const projTitle    = rep.projectId?.title || '—';
+              const studentNames = group.map((m) => {
+                const student = isOutgoing ? m.requestedTo : m.requestedBy;
+                return student?.name || '—';
+              }).join(', ');
+              const studentReplies = group
+                .filter((m) => m.studentReply)
+                .map((m) => {
+                  const student = isOutgoing ? m.requestedTo : m.requestedBy;
+                  return { name: student?.name || '—', reply: m.studentReply };
+                });
+              const canCancelGroup = isOutgoing && rep.meetingType === 'scheduled';
+              const groupIds = group.map((m) => String(m._id));
+
+              return (
+                <div key={`group-${rep._id}`} className="card shadow-sm border-0">
+                  <div className="card-body p-4">
+                    <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                      <div className="flex-grow-1">
+                        <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                          <span className="badge bg-primary rounded-pill px-2 small">Project Meeting</span>
+                          <span className="badge bg-light text-dark border rounded-pill px-2 small">Scheduled</span>
+                          <h6 className="fw-semibold text-dark mb-0">{rep.topic}</h6>
+                        </div>
+                        <p className="text-muted small mb-1">
+                          Project: <strong className="text-dark">{projTitle}</strong>
+                        </p>
+                        <p className="text-muted small mb-1">
+                          Students: <strong className="text-dark">{studentNames}</strong>
+                        </p>
+                        <p className="text-muted small mb-1">
+                          Date: <strong className="text-dark">{formatDate(rep.proposedDate)}</strong> at{' '}
+                          <strong className="text-dark">{rep.proposedTime}</strong>
+                        </p>
+                        {rep.location && (
+                          <p className="text-muted small mb-1">
+                            Location: <strong className="text-dark">📍 {rep.location}</strong>
+                          </p>
+                        )}
+                      </div>
+                      <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(rep.status)}`}>
+                        {rep.status.charAt(0).toUpperCase() + rep.status.slice(1)}
+                      </span>
+                    </div>
+
+                    {studentReplies.map((sr, i) => (
+                      <div key={i} className="alert alert-secondary py-2 px-3 mt-2 mb-0">
+                        <p className="small mb-0">
+                          <strong>{sr.name}'s reply:</strong> {sr.reply}
+                        </p>
+                      </div>
+                    ))}
+
+                    {canCancelGroup && (
+                      <div className="mt-3">
+                        <button
+                          className="btn btn-outline-danger btn-sm px-3"
+                          onClick={() => cancelMeetingGroup(groupIds)}
+                        >
+                          Cancel Meeting
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
+            // ── Single meeting card ──
+            const m           = rep;
             const otherPerson = isOutgoing ? m.requestedTo : m.requestedBy;
-            const canCancel = m.meetingType === 'scheduled' && isOutgoing;
-            const canRespond = m.status === 'pending' && !isOutgoing;
+            const canCancel   = m.meetingType === 'scheduled' && isOutgoing;
+            const canRespond  = m.status === 'pending' && !isOutgoing;
 
             return (
               <div key={m._id} className="card shadow-sm border-0">

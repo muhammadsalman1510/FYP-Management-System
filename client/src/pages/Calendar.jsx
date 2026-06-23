@@ -111,7 +111,6 @@ const Calendar = () => {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to send reply');
 
-      // Update the meeting in state with the new reply
       const updatedMeeting = { ...selectedMeeting, studentReply: replyText.trim() };
       setMeetings((prev) => prev.map((m) => m._id === selectedMeeting._id ? updatedMeeting : m));
       setSelectedMeeting(updatedMeeting);
@@ -222,6 +221,9 @@ const Calendar = () => {
                                       >
                                         <div className="fw-semibold">{m.topic}</div>
                                         <div style={{ opacity: 0.9 }}>{m.proposedTime}</div>
+                                        {m.location && (
+                                          <div style={{ opacity: 0.85, fontSize: '0.63rem' }}>📍 {m.location}</div>
+                                        )}
                                       </div>
                                     );
                                   })}
@@ -279,7 +281,6 @@ const Calendar = () => {
 
               <div className="modal-body px-4 py-4">
 
-                {/* Meeting details */}
                 <div className="mb-4">
                   <div className="d-flex flex-column gap-2">
                     <div className="d-flex gap-2 small">

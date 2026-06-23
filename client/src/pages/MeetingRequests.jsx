@@ -144,10 +144,17 @@ const MeetingRequests = () => {
     });
   };
 
+  const getRoleBadgeClass = (role) => {
+    if (!role) return 'bg-secondary';
+    if (role === 'supervisor')  return 'bg-info text-dark';
+    if (role === 'coordinator') return 'bg-primary';
+    return 'bg-secondary';
+  };
+
   if (loading) {
     return (
       <>
-        <Breadcrumb pageName="Meeting Requests" />
+        <Breadcrumb pageName="My Meetings" />
         <div className="d-flex justify-content-center align-items-center py-5">
           <div className="spinner-border text-primary" role="status">
             <span className="visually-hidden">Loading...</span>
@@ -160,15 +167,17 @@ const MeetingRequests = () => {
   if (error) {
     return (
       <>
-        <Breadcrumb pageName="Meeting Requests" />
+        <Breadcrumb pageName="My Meetings" />
         <div className="alert alert-danger border-0">{error}</div>
       </>
     );
   }
 
-  // Only show meetings the student created (outgoing requests)
-  const myRequests = meetings.filter(
-    (m) => String(m.requestedBy?._id || m.requestedBy) === String(currentUserId)
+  // Show all meetings where student is involved (both outgoing and incoming)
+  const myMeetings = meetings.filter(
+    (m) =>
+      String(m.requestedBy?._id || m.requestedBy) === String(currentUserId) ||
+      String(m.requestedTo?._id  || m.requestedTo)  === String(currentUserId)
   );
 
   const supervisorName  = project?.supervisors?.[0]?.name || '';
@@ -176,84 +185,119 @@ const MeetingRequests = () => {
 
   return (
     <>
-      <Breadcrumb pageName="Meeting Requests" />
+      <Breadcrumb pageName="My Meetings" />
 
       <div className="row g-4">
         <div className="col-12">
           <div className="card shadow-sm border-0">
 
             <div className="card-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
-              <h5 className="fw-semibold text-dark mb-0">My Meeting Requests</h5>
+              <h5 className="fw-semibold text-dark mb-0">My Meetings</h5>
               <button
                 className="btn btn-primary btn-sm px-3 fw-medium"
                 onClick={openModal}
                 disabled={!project}
                 title={!project ? 'You need an active project before requesting a meeting.' : ''}
               >
-                + New Meeting Request
+                + Request a Meeting
               </button>
             </div>
 
             {!project && (
               <div className="alert alert-warning border-0 rounded-0 mb-0 px-4 py-3 small">
                 You need an active project before requesting a meeting. Once your proposal is approved,
-                you will be able to submit meeting requests here.
+                you will be able to request meetings here.
               </div>
             )}
 
             <div className="card-body p-4">
-              {myRequests.length === 0 ? (
+              {myMeetings.length === 0 ? (
                 <div className="text-center py-4">
-                  <p className="text-muted mb-0">No meeting requests sent yet.</p>
+                  <p className="text-muted mb-0">No meetings yet.</p>
                 </div>
               ) : (
                 <div className="d-flex flex-column gap-4">
-                  {myRequests.map((m) => {
-                    const otherPerson = m.requestedTo;
-                    const otherRole   = otherPerson?.role
-                      ? otherPerson.role.charAt(0).toUpperCase() + otherPerson.role.slice(1)
-                      : '';
+                  {myMeetings.map((m) => {
+                    const isOutgoing  = String(m.requestedBy?._id || m.requestedBy) === String(currentUserId);
+                    const otherPerson = isOutgoing ? m.requestedTo : m.requestedBy;
+                    const otherRole   = otherPerson?.role || '';
 
                     return (
                       <div key={m._id} className="border rounded p-4">
 
                         <div className="d-flex justify-content-between align-items-start mb-3">
                           <div>
-                            <h5 className="fw-semibold text-dark mb-1">{m.topic}</h5>
+                            <h5 className="fw-semibold text-dark mb-2">{m.topic}</h5>
+
+                            {isOutgoing ? (
+                              <>
+                                <p className="text-muted mb-1 small">
+                                  With:{' '}
+                                  <strong className="text-dark">{otherPerson?.name || '—'}</strong>
+                                  {otherRole && (
+                                    <span className={`ms-1 badge rounded-pill ${getRoleBadgeClass(otherRole)}`} style={{ fontSize: '0.65rem' }}>
+                                      {otherRole.charAt(0).toUpperCase() + otherRole.slice(1)}
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-muted mb-1 small" style={{ fontStyle: 'italic' }}>
+                                  You requested this meeting
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-muted mb-1 small">
+                                Scheduled by:{' '}
+                                <strong className="text-dark">{otherPerson?.name || '—'}</strong>
+                                {otherRole && (
+                                  <span className={`ms-1 badge rounded-pill ${getRoleBadgeClass(otherRole)}`} style={{ fontSize: '0.65rem' }}>
+                                    {otherRole.charAt(0).toUpperCase() + otherRole.slice(1)}
+                                  </span>
+                                )}
+                              </p>
+                            )}
+
                             <p className="text-muted mb-1 small">
-                              With:{' '}
-                              <strong className="text-dark">{otherPerson?.name || '—'}</strong>
-                              {otherRole && (
-                                <span className="ms-1 badge bg-secondary rounded-pill" style={{ fontSize: '0.65rem' }}>
-                                  {otherRole}
-                                </span>
-                              )}
-                            </p>
-                            <p className="text-muted mb-1 small">
-                              Proposed:{' '}
+                              Date:{' '}
                               <strong className="text-dark">{formatDate(m.proposedDate)}</strong>
                               {' '}at{' '}
                               <strong className="text-dark">{m.proposedTime}</strong>
                             </p>
+                            {m.location && (
+                              <p className="text-muted mb-1 small">
+                                Location: <strong className="text-dark">📍 {m.location}</strong>
+                              </p>
+                            )}
                             {m.projectId?.title && (
                               <p className="text-muted mb-1 small">
                                 Project: <strong className="text-dark">{m.projectId.title}</strong>
                               </p>
                             )}
-                            <p className="text-muted mb-0 small">
-                              Submitted: {formatDate(m.createdAt)}
-                            </p>
+                            {isOutgoing && (
+                              <p className="text-muted mb-0 small">
+                                Submitted: {formatDate(m.createdAt)}
+                              </p>
+                            )}
                           </div>
                           <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(m.status)}`}>
                             {getStatusText(m.status)}
                           </span>
                         </div>
 
+                        {/* Response / approval notes from coordinator or supervisor */}
                         {m.notes && (
-                          <div className={`alert py-2 px-3 mt-2 mb-0 ${m.status === 'approved' ? 'alert-success' : 'alert-danger'}`}>
+                          <div className={`alert py-2 px-3 mt-2 mb-2 ${m.status === 'approved' ? 'alert-success' : 'alert-danger'}`}>
                             <p className="small mb-0">
                               <strong>{m.status === 'approved' ? 'Approval Message' : 'Response'}:</strong>{' '}
                               {m.notes}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Student's own reply (read-only here — reply is sent from Calendar) */}
+                        {m.studentReply && (
+                          <div className="alert alert-light border py-2 px-3 mt-2 mb-0">
+                            <p className="small mb-0">
+                              <strong>Your reply:</strong> {m.studentReply}
                             </p>
                           </div>
                         )}
@@ -269,7 +313,7 @@ const MeetingRequests = () => {
         </div>
       </div>
 
-      {/* ── New Meeting Request Modal ── */}
+      {/* ── Request a Meeting Modal ── */}
       {showModal && (
         <div
           className="modal d-block"
@@ -280,7 +324,7 @@ const MeetingRequests = () => {
             <div className="modal-content border-0 shadow">
 
               <div className="modal-header border-bottom px-4 py-3">
-                <h5 className="modal-title fw-semibold text-dark">New Meeting Request</h5>
+                <h5 className="modal-title fw-semibold text-dark">Request a Meeting</h5>
                 <button className="btn-close" onClick={closeModal} />
               </div>
 
