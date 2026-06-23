@@ -4,6 +4,8 @@ import { upload } from '../middleware/upload.middleware.js';
 import {
     createTask,
     getTasks,
+    updateTask,
+    deleteTask,
     submitTask,
     getSubmissions,
     getMySubmissions,
@@ -25,5 +27,7 @@ router.put(
 router.post('/', authenticate, authorize('coordinator', 'supervisor'), createTask);
 router.get('/', authenticate, getTasks);
 router.post('/:id/submit', authenticate, authorize('student'), upload.single('file'), submitTask);
+router.put('/:id', authenticate, authorize('coordinator', 'supervisor'), updateTask);
+router.delete('/:id', authenticate, authorize('coordinator', 'supervisor'), deleteTask);
 
 export default router;

@@ -2,54 +2,54 @@ import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 
 const SupervisorMeetingRequests = () => {
-  const [activeTab, setActiveTab] = useState('incoming');
+  const [activeTab, setActiveTab] = useState('all');
   const [meetings, setMeetings]   = useState([]);
   const [projects, setProjects]   = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
+  const [cancelError, setCancelError] = useState('');
 
   const currentUserId = (() => {
     try { return JSON.parse(sessionStorage.getItem('user'))?._id || ''; }
     catch { return ''; }
   })();
 
-  // Respond modal (approve/reject incoming from students)
+  const token   = sessionStorage.getItem('token');
+  const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+  // Respond modal
   const [respondModal, setRespondModal]       = useState(false);
   const [respondMeeting, setRespondMeeting]   = useState(null);
   const [respondDecision, setRespondDecision] = useState('');
   const [respondNotes, setRespondNotes]       = useState('');
   const [responding, setResponding]           = useState(false);
+  const [respondError, setRespondError]       = useState('');
 
-  // New meeting modal — dual-mode (to Student or to Coordinator)
+  // New meeting modal
   const [requestModal, setRequestModal] = useState(false);
   const [reqForm, setReqForm] = useState({
-    meetWith:     '',   // 'student' | 'coordinator'
-    studentId:    '',
-    projectId:    '',
-    proposedDate: '',
-    proposedTime: '',
-    topic:        '',
+    meetWith: '', studentId: '', projectId: '',
+    proposedDate: '', proposedTime: '', topic: '', location: '',
   });
   const [reqError, setReqError]     = useState('');
   const [reqSending, setReqSending] = useState(false);
   const [reqSuccess, setReqSuccess] = useState(false);
 
+  const today = new Date().toISOString().split('T')[0];
+
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const token = sessionStorage.getItem('token');
-        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
-
         const [meetingsRes, projectsRes] = await Promise.all([
-          fetch('/api/meetings', { headers }),
+          fetch('/api/meetings',          { headers }),
           fetch('/api/projects/assigned', { headers }),
         ]);
 
         const meetingsData = await meetingsRes.json();
         const projectsData = await projectsRes.json();
 
-        if (!meetingsRes.ok || !meetingsData.success)  throw new Error(meetingsData.message  || 'Failed to load meetings');
-        if (!projectsRes.ok || !projectsData.success)  throw new Error(projectsData.message  || 'Failed to load projects');
+        if (!meetingsRes.ok || !meetingsData.success) throw new Error(meetingsData.message || 'Failed to load meetings');
+        if (!projectsRes.ok || !projectsData.success) throw new Error(projectsData.message || 'Failed to load projects');
 
         setMeetings(meetingsData.data);
         setProjects(projectsData.data);
@@ -62,64 +62,68 @@ const SupervisorMeetingRequests = () => {
     fetchAll();
   }, []);
 
-  // Deduplicated list of all students across assigned projects (requires populated students)
   const allStudents = projects.reduce((acc, project) => {
     (project.students || []).forEach((student) => {
       if (!student || !student._id) return;
-      if (!acc.find((s) => String(s._id) === String(student._id))) {
-        acc.push(student);
-      }
+      if (!acc.find((s) => String(s._id) === String(student._id))) acc.push(student);
     });
     return acc;
   }, []);
 
-  const incoming = meetings.filter((m) => {
-    const toId = m.requestedTo?._id || m.requestedTo;
-    return String(toId) === String(currentUserId);
-  });
-
-  const outgoing = meetings.filter((m) => {
-    const byId = m.requestedBy?._id || m.requestedBy;
-    return String(byId) === String(currentUserId);
-  });
-
-  const pendingIncomingCount = incoming.filter((m) => m.status === 'pending').length;
+  const pendingCount = meetings.filter((m) => m.status === 'pending').length;
+  const displayedMeetings = activeTab === 'all'
+    ? meetings
+    : meetings.filter((m) => m.status === 'pending');
 
   const openRespond = (meeting, decision) => {
     setRespondMeeting(meeting);
     setRespondDecision(decision);
     setRespondNotes('');
+    setRespondError('');
     setRespondModal(true);
   };
 
   const submitResponse = async () => {
-    if (!respondNotes.trim()) { alert('Please provide a response message.'); return; }
+    if (!respondNotes.trim()) { setRespondError('Please provide a response message.'); return; }
     setResponding(true);
+    setRespondError('');
     try {
-      const token = sessionStorage.getItem('token');
       const res = await fetch(`/api/meetings/${respondMeeting._id}`, {
         method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: respondDecision, notes: respondNotes }),
+        headers,
+        body: JSON.stringify({ status: respondDecision, notes: respondNotes.trim() }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update meeting');
 
       setMeetings((prev) =>
         prev.map((m) =>
-          m._id === respondMeeting._id ? { ...m, status: respondDecision, notes: respondNotes } : m
+          m._id === respondMeeting._id ? { ...m, status: respondDecision, notes: respondNotes.trim() } : m
         )
       );
       setRespondModal(false);
     } catch (err) {
-      alert(err.message);
+      setRespondError(err.message);
     } finally {
       setResponding(false);
     }
   };
 
+  const cancelMeeting = async (meetingId) => {
+    if (!window.confirm('Cancel this meeting? This cannot be undone.')) return;
+    setCancelError('');
+    try {
+      const res = await fetch(`/api/meetings/${meetingId}`, { method: 'DELETE', headers });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to cancel meeting');
+      setMeetings((prev) => prev.filter((m) => m._id !== meetingId));
+    } catch (err) {
+      setCancelError(err.message);
+    }
+  };
+
   const openRequestModal = () => {
-    setReqForm({ meetWith: '', studentId: '', projectId: '', proposedDate: '', proposedTime: '', topic: '' });
+    setReqForm({ meetWith: '', studentId: '', projectId: '', proposedDate: '', proposedTime: '', topic: '', location: '' });
     setReqError('');
     setReqSuccess(false);
     setRequestModal(true);
@@ -133,14 +137,14 @@ const SupervisorMeetingRequests = () => {
 
   const handleSendRequest = async () => {
     setReqError('');
-
-    if (!reqForm.meetWith)         { setReqError('Please select who you want to meet with.'); return; }
-    if (!reqForm.proposedDate)     { setReqError('Please select a date.'); return; }
-    if (!reqForm.proposedTime)     { setReqError('Please select a time.'); return; }
-    if (!reqForm.topic.trim())     { setReqError('Please enter a topic.'); return; }
+    if (!reqForm.meetWith)       { setReqError('Please select who you want to meet with.'); return; }
+    if (!reqForm.proposedDate)   { setReqError('Please select a date.'); return; }
+    if (!reqForm.proposedTime)   { setReqError('Please select a time.'); return; }
+    if (!reqForm.topic.trim())   { setReqError('Please enter a topic.'); return; }
 
     let requestedToId = '';
-    let projectId = null;
+    let projectId     = null;
+    let meetingType   = undefined; // let backend decide for student; send 'requested' for coordinator
 
     if (reqForm.meetWith === 'coordinator') {
       if (!reqForm.projectId) { setReqError('Please select a project.'); return; }
@@ -148,32 +152,33 @@ const SupervisorMeetingRequests = () => {
       const coordinatorId = selectedProject?.coordinator?._id;
       if (!coordinatorId) { setReqError('No coordinator assigned to this project.'); return; }
       requestedToId = coordinatorId;
-      projectId = reqForm.projectId;
+      projectId     = reqForm.projectId;
+      meetingType   = 'requested';
     } else {
-      // meeting with a student
       if (!reqForm.studentId) { setReqError('Please select a student.'); return; }
       requestedToId = reqForm.studentId;
-      // attach the project this student belongs to for context
       const proj = projects.find((p) =>
         (p.students || []).some((s) => String(s._id || s) === String(reqForm.studentId))
       );
       if (proj) projectId = proj._id;
+      // no meetingType → backend defaults to 'scheduled' for supervisor
     }
 
     setReqSending(true);
     try {
-      const token = sessionStorage.getItem('token');
       const body = {
         requestedTo:  requestedToId,
         proposedDate: reqForm.proposedDate,
         proposedTime: reqForm.proposedTime,
         topic:        reqForm.topic.trim(),
+        location:     reqForm.location.trim(),
       };
-      if (projectId) body.projectId = projectId;
+      if (projectId)   body.projectId   = projectId;
+      if (meetingType) body.meetingType  = meetingType;
 
       const res = await fetch('/api/meetings', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(body),
       });
       const data = await res.json();
@@ -213,11 +218,6 @@ const SupervisorMeetingRequests = () => {
     return 'New Meeting';
   };
 
-  const submitBtnLabel = () => {
-    if (reqSending) return null;
-    return reqForm.meetWith === 'student' ? 'Create Meeting' : 'Request Meeting';
-  };
-
   if (loading) {
     return (
       <>
@@ -250,158 +250,160 @@ const SupervisorMeetingRequests = () => {
         </button>
       </div>
 
+      {cancelError && (
+        <div className="alert alert-danger border-0 mb-3">{cancelError}</div>
+      )}
+
       {/* Tab Navigation */}
       <div className="card shadow-sm border-0 mb-4">
         <div className="card-body p-0">
           <div className="d-flex border-bottom">
             <button
-              onClick={() => setActiveTab('incoming')}
+              onClick={() => setActiveTab('all')}
               className="btn btn-link flex-fill py-3 text-decoration-none fw-medium border-0 rounded-0"
               style={{
-                color: activeTab === 'incoming' ? '#3c50e0' : '#6c757d',
-                borderBottom: activeTab === 'incoming' ? '2px solid #3c50e0' : '2px solid transparent',
+                color: activeTab === 'all' ? '#3c50e0' : '#6c757d',
+                borderBottom: activeTab === 'all' ? '2px solid #3c50e0' : '2px solid transparent',
               }}
             >
-              From Students
-              {pendingIncomingCount > 0 && (
-                <span className="badge bg-warning text-dark ms-2 rounded-pill" style={{ fontSize: '0.7rem' }}>
-                  {pendingIncomingCount}
-                </span>
-              )}
+              All Meetings ({meetings.length})
             </button>
             <button
-              onClick={() => setActiveTab('outgoing')}
+              onClick={() => setActiveTab('pending')}
               className="btn btn-link flex-fill py-3 text-decoration-none fw-medium border-0 rounded-0"
               style={{
-                color: activeTab === 'outgoing' ? '#3c50e0' : '#6c757d',
-                borderBottom: activeTab === 'outgoing' ? '2px solid #3c50e0' : '2px solid transparent',
+                color: activeTab === 'pending' ? '#3c50e0' : '#6c757d',
+                borderBottom: activeTab === 'pending' ? '2px solid #3c50e0' : '2px solid transparent',
               }}
             >
-              My Requests ({outgoing.length})
+              Pending
+              {pendingCount > 0 && (
+                <span className="badge bg-warning text-dark ms-2 rounded-pill" style={{ fontSize: '0.7rem' }}>
+                  {pendingCount}
+                </span>
+              )}
             </button>
           </div>
         </div>
       </div>
 
-      {/* INCOMING — FROM STUDENTS */}
-      {activeTab === 'incoming' && (
-        <div className="d-flex flex-column gap-3">
-          {incoming.length === 0 ? (
-            <div className="card shadow-sm border-0">
-              <div className="card-body text-center py-5">
-                <p className="text-muted mb-0">No meeting requests from students.</p>
-              </div>
-            </div>
-          ) : (
-            incoming.map((req) => (
-              <div key={req._id} className="card shadow-sm border-0">
-                <div className="card-body p-4">
-                  <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
-                    <div className="flex-grow-1">
-                      <h6 className="fw-semibold text-dark mb-1">{req.topic}</h6>
-                      <p className="text-muted small mb-1">
-                        From: <strong className="text-dark">{req.requestedBy?.name || '—'}</strong>
-                        {req.requestedBy?.email && ` (${req.requestedBy.email})`}
-                      </p>
-                      <p className="text-muted small mb-1">
-                        Proposed: <strong className="text-dark">{formatDate(req.proposedDate)}</strong> at{' '}
-                        <strong className="text-dark">{req.proposedTime}</strong>
-                      </p>
-                      {req.projectId && (
-                        <p className="text-muted small mb-0">
-                          Project: <strong className="text-dark">{req.projectId.title || '—'}</strong>
-                        </p>
-                      )}
-                      <p className="text-muted small mb-0">Submitted: {formatDate(req.createdAt)}</p>
-                    </div>
-                    <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(req.status)}`}>
-                      {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
-                    </span>
-                  </div>
-
-                  {req.notes && (
-                    <div className={`alert ${req.status === 'approved' ? 'alert-success' : 'alert-danger'} py-2 px-3 mt-3 mb-2`}>
-                      <p className="small mb-0">
-                        <strong>Your Response:</strong> {req.notes}
-                      </p>
-                    </div>
-                  )}
-
-                  {req.status === 'pending' && (
-                    <div className="d-flex gap-2 mt-3">
-                      <button className="btn btn-success btn-sm px-4 fw-medium" onClick={() => openRespond(req, 'approved')}>
-                        ✓ Approve
-                      </button>
-                      <button className="btn btn-danger btn-sm px-4 fw-medium" onClick={() => openRespond(req, 'rejected')}>
-                        ✕ Reject
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* OUTGOING — MY REQUESTS */}
-      {activeTab === 'outgoing' && (
-        <div className="d-flex flex-column gap-3">
-          {outgoing.length === 0 ? (
-            <div className="card shadow-sm border-0">
-              <div className="card-body text-center py-5">
-                <p className="text-muted mb-2">No outgoing meeting requests.</p>
+      {/* Meeting Cards */}
+      <div className="d-flex flex-column gap-3">
+        {displayedMeetings.length === 0 ? (
+          <div className="card shadow-sm border-0">
+            <div className="card-body text-center py-5">
+              <p className="text-muted mb-2">
+                {activeTab === 'pending' ? 'No pending meeting requests.' : 'No meetings yet.'}
+              </p>
+              {activeTab === 'all' && (
                 <button className="btn btn-primary btn-sm px-4" onClick={openRequestModal}>
                   + New Meeting
                 </button>
-              </div>
+              )}
             </div>
-          ) : (
-            outgoing.map((req) => (
-              <div key={req._id} className="card shadow-sm border-0">
+          </div>
+        ) : (
+          displayedMeetings.map((m) => {
+            const isOutgoing   = String(m.requestedBy?._id || m.requestedBy) === String(currentUserId);
+            const otherPerson  = isOutgoing ? m.requestedTo : m.requestedBy;
+            const canRespond   = m.status === 'pending' && !isOutgoing;
+            // Supervisor can only cancel meetings they created with students
+            const canCancel    = isOutgoing &&
+                                 m.meetingType === 'scheduled' &&
+                                 m.requestedTo?.role === 'student';
+
+            return (
+              <div key={m._id} className="card shadow-sm border-0">
                 <div className="card-body p-4">
                   <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
                     <div className="flex-grow-1">
-                      <h6 className="fw-semibold text-dark mb-1">{req.topic}</h6>
-                      <p className="text-muted small mb-1">
-                        To: <strong className="text-dark">{req.requestedTo?.name || '—'}</strong>
-                        {req.requestedTo?.role && (
-                          <span className="ms-1 badge bg-secondary rounded-pill" style={{ fontSize: '0.65rem' }}>
-                            {req.requestedTo.role}
+                      <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                        {otherPerson?.role && (
+                          <span
+                            className={`badge rounded-pill px-2 small ${
+                              otherPerson.role === 'student' ? 'bg-primary' :
+                              otherPerson.role === 'coordinator' ? 'bg-secondary' : 'bg-info text-dark'
+                            }`}
+                          >
+                            {otherPerson.role.charAt(0).toUpperCase() + otherPerson.role.slice(1)}
                           </span>
                         )}
+                        {m.meetingType === 'scheduled' && (
+                          <span className="badge bg-light text-dark border rounded-pill px-2 small">Scheduled</span>
+                        )}
+                        <h6 className="fw-semibold text-dark mb-0">{m.topic}</h6>
+                      </div>
+                      <p className="text-muted small mb-1">
+                        {isOutgoing ? 'To' : 'From'}:{' '}
+                        <strong className="text-dark">{otherPerson?.name || '—'}</strong>
+                        {otherPerson?.email && ` (${otherPerson.email})`}
                       </p>
                       <p className="text-muted small mb-1">
-                        Proposed: <strong className="text-dark">{formatDate(req.proposedDate)}</strong> at{' '}
-                        <strong className="text-dark">{req.proposedTime}</strong>
+                        Date: <strong className="text-dark">{formatDate(m.proposedDate)}</strong> at{' '}
+                        <strong className="text-dark">{m.proposedTime}</strong>
                       </p>
-                      {req.projectId && (
-                        <p className="text-muted small mb-0">
-                          Project: <strong className="text-dark">{req.projectId.title || '—'}</strong>
+                      {m.location && (
+                        <p className="text-muted small mb-1">
+                          Location: <strong className="text-dark">📍 {m.location}</strong>
+                        </p>
+                      )}
+                      {m.projectId?.title && (
+                        <p className="text-muted small mb-1">
+                          Project: <strong className="text-dark">{m.projectId.title}</strong>
                         </p>
                       )}
                     </div>
-                    <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(req.status)}`}>
-                      {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
+                    <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(m.status)}`}>
+                      {m.status.charAt(0).toUpperCase() + m.status.slice(1)}
                     </span>
                   </div>
-                  {req.notes && (
-                    <div className={`alert ${req.status === 'approved' ? 'alert-success' : 'alert-danger'} py-2 px-3 mt-3 mb-0`}>
+
+                  {m.notes && (
+                    <div className={`alert ${m.status === 'approved' ? 'alert-success' : 'alert-danger'} py-2 px-3 mt-3 mb-2`}>
                       <p className="small mb-0">
-                        <strong>Response:</strong> {req.notes}
+                        <strong>{isOutgoing ? 'Response' : 'Your Response'}:</strong> {m.notes}
                       </p>
+                    </div>
+                  )}
+
+                  {m.studentReply && (
+                    <div className="alert alert-secondary py-2 px-3 mt-2 mb-2">
+                      <p className="small mb-0">
+                        <strong>Student's reply:</strong> {m.studentReply}
+                      </p>
+                    </div>
+                  )}
+
+                  {(canRespond || canCancel) && (
+                    <div className="d-flex gap-2 mt-3">
+                      {canRespond && (
+                        <>
+                          <button className="btn btn-success btn-sm px-4 fw-medium" onClick={() => openRespond(m, 'approved')}>
+                            ✓ Approve
+                          </button>
+                          <button className="btn btn-danger btn-sm px-4 fw-medium" onClick={() => openRespond(m, 'rejected')}>
+                            ✕ Reject
+                          </button>
+                        </>
+                      )}
+                      {canCancel && (
+                        <button className="btn btn-outline-danger btn-sm px-3" onClick={() => cancelMeeting(m._id)}>
+                          Cancel Meeting
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
-            ))
-          )}
-        </div>
-      )}
+            );
+          })
+        )}
+      </div>
 
-      {/* ── Respond to Student Modal ── */}
+      {/* ── Respond Modal ── */}
       {respondModal && (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}>
+        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}
+          onClick={(e) => { if (e.target === e.currentTarget) setRespondModal(false); }}>
           <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '480px' }}>
             <div className="modal-content border-0 shadow">
               <div className="modal-header border-bottom px-4 py-3">
@@ -411,6 +413,9 @@ const SupervisorMeetingRequests = () => {
                 <button className="btn-close" onClick={() => setRespondModal(false)} />
               </div>
               <div className="modal-body px-4 py-4">
+                {respondError && (
+                  <div className="alert alert-danger border-0 py-2 px-3 small mb-3">{respondError}</div>
+                )}
                 <p className="text-muted small mb-3">
                   From: <strong className="text-dark">{respondMeeting?.requestedBy?.name}</strong>
                   <br />
@@ -430,7 +435,7 @@ const SupervisorMeetingRequests = () => {
                       : 'e.g. I am unavailable. Please reschedule.'
                   }
                   value={respondNotes}
-                  onChange={(e) => setRespondNotes(e.target.value)}
+                  onChange={(e) => { setRespondNotes(e.target.value); setRespondError(''); }}
                 />
               </div>
               <div className="modal-footer border-top px-4 py-3">
@@ -451,7 +456,8 @@ const SupervisorMeetingRequests = () => {
 
       {/* ── New Meeting Modal ── */}
       {requestModal && (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}>
+        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeRequestModal(); }}>
           <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '500px' }}>
             <div className="modal-content border-0 shadow">
               <div className="modal-header border-bottom px-4 py-3">
@@ -462,24 +468,21 @@ const SupervisorMeetingRequests = () => {
 
                 {reqSuccess && (
                   <div className="alert alert-success border-0 small py-2 mb-3">
-                    <strong>Request sent!</strong> They will be notified shortly.
+                    <strong>{reqForm.meetWith === 'student' ? 'Meeting scheduled!' : 'Request sent!'}</strong>
                   </div>
                 )}
                 {reqError && (
                   <div className="alert alert-danger border-0 small py-2 mb-3">{reqError}</div>
                 )}
 
-                {/* Meet With dropdown */}
+                {/* Meet With */}
                 <div className="mb-3">
                   <label className="form-label fw-medium text-dark small">Meet With *</label>
                   <select
                     className="form-select"
                     value={reqForm.meetWith}
                     onChange={(e) => setReqForm((prev) => ({
-                      ...prev,
-                      meetWith: e.target.value,
-                      studentId: '',
-                      projectId: '',
+                      ...prev, meetWith: e.target.value, studentId: '', projectId: '',
                     }))}
                   >
                     <option value="">— Select —</option>
@@ -543,6 +546,7 @@ const SupervisorMeetingRequests = () => {
                     type="date"
                     className="form-control"
                     value={reqForm.proposedDate}
+                    min={today}
                     onChange={(e) => setReqForm((prev) => ({ ...prev, proposedDate: e.target.value }))}
                   />
                 </div>
@@ -568,6 +572,17 @@ const SupervisorMeetingRequests = () => {
                   />
                 </div>
 
+                <div className="mb-0">
+                  <label className="form-label fw-medium text-dark small">Location <span className="text-muted">(optional)</span></label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. Room 204, Online (Zoom)"
+                    value={reqForm.location}
+                    onChange={(e) => setReqForm((prev) => ({ ...prev, location: e.target.value }))}
+                  />
+                </div>
+
               </div>
               <div className="modal-footer border-top px-4 py-3">
                 <button className="btn btn-outline-secondary px-4" onClick={closeRequestModal}>Cancel</button>
@@ -577,7 +592,7 @@ const SupervisorMeetingRequests = () => {
                   disabled={reqSending}
                 >
                   {reqSending && <span className="spinner-border spinner-border-sm me-2" role="status" />}
-                  {submitBtnLabel()}
+                  {reqForm.meetWith === 'student' ? 'Create Meeting' : 'Request Meeting'}
                 </button>
               </div>
             </div>

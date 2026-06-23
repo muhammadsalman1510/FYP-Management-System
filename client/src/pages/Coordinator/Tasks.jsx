@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 
-// coordinator tasks — create tasks for specific projects or blast all of them at once
-// also reviews submissions from students
-
 const CoordinatorTasks = () => {
   const [activeTab, setActiveTab] = useState('create');
   const [projects, setProjects] = useState([]);
@@ -12,7 +9,8 @@ const CoordinatorTasks = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // load everything on mount — parallel is fine here
+  const today = new Date().toISOString().split('T')[0];
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -34,8 +32,9 @@ const CoordinatorTasks = () => {
 
         setTasks(tasksData.data);
         setSubmissions(subsData.data);
-        // projects endpoint returns { projects } without the success wrapper
-        setProjects(projectsData.projects || []);
+        if (projectsRes.ok && projectsData.success) {
+          setProjects(projectsData.data || []);
+        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -75,12 +74,10 @@ const CoordinatorTasks = () => {
 
   const handleProjectSearchChange = (value) => {
     setProjectSearch(value);
-    // clear the selection when they start typing freely
     setTaskForm((prev) => ({ ...prev, projectId: '', projectName: '', scope: '' }));
     setShowProjectDropdown(true);
   };
 
-  // little timeout so the click registers before onBlur hides the dropdown
   const handleProjectBlur = () => {
     setTimeout(() => setShowProjectDropdown(false), 150);
   };
@@ -111,7 +108,6 @@ const CoordinatorTasks = () => {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to create task');
 
-      // coordinator always gets a single task back (even for scope=all)
       setTasks((prev) => [data.data, ...prev]);
       setTaskForm(emptyTask);
       setProjectSearch('');
@@ -120,6 +116,72 @@ const CoordinatorTasks = () => {
       setFormError(err.message);
     } finally {
       setCreating(false);
+    }
+  };
+
+  // edit task modal
+  const [editModal, setEditModal] = useState(false);
+  const [editTask, setEditTask] = useState(null);
+  const [editForm, setEditForm] = useState({ title: '', instructions: '', openDate: '', dueDate: '' });
+  const [editError, setEditError] = useState('');
+  const [editing, setEditing] = useState(false);
+
+  const openEditModal = (task) => {
+    setEditTask(task);
+    setEditForm({
+      title: task.title || '',
+      instructions: task.instructions || '',
+      openDate: task.openDate ? task.openDate.split('T')[0] : '',
+      dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
+    });
+    setEditError('');
+    setEditModal(true);
+  };
+
+  const handleEditTask = async () => {
+    if (!editForm.title.trim()) { setEditError('Task title is required.'); return; }
+    if (!editForm.openDate) { setEditError('Open date is required.'); return; }
+    if (!editForm.dueDate) { setEditError('Due date is required.'); return; }
+
+    setEditing(true);
+    setEditError('');
+    try {
+      const token = sessionStorage.getItem('token');
+      const res = await fetch(`/api/tasks/${editTask._id}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editForm.title.trim(),
+          instructions: editForm.instructions,
+          openDate: editForm.openDate,
+          dueDate: editForm.dueDate,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update task');
+
+      setTasks((prev) => prev.map((t) => t._id === editTask._id ? data.data : t));
+      setEditModal(false);
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setEditing(false);
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    if (!window.confirm('Delete this task? This cannot be undone.')) return;
+    try {
+      const token = sessionStorage.getItem('token');
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to delete task');
+      setTasks((prev) => prev.filter((t) => t._id !== taskId));
+    } catch (err) {
+      alert(err.message);
     }
   };
 
@@ -261,7 +323,6 @@ const CoordinatorTasks = () => {
                 />
               </div>
 
-              {/* searchable project dropdown */}
               <div className="col-12 col-md-6">
                 <label className="form-label fw-medium text-dark small">Assign To Project *</label>
                 <div className="position-relative">
@@ -326,6 +387,7 @@ const CoordinatorTasks = () => {
                   type="date"
                   className="form-control"
                   value={taskForm.dueDate}
+                  min={today}
                   onChange={(e) => { setTaskForm((prev) => ({ ...prev, dueDate: e.target.value })); setFormError(''); }}
                 />
               </div>
@@ -374,6 +436,7 @@ const CoordinatorTasks = () => {
                       <th className="px-4 py-3 fw-semibold small text-dark" style={{ width: '120px' }}>Open Date</th>
                       <th className="px-4 py-3 fw-semibold small text-dark" style={{ width: '120px' }}>Due Date</th>
                       <th className="px-4 py-3 fw-semibold small text-dark" style={{ width: '110px' }}>Submissions</th>
+                      <th className="px-4 py-3 fw-semibold small text-dark" style={{ width: '130px' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -400,6 +463,24 @@ const CoordinatorTasks = () => {
                           >
                             {submissionCountForTask(task._id)}
                           </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="d-flex gap-2">
+                            <button
+                              className="btn btn-outline-primary btn-sm px-2"
+                              style={{ fontSize: '0.75rem' }}
+                              onClick={() => openEditModal(task)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="btn btn-outline-danger btn-sm px-2"
+                              style={{ fontSize: '0.75rem' }}
+                              onClick={() => handleDeleteTask(task._id)}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -493,6 +574,79 @@ const CoordinatorTasks = () => {
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Task Modal */}
+      {editModal && editTask && (
+        <div
+          className="modal d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}
+          onClick={(e) => { if (e.target === e.currentTarget) setEditModal(false); }}
+        >
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '520px' }}>
+            <div className="modal-content border-0 shadow">
+              <div className="modal-header border-bottom px-4 py-3">
+                <h5 className="modal-title fw-semibold text-dark">Edit Task</h5>
+                <button className="btn-close" onClick={() => setEditModal(false)} />
+              </div>
+              <div className="modal-body px-4 py-4">
+                {editError && (
+                  <div className="alert alert-danger border-0 py-2 px-3 small mb-3">{editError}</div>
+                )}
+                <div className="row g-3">
+                  <div className="col-12">
+                    <label className="form-label fw-medium text-dark small">Task Title *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editForm.title}
+                      onChange={(e) => { setEditForm((p) => ({ ...p, title: e.target.value })); setEditError(''); }}
+                    />
+                  </div>
+                  <div className="col-12">
+                    <label className="form-label fw-medium text-dark small">Instructions</label>
+                    <textarea
+                      className="form-control"
+                      rows={3}
+                      value={editForm.instructions}
+                      onChange={(e) => setEditForm((p) => ({ ...p, instructions: e.target.value }))}
+                    />
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label fw-medium text-dark small">Open Date *</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={editForm.openDate}
+                      onChange={(e) => { setEditForm((p) => ({ ...p, openDate: e.target.value })); setEditError(''); }}
+                    />
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label fw-medium text-dark small">Due Date *</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={editForm.dueDate}
+                      min={today}
+                      onChange={(e) => { setEditForm((p) => ({ ...p, dueDate: e.target.value })); setEditError(''); }}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer border-top px-4 py-3 gap-2">
+                <button className="btn btn-outline-secondary px-4" onClick={() => setEditModal(false)}>Cancel</button>
+                <button
+                  className="btn btn-primary px-4 fw-medium"
+                  onClick={handleEditTask}
+                  disabled={editing}
+                >
+                  {editing && <span className="spinner-border spinner-border-sm me-2" role="status" />}
+                  Save Changes
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

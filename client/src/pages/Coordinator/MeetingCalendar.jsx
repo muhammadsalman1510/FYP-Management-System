@@ -138,12 +138,13 @@ const CoordinatorMeetingCalendar = () => {
                                     const colors    = getMeetingColor(meeting);
                                     const other     = getOtherParty(meeting);
                                     const otherName = other?.name || '—';
+                                    const locationStr = meeting.location ? ` | 📍 ${meeting.location}` : '';
                                     return (
                                       <div
                                         key={meeting._id}
                                         className="rounded px-2 py-1"
                                         style={{ backgroundColor: colors.bg, color: colors.text, fontSize: '0.7rem', lineHeight: '1.3', cursor: 'pointer' }}
-                                        title={`${meeting.topic} — ${otherName} at ${meeting.proposedTime}`}
+                                        title={`${meeting.topic} — ${otherName} at ${meeting.proposedTime}${locationStr}`}
                                       >
                                         <div className="fw-semibold">{meeting.topic}</div>
                                         <div style={{ opacity: 0.9 }}>{meeting.proposedTime}</div>

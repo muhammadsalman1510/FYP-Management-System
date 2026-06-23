@@ -2,78 +2,112 @@ import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 
 const CoordinatorScheduleMeeting = () => {
-  const [students, setStudents]       = useState([]);
+  const [projects, setProjects]       = useState([]);
   const [supervisors, setSupervisors] = useState([]);
-  const [loadingUsers, setLoadingUsers] = useState(true);
-  const [usersError, setUsersError]   = useState(null);
+  const [loadingData, setLoadingData] = useState(true);
+  const [dataError, setDataError]     = useState(null);
 
   // Form state
-  const [meetWith, setMeetWith]             = useState('student');
-  const [selectedUserId, setSelectedUserId] = useState('');
-  const [topic, setTopic]                   = useState('');
-  const [proposedDate, setProposedDate]     = useState('');
-  const [proposedTime, setProposedTime]     = useState('');
-  const [submitting, setSubmitting]         = useState(false);
-  const [formError, setFormError]           = useState('');
-  const [success, setSuccess]               = useState(false);
+  const [meetWith, setMeetWith]                   = useState('project');
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [selectedSupervisorId, setSelectedSupervisorId] = useState('');
+  const [topic, setTopic]                         = useState('');
+  const [proposedDate, setProposedDate]           = useState('');
+  const [proposedTime, setProposedTime]           = useState('');
+  const [location, setLocation]                   = useState('');
+  const [submitting, setSubmitting]               = useState(false);
+  const [formError, setFormError]                 = useState('');
+  const [success, setSuccess]                     = useState(null); // { message }
 
   const token   = sessionStorage.getItem('token');
   const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const today   = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
-    const loadUsers = async () => {
+    const load = async () => {
       try {
-        const [studentsRes, supervisorsRes] = await Promise.all([
-          fetch('/api/users?role=student',    { headers }),
+        const [projectsRes, supervisorsRes] = await Promise.all([
+          fetch('/api/projects',           { headers }),
           fetch('/api/users?role=supervisor', { headers }),
         ]);
 
-        const studentsData    = await studentsRes.json();
+        const projectsData    = await projectsRes.json();
         const supervisorsData = await supervisorsRes.json();
 
-        if (!studentsRes.ok)    throw new Error(studentsData.message    || 'Failed to load students');
+        if (!projectsRes.ok || !projectsData.success) throw new Error(projectsData.message || 'Failed to load projects');
         if (!supervisorsRes.ok) throw new Error(supervisorsData.message || 'Failed to load supervisors');
 
+        // GET /api/projects returns { success: true, data: [...] }
+        setProjects(projectsData.data || []);
         // GET /api/users returns { users: [...] } — not { success, data }
-        setStudents(studentsData.users    || []);
         setSupervisors(supervisorsData.users || []);
       } catch (err) {
-        setUsersError(err.message);
+        setDataError(err.message);
       } finally {
-        setLoadingUsers(false);
+        setLoadingData(false);
       }
     };
-    loadUsers();
+    load();
   }, []);
 
   const handleMeetWithChange = (value) => {
     setMeetWith(value);
-    setSelectedUserId('');
+    setSelectedProjectId('');
+    setSelectedSupervisorId('');
     setFormError('');
   };
 
   const handleSubmit = async () => {
-    if (!selectedUserId)  { setFormError(`Please select a ${meetWith}.`); return; }
     if (!topic.trim())    { setFormError('Please enter a meeting topic.'); return; }
     if (!proposedDate)    { setFormError('Please select a proposed date.'); return; }
     if (!proposedTime)    { setFormError('Please select a proposed time.'); return; }
 
+    if (meetWith === 'project') {
+      if (!selectedProjectId) { setFormError('Please select a project.'); return; }
+    } else {
+      if (!selectedSupervisorId) { setFormError('Please select a supervisor.'); return; }
+    }
+
     setFormError('');
     setSubmitting(true);
     try {
-      const res = await fetch('/api/meetings', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          requestedTo: selectedUserId,
+      let body;
+      if (meetWith === 'project') {
+        body = {
+          meetWith:    'project',
+          projectId:   selectedProjectId,
           topic:       topic.trim(),
           proposedDate,
           proposedTime,
-        }),
+          location:    location.trim(),
+        };
+      } else {
+        body = {
+          requestedTo:  selectedSupervisorId,
+          topic:        topic.trim(),
+          proposedDate,
+          proposedTime,
+          location:     location.trim(),
+          meetingType:  'requested',
+        };
+      }
+
+      const res = await fetch('/api/meetings', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to send meeting request');
-      setSuccess(true);
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to schedule meeting');
+
+      if (meetWith === 'project') {
+        const proj = projects.find((p) => p._id === selectedProjectId);
+        const count = Array.isArray(data.data) ? data.data.length : 1;
+        setSuccess({ message: `Meeting scheduled for ${count} student${count !== 1 ? 's' : ''} in "${proj?.title || 'project'}".` });
+      } else {
+        const sup = supervisors.find((s) => s._id === selectedSupervisorId);
+        setSuccess({ message: `Meeting request sent to ${sup?.name || 'supervisor'}.` });
+      }
     } catch (err) {
       setFormError(err.message);
     } finally {
@@ -82,13 +116,15 @@ const CoordinatorScheduleMeeting = () => {
   };
 
   const handleReset = () => {
-    setMeetWith('student');
-    setSelectedUserId('');
+    setMeetWith('project');
+    setSelectedProjectId('');
+    setSelectedSupervisorId('');
     setTopic('');
     setProposedDate('');
     setProposedTime('');
+    setLocation('');
     setFormError('');
-    setSuccess(false);
+    setSuccess(null);
   };
 
   if (success) {
@@ -98,10 +134,10 @@ const CoordinatorScheduleMeeting = () => {
         <div className="card shadow-sm border-0">
           <div className="card-body text-center py-5">
             <div className="mb-3" style={{ fontSize: '3rem' }}>✅</div>
-            <h5 className="fw-bold text-dark mb-2">Meeting Request Sent!</h5>
-            <p className="text-muted mb-4">
-              The meeting request has been sent and is awaiting confirmation.
-            </p>
+            <h5 className="fw-bold text-dark mb-2">
+              {meetWith === 'project' ? 'Meeting Scheduled!' : 'Meeting Request Sent!'}
+            </h5>
+            <p className="text-muted mb-4">{success.message}</p>
             <div className="d-flex justify-content-center gap-3">
               <a href="/coordinator/meetings/calendar" className="btn btn-primary px-4">View Calendar</a>
               <button className="btn btn-outline-secondary px-4" onClick={handleReset}>Schedule Another</button>
@@ -112,7 +148,7 @@ const CoordinatorScheduleMeeting = () => {
     );
   }
 
-  if (loadingUsers) {
+  if (loadingData) {
     return (
       <>
         <Breadcrumb pageName="Schedule Meeting" />
@@ -125,16 +161,18 @@ const CoordinatorScheduleMeeting = () => {
     );
   }
 
-  if (usersError) {
+  if (dataError) {
     return (
       <>
         <Breadcrumb pageName="Schedule Meeting" />
-        <div className="alert alert-danger border-0">{usersError}</div>
+        <div className="alert alert-danger border-0">{dataError}</div>
       </>
     );
   }
 
-  const participantList = meetWith === 'student' ? students : supervisors;
+  // Derive student names for the selected project preview
+  const selectedProject = projects.find((p) => p._id === selectedProjectId);
+  const projectStudentNames = (selectedProject?.students || []).map((s) => s.name).filter(Boolean);
 
   return (
     <>
@@ -146,7 +184,7 @@ const CoordinatorScheduleMeeting = () => {
             <div className="card-header bg-white border-bottom py-3 px-4">
               <h6 className="fw-semibold text-dark mb-0">Meeting Details</h6>
               <p className="text-muted small mb-0 mt-1">
-                Schedule a meeting with a student or supervisor.
+                Schedule a meeting for a project group or request a meeting with a supervisor.
               </p>
             </div>
             <div className="card-body p-4">
@@ -163,54 +201,78 @@ const CoordinatorScheduleMeeting = () => {
                 <div className="col-12">
                   <label className="form-label fw-medium text-dark small">Meet With *</label>
                   <div className="d-flex gap-4">
-                    {['student', 'supervisor'].map((role) => (
+                    {['project', 'supervisor'].map((opt) => (
                       <div
-                        key={role}
+                        key={opt}
                         className="form-check d-flex align-items-center gap-2 mb-0"
                         style={{ cursor: 'pointer' }}
                       >
                         <input
                           type="radio"
                           className="form-check-input mt-0"
-                          id={`meetWith-${role}`}
-                          value={role}
-                          checked={meetWith === role}
-                          onChange={() => handleMeetWithChange(role)}
+                          id={`meetWith-${opt}`}
+                          value={opt}
+                          checked={meetWith === opt}
+                          onChange={() => handleMeetWithChange(opt)}
                         />
                         <label
                           className="form-check-label fw-medium small text-dark text-capitalize"
-                          htmlFor={`meetWith-${role}`}
+                          htmlFor={`meetWith-${opt}`}
                           style={{ cursor: 'pointer' }}
                         >
-                          {role}
+                          {opt === 'project' ? 'Project (schedule for all students)' : 'Supervisor (send request)'}
                         </label>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Select Participant */}
-                <div className="col-12">
-                  <label className="form-label fw-medium text-dark small">
-                    Select {meetWith === 'student' ? 'Student' : 'Supervisor'} *
-                  </label>
-                  <select
-                    className="form-select"
-                    value={selectedUserId}
-                    onChange={(e) => { setSelectedUserId(e.target.value); setFormError(''); }}
-                  >
-                    <option value="">
-                      — Select {meetWith === 'student' ? 'a student' : 'a supervisor'} —
-                    </option>
-                    {participantList.map((u) => (
-                      <option key={u._id} value={u._id}>
-                        {u.name}
-                        {meetWith === 'student' && u.rollNumber ? ` (${u.rollNumber})` : ''}
-                        {meetWith === 'supervisor' && u.department ? ` — ${u.department}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {/* Project dropdown */}
+                {meetWith === 'project' && (
+                  <div className="col-12">
+                    <label className="form-label fw-medium text-dark small">Select Project *</label>
+                    <select
+                      className="form-select"
+                      value={selectedProjectId}
+                      onChange={(e) => { setSelectedProjectId(e.target.value); setFormError(''); }}
+                    >
+                      <option value="">— Select a project —</option>
+                      {projects.map((p) => (
+                        <option key={p._id} value={p._id}>{p.title}</option>
+                      ))}
+                    </select>
+                    {selectedProjectId && (
+                      projectStudentNames.length > 0 ? (
+                        <div className="alert alert-info border-0 py-2 px-3 small mt-2 mb-0">
+                          <strong>This meeting will be sent to:</strong> {projectStudentNames.join(', ')}
+                        </div>
+                      ) : (
+                        <div className="alert alert-warning border-0 py-2 px-3 small mt-2 mb-0">
+                          No students are currently assigned to this project.
+                        </div>
+                      )
+                    )}
+                  </div>
+                )}
+
+                {/* Supervisor dropdown */}
+                {meetWith === 'supervisor' && (
+                  <div className="col-12">
+                    <label className="form-label fw-medium text-dark small">Select Supervisor *</label>
+                    <select
+                      className="form-select"
+                      value={selectedSupervisorId}
+                      onChange={(e) => { setSelectedSupervisorId(e.target.value); setFormError(''); }}
+                    >
+                      <option value="">— Select a supervisor —</option>
+                      {supervisors.map((s) => (
+                        <option key={s._id} value={s._id}>
+                          {s.name}{s.department ? ` — ${s.department}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {/* Meeting Topic */}
                 <div className="col-12">
@@ -231,6 +293,7 @@ const CoordinatorScheduleMeeting = () => {
                     type="date"
                     className="form-control"
                     value={proposedDate}
+                    min={today}
                     onChange={(e) => setProposedDate(e.target.value)}
                   />
                 </div>
@@ -243,6 +306,18 @@ const CoordinatorScheduleMeeting = () => {
                     className="form-control"
                     value={proposedTime}
                     onChange={(e) => setProposedTime(e.target.value)}
+                  />
+                </div>
+
+                {/* Location */}
+                <div className="col-12">
+                  <label className="form-label fw-medium text-dark small">Location <span className="text-muted">(optional)</span></label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. Room 204, Online (Zoom), Faculty Office"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
                   />
                 </div>
 
@@ -260,7 +335,7 @@ const CoordinatorScheduleMeeting = () => {
                       {submitting && (
                         <span className="spinner-border spinner-border-sm me-2" role="status" />
                       )}
-                      Send Meeting Request
+                      {meetWith === 'project' ? 'Schedule Meeting' : 'Send Meeting Request'}
                     </button>
                   </div>
                 </div>

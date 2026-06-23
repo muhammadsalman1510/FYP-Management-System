@@ -21,69 +21,105 @@ Three roles: Coordinator, Supervisor, Student. Local dev path: `D:\FYP-Github\Fy
 All pages built and styled. Frontend-backend wiring is now in progress/ongoing as bugs are found and fixed.
 
 ### Backend — ALL CORE ROUTES BUILT
-All models, routes, controllers, and middleware are built, including the proposal auto-creates-project workflow (see below — this is the most important business logic in the system).
+All models, routes, controllers, and middleware are built.
 
-### Current Phase — Bug fixing during SQA testing
-Frontend and backend are wired together. We are now fixing bugs found during end-to-end testing, one focused batch at a time.
+### Current Phase — Bug fixing and feature completion during SQA testing
 
 ---
 
 ## CRITICAL — Proposal-to-Project Workflow (DO NOT REVERSE THIS)
 
-This is the most important business logic in the entire system. A student does NOT need an existing project to submit a proposal — the proposal IS what creates the project. Do not gate the proposal form behind "must have a project first."
+A student does NOT need an existing project to submit a proposal — the proposal IS what creates the project.
 
 **Full flow:**
 
-1. Student submits a proposal with: title, description, problemStatement, techStack, groupMembers (array of {name, rollNumber} — manually typed by the student, no dropdown, since the form represents the whole group), supervisorName, supervisorEmail (also manually typed).
+1. Student submits a proposal with: title, description, problemStatement, techStack, groupMembers (array of {name, rollNumber, section, email} — ALL FOUR FIELDS), supervisorName, supervisorEmail.
 2. Backend validates BEFORE saving:
-   - Every groupMembers[].rollNumber must exist in StudentProfile. If any roll number is not found, reject with the EXACT message: "No student found with roll number '{rollNumber}'. Please check and try again."
-   - supervisorEmail must exist in User with role='supervisor'. If not found, reject with the EXACT message: "No supervisor found with email '{email}'. Please check the email and try again."
-   - Both validations return HTTP 400 and must happen before any database write — never save a partially-invalid proposal.
-3. Proposal is saved with status: 'pending', no projectId yet.
-4. Coordinator (and supervisor, read-only) can view it. Supervisor only sees proposals where supervisorEmail matches their own email — not all proposals.
-5. Coordinator approves or rejects via PUT /api/proposals/:id/review.
-6. On approval — the backend AUTOMATICALLY creates the Project. The coordinator does NOT manually create it. Auto-created project gets:
-   - title = proposal.title
-   - description = proposal.description
-   - maxStudents = proposal.groupMembers.length
-   - students = resolved User IDs from each groupMember's rollNumber
-   - supervisors = resolved User ID from supervisorEmail
-   - coordinator = the reviewing coordinator's ID
-   - milestones = the default 5 milestones, with milestone 1 marked completed: true and completedAt set
-   - progress = 20 (1 of 5 milestones done)
-   - status = 'active'
-   - proposalId = the proposal's own ID
-   - Supervisor's SupervisorProfile.currentProjects is incremented (respect capacity checks if present)
-   - proposal.projectId is set to the new project's ID
-7. On rejection: student submits a brand new proposal from scratch. No edit/resubmit of the same proposal document.
-8. Coordinator retains full manual ability to edit project students/supervisor AFTER auto-creation (existing assignSupervisor/assignStudent endpoints stay intact) — auto-creation is the starting point, not the only way to modify a project.
-9. Students check their own proposal status via GET /api/proposals/my (see below) — this MUST be used so proposal status persists across page refreshes. Do not rely on local component state alone, since refreshing the page loses that state and previously caused the form to incorrectly reappear after a pending submission.
+   - PRESENCE CHECK FIRST: every group member must have all 4 fields non-empty.
+   - CROSS-VALIDATION: all 4 fields must match real records. Look up StudentProfile by rollNumber, then User by profile.userId, then compare name → section → email IN THAT ORDER. Exact error messages: "No student found with roll number '{rollNumber}'. Please check and try again." or "The {field} provided for roll number '{rollNumber}' does not match our records. Please check and try again."
+   - This logic lives in shared helper validateAndResolveMember in proposal.controller.js — used by BOTH createProposal and reviewProposal. Do not duplicate it.
+   - supervisorEmail must exist in User with role='supervisor'.
+3. Proposal saved with status: 'pending', no projectId yet.
+4. On coordinator approval: backend AUTOMATICALLY creates the Project with milestone 1 completed, progress=20, status='active'.
+5. On rejection: student submits a brand new proposal from scratch.
+6. Students check own proposal status via GET /api/proposals/my (persists across refresh).
 
 ---
 
 ## Supervisor Recommendation on Proposals (ADVISORY ONLY)
 
-The supervisor's input on a proposal is a non-binding RECOMMENDATION ONLY. It NEVER overrides the coordinator's decision. There is no scenario where the supervisor's choice changes the outcome by itself.
+Non-binding recommendation only. NEVER overrides coordinator's decision.
 
 Truth table:
 - Supervisor approves + Coordinator approves → Project created
 - Supervisor rejects  + Coordinator approves → Project STILL created (coordinator overrides)
-- Supervisor approves + Coordinator rejects  → Project NOT created (coordinator overrides)
+- Supervisor approves + Coordinator rejects  → Project NOT created
 - Supervisor rejects  + Coordinator rejects  → Project NOT created
 
-Proposal model has separate fields for this:
-- supervisorRecommendation: 'pending' | 'approved' | 'rejected'
-- supervisorFeedback: String
-- supervisorReviewedAt: Date
-These are entirely separate from status (the coordinator's field) and coordinatorFeedback.
-
 Rules:
-- Only the supervisor NAMED on the proposal (req.user.email === proposal.supervisorEmail) can submit a recommendation — not any supervisor.
-- Supervisor can change their recommendation as many times as they want, but ONLY while proposal.status === 'pending' (i.e. before the coordinator has made the final call). Once the coordinator decides, the proposal is locked — PUT /api/proposals/:id/supervisor-review must reject further changes with a 400 once status is no longer pending.
-- The coordinator's reviewProposal logic in proposal.controller.js does NOT read or depend on supervisorRecommendation at all when deciding whether to approve/reject or whether to auto-create the project. It is display-only information for the coordinator's benefit before they decide.
-- Student-facing views must show BOTH decisions separately and clearly labeled: "Supervisor Recommendation: ..." and "Coordinator Decision: ...". Never merge them into a single status — they are conceptually different things.
+- Only the NAMED supervisor (req.user.email === proposal.supervisorEmail) can submit a recommendation.
+- Supervisor can change recommendation anytime while proposal.status === 'pending'.
+- Once coordinator decides, proposal is locked — PUT /api/proposals/:id/supervisor-review returns 400.
+- Supervisor recommendation buttons (Recommend Approval / Recommend Rejection) must be HIDDEN after a recommendation is successfully submitted — replaced by the success message and a "Change Recommendation" option. Do NOT keep showing the buttons after submission.
 
-New route: PUT /api/proposals/:id/supervisor-review — supervisor only.
+Route: PUT /api/proposals/:id/supervisor-review — supervisor only.
+
+---
+
+## Meeting System Rules (CRITICAL — DO NOT REVERSE)
+
+There are two fundamentally different types of meetings:
+
+**TYPE 1 — Scheduled meetings** (created BY coordinator or supervisor):
+- meetingType: 'scheduled', status: 'approved' — set immediately on creation
+- Go directly to all recipients' CALENDARS as confirmed events
+- Do NOT appear in recipient's Meeting Requests page
+- Student cannot approve or reject these
+- Student CAN send a text reply from their calendar (stored in meeting.studentReply)
+- Coordinator can cancel/delete any meeting they created (DELETE /api/meetings/:id)
+- Supervisor can cancel/delete meetings they created with students only — NOT meetings they created requesting coordinator
+- Student cannot cancel any meeting
+
+**TYPE 2 — Requested meetings** (created BY student requesting supervisor/coordinator):
+- meetingType: 'requested', status: 'pending'
+- Go to recipient's Meeting Requests page as pending
+- Recipient approves/rejects with a response note
+- Upon approval, appear on both parties' calendars
+
+**Coordinator Schedule Meeting form:**
+- "Meet With" options: "Project" or "Supervisor"
+- When "Project" selected: shows project dropdown (GET /api/projects → reads .data). Creates ONE meeting per student in that project, all with status: 'approved', meetingType: 'scheduled'.
+- When "Supervisor" selected: shows supervisor dropdown (GET /api/users?role=supervisor → reads .users). Single meeting, meetingType: 'requested'.
+- Has a Location field (stored in meeting.location, optional).
+
+**Supervisor "New Meeting" modal:**
+- "Meet With" dropdown: "Student" or "Coordinator"
+- Student meetings: meetingType: 'scheduled', status: 'approved'
+- Coordinator meetings: meetingType: 'requested', status: 'pending'
+- Has a Location field.
+
+**Student Meeting Requests page:**
+- ONLY shows meetings where student is requestedBy (outgoing requests the student created)
+- Does NOT show incoming scheduled meetings (those go to calendar only)
+- Student cannot approve/reject anything on this page
+
+**Student Calendar:**
+- Shows ALL meetings where student is requestedTo AND status === 'approved'
+- Clicking a meeting event shows popup with: topic, date, time, location, who it's from, and a reply text box
+- Student sends reply via PUT /api/meetings/:id with { studentReply: text }
+
+**Meeting Requests pages (Coordinator + Supervisor):**
+- Tab 1: "All Meetings" — all meetings, both directions, all statuses
+- Tab 2: "Pending" — only status === 'pending'
+- "Cancel Meeting" button on meetings they created (calls DELETE /api/meetings/:id)
+
+**Meeting model fields (including new ones):**
+- location: String (optional, default '')
+- meetingType: String (enum: ['scheduled', 'requested'], default: 'requested')
+- studentReply: String (optional, default '')
+
+**New routes:**
+- DELETE /api/meetings/:id — coordinator (any meeting they created), supervisor (meetings they created with students only)
 
 ---
 
@@ -91,65 +127,42 @@ New route: PUT /api/proposals/:id/supervisor-review — supervisor only.
 
 ```
 server/
-├── index.js                      # Port 4000, mounts all routes, serves /uploads
-├── config/db.js                  # mongoose.connect — logs real error.message + process.exit(1) on failure
-├── uploads/                      # Multer file storage (gitignored)
-├── .env                          # MONGO_URI must have NO duplicate "MONGO_URI=" text, no replicaSet param
-│                                  # unless a real local replica set is initialized
+├── index.js
+├── config/db.js
+├── uploads/
+├── .env
 ├── middleware/
-│   ├── auth.middleware.js        # authenticate + authorize
-│   └── upload.middleware.js      # Multer — 10MB, disk storage, ext whitelist
+│   ├── auth.middleware.js
+│   └── upload.middleware.js
 ├── models/
-│   ├── user.model.js             # phone + photoUrl fields
-│   ├── student-profile.model.js  # supervisorId REMOVED — do not re-add
-│   ├── supervisor-profile.model.js  # has canAcceptProject(), currentProjects, maxProjects
-│   ├── project.model.js          # supervisors[] (array), coordinator, milestones[], progress, status, proposalId
+│   ├── user.model.js
+│   ├── student-profile.model.js       # supervisorId REMOVED
+│   ├── supervisor-profile.model.js    # canAcceptProject(), currentProjects, maxProjects
+│   ├── project.model.js               # supervisors[], coordinator, milestones[], progress, status, proposalId
 │   ├── announcements.js
-│   ├── proposal.model.js         # + supervisorName, supervisorEmail (lowercase indexed), supervisorRecommendation, supervisorFeedback, supervisorReviewedAt. projectId optional/nullable.
+│   ├── proposal.model.js              # supervisorName, supervisorEmail, supervisorRecommendation, supervisorFeedback, supervisorReviewedAt, projectId optional
 │   ├── task.model.js
 │   ├── tasksubmission.model.js
 │   ├── document.model.js
-│   └── meeting.model.js
+│   └── meeting.model.js               # + location, meetingType, studentReply fields
 ├── controllers/
 │   ├── auth.controller.js
-│   ├── user.controller.js        # getMe, updateMe, updatePassword, uploadPhoto + duplicate email/rollNumber checks on create
-│   ├── project.controller.js     # populateProject() helper uses 'supervisors' not 'supervisorId'. getMyProject, getAssignedProjects, updateMilestone
-│   ├── announcements.controller.js  # coordinator-only POST, all-roles GET
-│   ├── proposal.controller.js    # createProposal (validates roll numbers + supervisor email), getProposals, getMyProposal, reviewProposal (auto-creates Project on approval, coordinator decision is final/absolute), submitSupervisorRecommendation (advisory only, locked once coordinator decides)
-│   ├── task.controller.js        # createTask, getTasks, submitTask, getSubmissions (coordinator+supervisor), getMySubmissions (student, own submissions only), reviewSubmission
+│   ├── user.controller.js
+│   ├── project.controller.js          # populateProject() uses 'supervisors' not 'supervisorId'
+│   ├── announcements.controller.js
+│   ├── proposal.controller.js         # validateAndResolveMember shared helper
+│   ├── task.controller.js             # getMySubmissions (student), createTask, getTasks, submitTask, getSubmissions, reviewSubmission
 │   ├── document.controller.js
-│   └── meeting.controller.js
+│   └── meeting.controller.js          # createMeeting (sets meetingType+status by role), deleteMeeting (new)
 └── routes/
     ├── auth.routes.js
-    ├── user.routes.js            # /me/* routes BEFORE /:id routes
-    ├── project.routes.js         # /my and /assigned BEFORE /:id routes
+    ├── user.routes.js                 # /me/* BEFORE /:id
+    ├── project.routes.js              # /my and /assigned BEFORE /:id
     ├── announcements.routes.js
-    ├── proposal.routes.js        # /my BEFORE /:id routes (NEW route added)
-    ├── task.routes.js            # /submissions/my, /submissions, /submissions/:id/review BEFORE any /:id
+    ├── proposal.routes.js             # /my BEFORE /:id
+    ├── task.routes.js                 # /submissions/my, /submissions, /submissions/:id/review BEFORE /:id
     ├── document.routes.js
-    └── meeting.routes.js
-```
-
----
-
-## Client Structure Notes
-
-```
-client/
-├── vite.config.js   # MUST have a server.proxy block forwarding /api and /uploads
-│                     # to http://localhost:4000 (changeOrigin: true, secure: false).
-│                     # Without this, all fetch('/api/...') calls hit the Vite dev
-│                     # server itself and get back HTML, causing
-│                     # "Unexpected token '<', <!DOCTYPE..." JSON parse errors.
-│                     # MUST restart `npm run dev` after editing this file — it
-│                     # does not hot-reload.
-└── src/
-    ├── App.jsx       # AuthRoute: simple `if (token && role)` check only.
-    │                 # DO NOT decode the JWT with atob()/jwt-decode in the browser
-    │                 # for redirect logic — this previously caused a CSP 'eval'
-    │                 # violation error. If the token is actually expired/invalid,
-    │                 # the page's own API call will get a 401 and can redirect then.
-    └── pages/...
+    └── meeting.routes.js              # DELETE /:id added
 ```
 
 ---
@@ -160,9 +173,9 @@ client/
 - POST /api/auth/login
 
 ### Users
-- POST /api/users — coordinator only (checks duplicate email + duplicate rollNumber for students, returns clear 400 messages)
-- GET /api/users — coordinator only. **FOOTGUN: response shape is `{ users: [...] }`, NOT `{ success: true, data: [...] }` like every other route.** Read `data.users` on the frontend, not `data.data`. This inconsistency has caused bugs twice already (Coordinator Dashboard stat counts, Coordinator ScheduleMeeting dropdowns) — always double check this specific route's shape before writing parsing code against it.
-- GET /api/users/:id — coordinator only. Supervisors and students do NOT have access to this route, and it should not be loosened to give them access. If a supervisor/student-facing page needs user data (e.g. Supervisor/StudentDetail.jsx), assemble it from routes that role already has access to (e.g. GET /api/projects/assigned, which has students populated) rather than expanding this route's permissions.
+- POST /api/users — coordinator only
+- GET /api/users — coordinator only. **FOOTGUN: returns { users: [...] } NOT { success, data }. Read .users not .data.**
+- GET /api/users/:id — coordinator only. Do not loosen this restriction.
 - PUT /api/users/:id — coordinator only
 - DELETE /api/users/:id — coordinator only
 - GET /api/users/me — all roles
@@ -171,7 +184,7 @@ client/
 - POST /api/users/me/photo — all roles
 
 ### Projects
-- POST /api/projects — coordinator (manual creation still works; most projects now come via proposal auto-creation)
+- POST /api/projects — coordinator
 - GET /api/projects — coordinator
 - GET /api/projects/:id — coordinator
 - PUT /api/projects/:id — coordinator
@@ -184,18 +197,18 @@ client/
 - PUT /api/projects/:id/milestones/:milestoneId — coordinator only
 
 ### Proposals
-- POST /api/proposals — student only. Validates groupMembers rollNumbers + supervisorEmail exist BEFORE saving.
-- GET /api/proposals — coordinator (sees all) + supervisor (sees only proposals where supervisorEmail matches their own email)
-- GET /api/proposals/my — student only. Returns their own most recent proposal ({success:true, data: proposal|null}). Used so proposal status survives page refresh. Declared BEFORE /:id routes.
-- PUT /api/proposals/:id/review — coordinator only. On approval, auto-creates the Project (see workflow section above). Returns the created project in the response.
-- PUT /api/proposals/:id/supervisor-review — supervisor only (must be the NAMED supervisor on the proposal). Advisory only — does not affect coordinator's decision. Locked once status is no longer 'pending'.
+- POST /api/proposals — student only. Full 4-field cross-validation.
+- GET /api/proposals — coordinator (all) + supervisor (own email only)
+- GET /api/proposals/my — student only. Before /:id.
+- PUT /api/proposals/:id/review — coordinator only. Auto-creates Project on approval.
+- PUT /api/proposals/:id/supervisor-review — supervisor only. Advisory. Locked once coordinator decides.
 
 ### Tasks
 - POST /api/tasks — coordinator + supervisor
 - GET /api/tasks — all roles (role-filtered)
 - POST /api/tasks/:id/submit — student only, Multer
 - GET /api/tasks/submissions — coordinator + supervisor
-- GET /api/tasks/submissions/my — student only. Returns the student's own TaskSubmission documents with taskId populated (title, dueDate, createdBy, projectId). Exists because students otherwise had no way to see their own submission history, which caused the Submitted tab to reset to empty on every page refresh even after a real submission. Declared BEFORE /submissions/:id/review.
+- GET /api/tasks/submissions/my — student only. Before /submissions/:id/review.
 - PUT /api/tasks/submissions/:id/review — coordinator + supervisor
 
 ### Documents
@@ -205,7 +218,8 @@ client/
 ### Meetings
 - POST /api/meetings — all roles
 - GET /api/meetings — all roles (own meetings)
-- PUT /api/meetings/:id — supervisor + coordinator
+- PUT /api/meetings/:id — supervisor + coordinator (approve/reject + notes + studentReply)
+- DELETE /api/meetings/:id — coordinator (any they created) + supervisor (student meetings only)
 
 ### Announcements
 - POST /api/announcements — coordinator only
@@ -213,78 +227,60 @@ client/
 
 ---
 
-## Session Storage — sessionStorage, NOT localStorage (IMPORTANT — do not revert)
+## Session Storage — sessionStorage NOT localStorage (DO NOT REVERT)
 
-Auth session data (token, user, name, role) is stored in **sessionStorage**, not localStorage. This was a deliberate migration — do not change it back without understanding why.
-
-**Why:** localStorage is shared across every tab on the same origin. With localStorage, logging in as a different role in one tab silently overwrote the session for ALL open tabs, so a coordinator logging in in Tab 2 would cause Tab 1 (showing a student session) to suddenly redirect to the coordinator dashboard on its next refresh or navigation. sessionStorage is private per-tab by browser design, which fixes this completely — each tab keeps its own independent login.
-
-```js
-sessionStorage.setItem('token', data.token)
-sessionStorage.setItem('user',  JSON.stringify(data.user))
-sessionStorage.setItem('name',  data.user.name)
-sessionStorage.setItem('role',  data.user.role)
-```
-
-**Known sessionStorage behavior (not a bug, expected):**
-- A brand new tab opened via Ctrl+T and manually navigating to the URL will NOT have a session — sessionStorage only carries over to true duplicate tabs (e.g. "Duplicate Tab", or a tab opened via a link/window.open from an already-authenticated page).
-- Closing the browser entirely clears all sessions — this is correct, standard secure behavior, not a regression.
-- This enables testing/demoing multiple roles simultaneously in separate tabs without constantly logging in and out — this was the explicit reason for the migration.
-
-**Other localStorage usage in the app is intentionally NOT part of this migration** and should stay as localStorage since it's meant to persist across browser restarts: theme preference (useColorMode.jsx), sidebar collapsed/expanded state, toast notification settings (fireToast.jsx), and the generic useLocalStorage.jsx hook itself. Only the 4 auth keys (token, user, name, role) were migrated.
-
-If a future change needs to read/write the session, always use sessionStorage for these 4 keys specifically — grep for `sessionStorage.getItem('token')` patterns already established across the 36 files that already follow this convention.
+Auth keys (token, user, name, role) use sessionStorage for per-tab independence.
+UI preferences (theme, sidebar state) correctly stay in localStorage.
 
 ---
 
 ## User Roles
 
-### Coordinator — /coordinator/dashboard
-Admin. Creates users, projects (manual path still exists), tasks. Posts announcements. Approves/rejects proposals (approval auto-creates the project). Marks milestones. Can manually edit project students/supervisor after auto-creation.
+### Coordinator
+Admin. Creates users, tasks, projects. Approves/rejects proposals. Marks milestones. Schedules meetings by project (all students notified) or individual supervisor.
 
-### Supervisor — /supervisor/dashboard
-Assigned to projects (via proposal auto-creation or manual assignment). Creates tasks for their projects. Reviews submissions. Can submit a non-binding recommendation (approve/reject + feedback) on proposals that name them as supervisor, while status is still pending — see "Supervisor Recommendation on Proposals" section above. Otherwise read-only on proposals and announcements. Can request meetings with students OR with a project's coordinator (see Meeting UI note below).
+### Supervisor
+Assigned to projects. Creates tasks. Reviews submissions. Advisory recommendation on proposals naming them. Schedules meetings with students (confirmed immediately) or requests meetings with coordinator (needs approval).
 
-### Student — /dashboard
-Has 0 or 1 project. If 0 projects: submits a Project Proposal (the form that creates the project). If 1 project: sees Project Status with milestones, group members, supervisor info. Uploads documents, submits tasks, requests meetings. Read-only announcements.
-
----
-
-## Known UI/UX Conventions Established During Bug Fixes
-
-- Response parsing: Backend always returns { success: true, data: ... } or { success: false, message: '...' }. When the frontend reads a response, the actual payload is at responseJson.data — NOT responseJson.project, responseJson.user, responseJson.users, or any other custom key. Several bugs (Coordinator Dashboard showing 0, ProjectDetail showing "Project not found", Student Profile crashing) were all caused by reading the wrong key on the response object. Always re-verify the exact controller response shape before writing frontend parsing code — do not assume.
-- Dashboard stat cards should be clickable where a corresponding list page exists (e.g. Total Students card → navigates to Manage Students). Use useNavigate() + onClick + cursor: pointer style.
-- Supervisor meeting request UI: one form with a "Meet With" dropdown (Student or Coordinator), not two separate buttons. Selecting Student shows a student picker and the submit button reads "Create Meeting". Selecting Coordinator shows the project picker (to resolve which coordinator) and the submit button reads "Request Meeting". The page-level button that opens this modal should be a neutral label like "+ New Meeting" since it can lead to either action.
-- Error display in modals: never let a backend 400 error fail silently (console.error only). Always surface data.message in a visible alert-danger inside the relevant modal, keep the modal open, and preserve the user's entered form data so they can correct and resubmit.
-- A page can LOOK fully built (real-looking layout, real-looking data, a working-looking submit button) while actually being 100% disconnected from the backend — hardcoded arrays, a submit handler that only sets local state and fakes a success message, no useEffect fetch on mount. This was found in MeetingRequests.jsx (student), Calendar.jsx, Coordinator/MeetingRequests.jsx, Coordinator/ScheduleMeeting.jsx, and Supervisor/StudentDetail.jsx — all looked finished but had zero real API calls. When wiring or auditing any page, do not assume a page is done just because it renders correctly — check for an actual fetch()/useEffect pair and a real submit handler before marking it complete.
+### Student
+Submits proposals. Uploads documents. Submits tasks. Can re-upload a file to replace a wrong submission. Requests meetings with supervisor/coordinator. Sees scheduled meetings on calendar only (not in Meeting Requests). Can send a text reply to a scheduled meeting from their calendar.
 
 ---
 
-## File Upload Pattern (documents, task submissions, photos)
+## Known UI/UX Conventions
+
+- **Response parsing:** GET /api/users returns { users: [...] }. All other routes return { success, data }. Always verify.
+- **Date inputs:** Use type="date" HTML input only. Never use custom date pickers that allow impossible dates (June 31, Feb 30, etc). The browser's native date picker handles month lengths correctly.
+- **Dashboard stat cards:** All roles — clickable with useNavigate() + onClick + cursor:pointer.
+- **Supervisor recommendation buttons:** Hide after submission — show success message + "Change Recommendation" link instead. Do not keep showing Recommend Approval/Rejection buttons after a recommendation was already submitted.
+- **Student profile photos in project cards:** When rendering student cards in supervisor/coordinator project detail pages, always pass photoUrl from the populated student object to the Avatar component. Missing photoUrl prop causes silhouette even when student has uploaded a photo.
+- **Coordinator profile photo in student's coordinator view:** The student's "My Coordinator" page (CoordinatorView.jsx) must fetch the coordinator's photoUrl from the project data (project.coordinator.photoUrl if populated) and pass it to Avatar.
+- **Designation field:** Removed from Add Supervisor form. Do not re-add it.
+- **Task shortcuts on project pages:** All 3 roles' project detail pages show a clickable task count shortcut (e.g. "2 Pending Tasks →") linking to the tasks page.
+- **Coordinator ProjectDetail tabs:** Same tab structure as Supervisor ProjectDetail — Overview, Tasks, Submissions, Documents. Coordinator should be able to view all task/submission activity on a project.
+- **Student cards clickable on coordinator ProjectDetail:** Same modal pattern as Supervisor ProjectDetail — clicking a student card opens an inline modal with their submissions and documents.
+- **Error display in modals:** Always surface data.message in alert-danger, keep modal open, preserve form data.
+- **Stub page warning:** A page that looks done may have zero real API calls. Always verify useEffect + fetch exist before assuming a page is wired.
+
+---
+
+## File Upload Pattern
 
 ```js
 const formData = new FormData();
-formData.append('file', selectedFile); // or 'photo' for user photo uploads
+formData.append('file', selectedFile);
 const res = await fetch('/api/documents', {
   method: 'POST',
-  headers: { 'Authorization': `Bearer ${token}` }, // NO Content-Type for FormData — browser sets it
+  headers: { 'Authorization': `Bearer ${token}` }, // NO Content-Type for FormData
   body: formData
 });
 ```
 
-## Standard Auth Header Pattern (all JSON requests)
+## Standard Auth Header Pattern
 
 ```js
 const token = sessionStorage.getItem('token');
 const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
-```
-
-## Standard Loading/Error State Pattern (use on every page)
-
-```js
-const [loading, setLoading] = useState(true);
-const [error, setError] = useState(null);
-// in useEffect: try/catch around fetch, setLoading(false) in finally
 ```
 
 ---
@@ -292,54 +288,41 @@ const [error, setError] = useState(null);
 ## Backend Architecture Notes
 
 - ES modules ("type": "module" in server/package.json)
-- All models: export default mongoose.model(...)
-- Server port: 4000 | Frontend port: 5173 (Vite proxy forwards /api and /uploads — see Client Structure Notes above)
-- .env: MONGO_URI, JWT_SECRET, PORT, ADMIN_EMAIL, ADMIN_PASSWORD
-  - Known footgun: a duplicated MONGO_URI=MONGO_URI=mongodb://... line (e.g. from pasting a value back into an already-filled field) will cause MongoParseError: Invalid scheme. If you ever see that error, print JSON.stringify(process.env.MONGO_URI) to check for this exact duplication before assuming anything else is wrong.
-  - Local MongoDB does not need ?replicaSet=rs0 unless a real replica set was deliberately initialized with mongod --replSet rs0 + rs.initiate(). If using plain standalone local MongoDB, the URI should NOT include the replicaSet query param.
-- uploads/ folder is gitignored
-- connectDB() in config/db.js must log the real error.message (not a generic string) and call process.exit(1) on failure — never let the server claim "running" while silently failing to connect to the database, since this previously caused every query to hang for 10 seconds with a confusing buffering timed out error instead of a clear connection failure message.
+- Server port: 4000 | Frontend port: 5173
+- Vite proxy forwards /api and /uploads to localhost:4000
+- .env footguns: duplicated MONGO_URI= prefix causes MongoParseError; no ?replicaSet=rs0 on plain standalone MongoDB
+- connectDB() must log real error.message and call process.exit(1) on failure
 
 ---
 
 ## Important Rules
 
-### Frontend rules:
-1. Read this entire CLAUDE.md before writing any code.
-2. Always return complete files — never partial snippets.
-3. Replace ALL hardcoded dummy data with real API calls when wiring a page.
-4. Always show a loading spinner while fetching.
-5. Always show a visible error message if a fetch fails — never console.error only.
-6. Never use form tags — use onClick and onChange handlers.
-7. Never use Tailwind — Bootstrap 5 and inline styles only.
-8. Do not change routing or URL paths unless explicitly asked.
-9. For file uploads use FormData — do NOT set Content-Type header manually.
-10. Token is always read from sessionStorage.getItem('token') (NOT localStorage — see Session Storage section above).
-11. Always double-check the actual backend response shape (read the controller) before writing .data parsing logic on the frontend.
+### Frontend:
+1. Read entire CLAUDE.md before writing code.
+2. Always return complete files — no partial snippets.
+3. Replace all hardcoded data with real API calls.
+4. Loading spinner while fetching. Visible error if fetch fails.
+5. No form tags. No Tailwind. Bootstrap 5 + inline styles only.
+6. Token from sessionStorage.getItem('token').
+7. Verify exact backend response shape before writing parsing code.
+8. Use type="date" for all date inputs — never custom pickers with manual day selectors.
 
-### Backend rules:
-1. Use ES module syntax — import/export not require.
-2. All routes use authenticate middleware.
-3. Role-restricted routes use authorize('role') middleware.
-4. Use try/catch in every controller function.
-5. Return { success: true, data: ... } or { success: false, message: '...' } — always.
+### Backend:
+1. ES module syntax only.
+2. All routes: authenticate middleware.
+3. Role restrictions: authorize('role') middleware.
+4. Try/catch in every controller function.
+5. Return { success: true, data: ... } or { success: false, message: '...' }.
 6. Never modify auth logic without asking first.
-7. Any route with a static segment (e.g. /my, /assigned, /me, /submissions) must be declared BEFORE a dynamic /:id route in the same router, or Express will incorrectly match the static path as an :id parameter.
-8. Validation errors (duplicate email, invalid roll number, invalid supervisor email, etc.) must return HTTP 400 with a specific, user-readable message naming exactly what was wrong — never a generic "Internal server error" for a validation case.
+7. Static route segments (/my, /assigned, /me, /submissions) BEFORE dynamic /:id in same router.
+8. Validation errors: HTTP 400 with specific user-readable messages.
 
 ---
 
 ## How to Run
 
 ```bash
-# Backend (port 4000)
-cd server && npm install && npm run dev
-
-# Frontend (port 5173) — restart after any vite.config.js change
-cd client && npm install && npm run dev
-
-# Seed coordinator
-cd server && node seed.js
+cd server && npm run dev   # port 4000
+cd client && npm run dev   # port 5173 — restart after vite.config.js changes
+cd server && node seed.js  # seed coordinator
 ```
-
-If login fails with "Internal server error" or queries hang/timeout: check the backend terminal for a real MongoDB connection error first (see .env footguns above) before assuming it's a frontend or route bug.

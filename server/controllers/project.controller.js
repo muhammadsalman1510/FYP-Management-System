@@ -53,8 +53,8 @@ const checkSupervisorCapacity = async (supervisorUserId) => {
 const populateProject = (query) =>
     query
         .populate('supervisors', 'name email phone photoUrl')
-        .populate('coordinator', 'name email phone')
-        .populate('students', 'name email')
+        .populate('coordinator', 'name email phone photoUrl')
+        .populate('students', 'name email photoUrl')
 
 // ─── controllers ────────────────────────────────────────────────────────────
 
@@ -350,8 +350,8 @@ export const getMyProject = async (req, res) => {
     try {
         const project = await Project.findOne({ students: req.user._id })
             .populate('supervisors', 'name email phone photoUrl')
-            .populate('coordinator', 'name email phone')
-            .populate('students', 'name email');
+            .populate('coordinator', 'name email phone photoUrl')
+            .populate('students', 'name email photoUrl');
 
         if (!project) {
             return res.status(404).json({ success: false, message: 'No project assigned to you' });
@@ -371,8 +371,8 @@ export const getMyProject = async (req, res) => {
 export const getAssignedProjects = async (req, res) => {
     try {
         const projects = await Project.find({ supervisors: req.user._id })
-            .populate('students', 'name email')
-            .populate('coordinator', 'name email')
+            .populate('students', 'name email photoUrl')
+            .populate('coordinator', 'name email photoUrl')
             .sort({ createdAt: -1 });
 
         return res.status(200).json({ success: true, data: projects });

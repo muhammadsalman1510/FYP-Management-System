@@ -8,11 +8,14 @@ const SupervisorProposals = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [expandedId, setExpandedId]     = useState(null);
 
+  // changingRec tracks which proposal IDs are in "change recommendation" mode
+  const [changingRec, setChangingRec] = useState({});
+
   // Recommendation form state (for whichever proposal is currently expanded)
-  const [recFeedback,    setRecFeedback]    = useState('');
-  const [recSubmitting,  setRecSubmitting]  = useState(false);
-  const [recError,       setRecError]       = useState(null);
-  const [recSuccess,     setRecSuccess]     = useState(null);
+  const [recFeedback,   setRecFeedback]   = useState('');
+  const [recSubmitting, setRecSubmitting] = useState(false);
+  const [recError,      setRecError]      = useState(null);
+  const [recSuccess,    setRecSuccess]    = useState(null);
 
   useEffect(() => {
     const fetchProposals = async () => {
@@ -66,6 +69,8 @@ const SupervisorProposals = () => {
       );
       setRecFeedback('');
       setRecSuccess('Your recommendation has been saved.');
+      // Exit change mode so the success view shows
+      setChangingRec((prev) => ({ ...prev, [proposal._id]: false }));
     } catch (err) {
       setRecError(err.message);
     } finally {
@@ -196,6 +201,8 @@ const SupervisorProposals = () => {
             const style           = getStatusStyle(proposal.status);
             const submittedByName = proposal.submittedBy?.name || '—';
             const isExpanded      = expandedId === proposal._id;
+            const hasSubmittedRec = proposal.supervisorRecommendation === 'approved' || proposal.supervisorRecommendation === 'rejected';
+            const isChangingThisRec = changingRec[proposal._id] === true;
 
             return (
               <div key={proposal._id} className="card shadow-sm border-0">
@@ -311,13 +318,31 @@ const SupervisorProposals = () => {
                         <p className="fw-semibold text-dark small mb-2">Your Recommendation</p>
 
                         {proposal.status !== 'pending' ? (
-                          // Coordinator already decided — lock the form
                           <div className="alert alert-secondary border-0 py-2 px-3 small mb-0">
                             This proposal has been finalized by the coordinator
                             ({proposal.status === 'approved' ? 'Approved' : 'Rejected'}).
                             No further recommendations can be submitted.
                           </div>
+                        ) : hasSubmittedRec && !isChangingThisRec ? (
+                          // Recommendation already submitted — show success view
+                          <>
+                            <div className="alert alert-success border-0 py-2 px-3 small mb-2">
+                              Your recommendation has been saved.
+                            </div>
+                            <button
+                              className="btn btn-link btn-sm p-0 text-primary text-decoration-none small"
+                              onClick={() => {
+                                setChangingRec((prev) => ({ ...prev, [proposal._id]: true }));
+                                setRecFeedback(proposal.supervisorFeedback || '');
+                                setRecError(null);
+                                setRecSuccess(null);
+                              }}
+                            >
+                              Change Recommendation
+                            </button>
+                          </>
                         ) : (
+                          // Show form + buttons
                           <>
                             <p className="text-muted small mb-3" style={{ fontStyle: 'italic' }}>
                               This is a recommendation for the coordinator. The coordinator's decision is final
@@ -326,9 +351,6 @@ const SupervisorProposals = () => {
 
                             {recError && (
                               <div className="alert alert-danger border-0 py-2 px-3 small mb-2">{recError}</div>
-                            )}
-                            {recSuccess && (
-                              <div className="alert alert-success border-0 py-2 px-3 small mb-2">{recSuccess}</div>
                             )}
 
                             <label className="form-label fw-medium text-dark small mb-1">
@@ -360,6 +382,14 @@ const SupervisorProposals = () => {
                                 {recSubmitting && <span className="spinner-border spinner-border-sm me-1" role="status" />}
                                 Recommend Rejection
                               </button>
+                              {isChangingThisRec && (
+                                <button
+                                  className="btn btn-outline-secondary btn-sm px-3"
+                                  onClick={() => setChangingRec((prev) => ({ ...prev, [proposal._id]: false }))}
+                                >
+                                  Cancel
+                                </button>
+                              )}
                             </div>
                           </>
                         )}

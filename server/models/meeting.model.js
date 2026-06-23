@@ -45,6 +45,19 @@ const meetingSchema = new mongoose.Schema(
             type: String,
             default: "",
         },
+        location: {
+            type: String,
+            default: "",
+        },
+        meetingType: {
+            type: String,
+            enum: ["scheduled", "requested"],
+            default: "requested",
+        },
+        studentReply: {
+            type: String,
+            default: "",
+        },
         createdAt: {
             type: Date,
             default: Date.now,

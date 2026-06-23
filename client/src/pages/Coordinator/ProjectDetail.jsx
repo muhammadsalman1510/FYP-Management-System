@@ -17,23 +17,34 @@ const ProjectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const [project, setProject] = useState(null);
+  const [project, setProject]         = useState(null);
   const [supervisors, setSupervisors] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [documents, setDocuments] = useState([]);
-  const [proposal, setProposal] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [alert, setAlert] = useState({ show: false, message: '', type: 'success' });
-  const [activeTab, setActiveTab] = useState('overview');
+  const [students, setStudents]       = useState([]);
+  const [documents, setDocuments]     = useState([]);
+  const [proposal, setProposal]       = useState(null);
+  const [tasks, setTasks]             = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState(null);
+  const [alert, setAlert]             = useState({ show: false, message: '', type: 'success' });
+  const [activeTab, setActiveTab]     = useState('overview');
 
   const [showChangeSupervisor, setShowChangeSupervisor] = useState(false);
-  const [showAssignStudent, setShowAssignStudent] = useState(false);
-  const [supervisorInput, setSupervisorInput] = useState('');
-  const [studentInput, setStudentInput] = useState('');
-  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
-  const [removingStudentId, setRemovingStudentId] = useState(null);
-  const [milestoneConfirm, setMilestoneConfirm] = useState(null);
+  const [showAssignStudent, setShowAssignStudent]       = useState(false);
+  const [supervisorInput, setSupervisorInput]           = useState('');
+  const [studentInput, setStudentInput]                 = useState('');
+  const [showRemoveConfirm, setShowRemoveConfirm]       = useState(false);
+  const [removingStudentId, setRemovingStudentId]       = useState(null);
+  const [milestoneConfirm, setMilestoneConfirm]         = useState(null);
+
+  const [selectedStudent, setSelectedStudent]     = useState(null);
+  const [showStudentModal, setShowStudentModal]   = useState(false);
+
+  const [reviewModal, setReviewModal]       = useState(false);
+  const [reviewSub, setReviewSub]           = useState(null);
+  const [reviewDecision, setReviewDecision] = useState('');
+  const [reviewFeedback, setReviewFeedback] = useState('');
+  const [reviewing, setReviewing]           = useState(false);
 
   const showAlertMsg = (message, type = 'success') => {
     setAlert({ show: true, message, type });
@@ -46,25 +57,24 @@ const ProjectDetail = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const [projectRes, supervisorsRes, studentsRes, docsRes, proposalsRes] = await Promise.all([
+        const [projectRes, supervisorsRes, studentsRes, docsRes, proposalsRes, tasksRes, subsRes] = await Promise.all([
           fetch(`/api/projects/${id}`, { headers: authHeaders }),
           fetch('/api/users?role=supervisor', { headers: authHeaders }),
           fetch('/api/users?role=student', { headers: authHeaders }),
           fetch('/api/documents', { headers: authHeaders }),
           fetch('/api/proposals', { headers: authHeaders }),
+          fetch('/api/tasks', { headers: authHeaders }),
+          fetch('/api/tasks/submissions', { headers: authHeaders }),
         ]);
 
-        const [projectData, supervisorsData, studentsData, docsData, proposalsData] = await Promise.all([
+        const [projectData, supervisorsData, studentsData, docsData, proposalsData, tasksData, subsData] = await Promise.all([
           projectRes.json(), supervisorsRes.json(), studentsRes.json(),
-          docsRes.json(), proposalsRes.json(),
+          docsRes.json(), proposalsRes.json(), tasksRes.json(), subsRes.json(),
         ]);
 
         if (!projectRes.ok) throw new Error(projectData.message || 'Failed to load project');
 
-        // API returns { success: true, data: { ...project } }
         setProject(projectData.data);
-
-        // getUsers returns { users: [...] }
         setSupervisors(supervisorsData.users || []);
         setStudents(studentsData.users || []);
 
@@ -78,6 +88,18 @@ const ProjectDetail = () => {
             (p) => p.projectId?._id?.toString() === id || p.projectId?.toString() === id
           );
           setProposal(match || null);
+        }
+        if (tasksData.success) {
+          setTasks((tasksData.data || []).filter((t) => {
+            const pid = t.projectId?._id || t.projectId;
+            return String(pid) === String(id);
+          }));
+        }
+        if (subsData.success) {
+          setSubmissions((subsData.data || []).filter((s) => {
+            const pid = s.projectId?._id || s.projectId;
+            return String(pid) === String(id);
+          }));
         }
       } catch (err) {
         setError(err.message);
@@ -93,7 +115,6 @@ const ProjectDetail = () => {
       const res = await fetch(`/api/projects/${id}`, { headers: authHeaders });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to refresh');
-      // API returns { success: true, data: { ...project } }
       setProject(data.data);
     } catch (err) {
       showAlertMsg(err.message, 'danger');
@@ -173,6 +194,47 @@ const ProjectDetail = () => {
     setMilestoneConfirm(null);
   };
 
+  const openStudentModal = (student) => {
+    setSelectedStudent(student);
+    setShowStudentModal(true);
+  };
+
+  const closeStudentModal = () => {
+    setShowStudentModal(false);
+    setSelectedStudent(null);
+  };
+
+  const openReview = (sub, decision) => {
+    setReviewSub(sub);
+    setReviewDecision(decision);
+    setReviewFeedback('');
+    setReviewModal(true);
+  };
+
+  const submitReview = async () => {
+    if (!reviewFeedback.trim()) { alert('Please provide feedback.'); return; }
+    setReviewing(true);
+    try {
+      const res = await fetch(`/api/tasks/submissions/${reviewSub._id}/review`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({ status: reviewDecision, feedback: reviewFeedback }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Review failed');
+      setSubmissions((prev) =>
+        prev.map((s) =>
+          s._id === reviewSub._id ? { ...s, status: reviewDecision, feedback: reviewFeedback } : s
+        )
+      );
+      setReviewModal(false);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setReviewing(false);
+    }
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -216,14 +278,20 @@ const ProjectDetail = () => {
   const currentMilestoneIdx = milestones.findIndex((m) => !m.completed);
 
   const supervisor = project.supervisors?.[0];
-
   const assignedStudentIds = (project.students || []).map((s) => s._id);
   const availableStudents = students.filter((s) => !assignedStudentIds.includes(s._id));
+  const pendingSubsCount = submissions.filter((s) => s.status === 'pending').length;
+
+  const studentSubs = selectedStudent
+    ? submissions.filter((s) => String(s.submittedBy?._id) === String(selectedStudent._id))
+    : [];
+  const studentDocs = selectedStudent
+    ? documents.filter((d) => String(d.uploadedBy?._id) === String(selectedStudent._id))
+    : [];
 
   const statusLabel =
     project.status === 'active'           ? 'Active' :
     project.status === 'completed'        ? 'Completed' :
-    project.status === 'pending_proposal' ? 'Pending Proposal' :
     'Pending Proposal';
 
   const statusColor =
@@ -234,6 +302,8 @@ const ProjectDetail = () => {
   const tabs = [
     { key: 'overview',    label: 'Overview' },
     { key: 'milestones',  label: `Milestones (${completedMilestones}/${milestones.length})` },
+    { key: 'tasks',       label: `Tasks (${tasks.length})` },
+    { key: 'submissions', label: `Submissions (${pendingSubsCount} Pending)` },
     { key: 'documents',   label: `Documents (${documents.length})` },
     { key: 'proposal',    label: 'Proposal' },
   ];
@@ -326,85 +396,145 @@ const ProjectDetail = () => {
 
       {/* ── TAB: OVERVIEW ── */}
       {activeTab === 'overview' && (
-        <div className="row g-4">
+        <div className="d-flex flex-column gap-4">
 
-          <div className="col-12 col-xl-5">
-            <div className="card shadow-sm border-0">
-              <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3 px-4">
-                <h6 className="fw-semibold text-dark mb-0">Supervisor</h6>
-                <button
-                  className="btn btn-outline-primary btn-sm px-3"
-                  onClick={() => { setSupervisorInput(''); setShowChangeSupervisor(true); }}
+          {/* Task Summary Shortcut */}
+          <div
+            className="card border-0 shadow-sm"
+            style={{ cursor: 'pointer' }}
+            onClick={() => setActiveTab('tasks')}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f8f9fa'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ''; }}
+          >
+            <div className="card-body p-3 d-flex align-items-center justify-content-between">
+              <div className="d-flex align-items-center gap-3">
+                <div
+                  className="d-flex align-items-center justify-content-center rounded-circle"
+                  style={{ width: '40px', height: '40px', minWidth: '40px', backgroundColor: '#3c50e015' }}
                 >
-                  {supervisor ? 'Change' : 'Assign'}
-                </button>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="#3c50e0">
+                    <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="fw-semibold text-dark mb-0 small">
+                    {tasks.length} Task{tasks.length !== 1 ? 's' : ''} assigned
+                    &nbsp;&bull;&nbsp;
+                    {pendingSubsCount} Submission{pendingSubsCount !== 1 ? 's' : ''} pending review
+                  </p>
+                  <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>Click to view tasks and submissions</p>
+                </div>
               </div>
-              <div className="card-body p-4">
-                {supervisor ? (
-                  <div className="d-flex align-items-center gap-3">
-                    <Avatar name={supervisor.name} size={44} />
-                    <div>
-                      <p className="fw-semibold text-dark mb-0 small">{supervisor.name}</p>
-                      <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>{supervisor.email}</p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-muted small mb-0 text-center py-2">No supervisor assigned yet.</p>
-                )}
-              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3c50e0" strokeWidth="2">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
             </div>
           </div>
 
-          <div className="col-12 col-xl-7">
-            <div className="card shadow-sm border-0">
-              <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3 px-4">
-                <h6 className="fw-semibold text-dark mb-0">
-                  Students
-                  <span className="badge bg-primary ms-2 rounded-pill" style={{ fontSize: '0.7rem' }}>
-                    {(project.students || []).length}/{project.maxStudents}
-                  </span>
-                </h6>
-                {(project.students || []).length < project.maxStudents && (
+          <div className="row g-4">
+
+            <div className="col-12 col-xl-5">
+              <div className="card shadow-sm border-0">
+                <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3 px-4">
+                  <h6 className="fw-semibold text-dark mb-0">Supervisor</h6>
                   <button
                     className="btn btn-outline-primary btn-sm px-3"
-                    onClick={() => { setStudentInput(''); setShowAssignStudent(true); }}
+                    onClick={() => { setSupervisorInput(''); setShowChangeSupervisor(true); }}
                   >
-                    + Add
+                    {supervisor ? 'Change' : 'Assign'}
                   </button>
-                )}
-              </div>
-              <div className="card-body p-3">
-                {(project.students || []).length === 0 ? (
-                  <p className="text-muted small mb-0 text-center py-3">No students added yet.</p>
-                ) : (
-                  <div className="d-flex flex-column gap-2">
-                    {project.students.map((student) => (
-                      <div
-                        key={student._id}
-                        className="d-flex align-items-center justify-content-between p-2 rounded border"
-                      >
-                        <div className="d-flex align-items-center gap-2">
-                          <Avatar name={student.name} size={32} />
-                          <div>
-                            <p className="fw-medium text-dark mb-0" style={{ fontSize: '0.82rem' }}>{student.name}</p>
-                            <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>{student.email}</p>
-                          </div>
-                        </div>
-                        <button
-                          className="btn btn-outline-danger btn-sm px-2"
-                          style={{ fontSize: '0.72rem' }}
-                          onClick={() => { setRemovingStudentId(student._id); setShowRemoveConfirm(true); }}
-                        >
-                          Remove
-                        </button>
+                </div>
+                <div className="card-body p-4">
+                  {supervisor ? (
+                    <div className="d-flex align-items-center gap-3">
+                      <Avatar name={supervisor.name} photoUrl={supervisor.photoUrl} size={44} />
+                      <div>
+                        <p className="fw-semibold text-dark mb-0 small">{supervisor.name}</p>
+                        <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>{supervisor.email}</p>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  ) : (
+                    <p className="text-muted small mb-0 text-center py-2">No supervisor assigned yet.</p>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
+            <div className="col-12 col-xl-7">
+              <div className="card shadow-sm border-0">
+                <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3 px-4">
+                  <h6 className="fw-semibold text-dark mb-0">
+                    Students
+                    <span className="badge bg-primary ms-2 rounded-pill" style={{ fontSize: '0.7rem' }}>
+                      {(project.students || []).length}/{project.maxStudents}
+                    </span>
+                  </h6>
+                  {(project.students || []).length < project.maxStudents && (
+                    <button
+                      className="btn btn-outline-primary btn-sm px-3"
+                      onClick={() => { setStudentInput(''); setShowAssignStudent(true); }}
+                    >
+                      + Add
+                    </button>
+                  )}
+                </div>
+                <div className="card-body p-3">
+                  {(project.students || []).length === 0 ? (
+                    <p className="text-muted small mb-0 text-center py-3">No students added yet.</p>
+                  ) : (
+                    <div className="d-flex flex-column gap-2">
+                      {project.students.map((student) => (
+                        <div
+                          key={student._id}
+                          className="d-flex align-items-center justify-content-between p-2 rounded border"
+                          style={{ cursor: 'pointer', transition: 'background-color 0.15s, border-color 0.15s' }}
+                          onClick={() => openStudentModal(student)}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f0f4ff';
+                            e.currentTarget.style.borderColor = '#3c50e0';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '';
+                            e.currentTarget.style.borderColor = '';
+                          }}
+                        >
+                          <div className="d-flex align-items-center gap-2">
+                            <Avatar name={student.name} photoUrl={student.photoUrl} size={32} />
+                            <div>
+                              <p className="fw-medium text-dark mb-0" style={{ fontSize: '0.82rem' }}>{student.name}</p>
+                              <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>{student.email}</p>
+                            </div>
+                          </div>
+                          <div className="d-flex align-items-center gap-2">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#adb5bd" strokeWidth="2">
+                              <path d="M9 18l6-6-6-6"/>
+                            </svg>
+                            <button
+                              className="btn btn-outline-danger btn-sm px-2"
+                              style={{ fontSize: '0.72rem' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRemovingStudentId(student._id);
+                                setShowRemoveConfirm(true);
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {(project.students || []).length > 0 && (
+                    <p className="text-muted text-center mt-2 mb-0" style={{ fontSize: '0.72rem' }}>
+                      Click a student to view their submissions and documents
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+          </div>
         </div>
       )}
 
@@ -480,6 +610,158 @@ const ProjectDetail = () => {
         </div>
       )}
 
+      {/* ── TAB: TASKS ── */}
+      {activeTab === 'tasks' && (
+        <div className="card border-0 shadow-sm">
+          <div className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between">
+            <div>
+              <h6 className="fw-semibold text-dark mb-0">Tasks</h6>
+              <p className="text-muted small mb-0 mt-1">Tasks assigned to this project.</p>
+            </div>
+            <button className="btn btn-primary btn-sm px-3" onClick={() => navigate('/coordinator/tasks')}>
+              + Create Task
+            </button>
+          </div>
+          <div className="card-body p-0">
+            {tasks.length === 0 ? (
+              <div className="text-center py-5 text-muted">
+                <p className="mb-0">No tasks assigned to this project yet.</p>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-hover mb-0" style={{ fontSize: '0.875rem' }}>
+                  <thead style={{ backgroundColor: '#f8f9fa' }}>
+                    <tr>
+                      <th className="px-4 py-3 fw-semibold text-muted border-0 small">#</th>
+                      <th className="px-4 py-3 fw-semibold text-muted border-0 small">TITLE &amp; INSTRUCTIONS</th>
+                      <th className="px-4 py-3 fw-semibold text-muted border-0 small">CREATED BY</th>
+                      <th className="px-4 py-3 fw-semibold text-muted border-0 small">OPEN DATE</th>
+                      <th className="px-4 py-3 fw-semibold text-muted border-0 small">DUE DATE</th>
+                      <th className="px-4 py-3 fw-semibold text-muted border-0 small">SUBMISSIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tasks.map((task, i) => {
+                      const subCount = submissions.filter((s) => {
+                        const tid = s.taskId?._id || s.taskId;
+                        return String(tid) === String(task._id);
+                      }).length;
+                      return (
+                        <tr key={task._id}>
+                          <td className="px-4 py-3 text-muted small">{i + 1}</td>
+                          <td className="px-4 py-3">
+                            <p className="fw-semibold text-dark mb-1 small">{task.title}</p>
+                            {task.instructions && (
+                              <p className="text-muted mb-0" style={{ fontSize: '0.78rem' }}>
+                                {task.instructions.length > 80 ? task.instructions.slice(0, 80) + '...' : task.instructions}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-muted small">{task.createdBy?.name || '—'}</td>
+                          <td className="px-4 py-3 text-muted small">{formatDate(task.openDate)}</td>
+                          <td className="px-4 py-3 text-muted small">{formatDate(task.dueDate)}</td>
+                          <td className="px-4 py-3">
+                            <span
+                              className="badge rounded-pill px-3"
+                              style={{
+                                backgroundColor: subCount > 0 ? '#28a74520' : '#ffc10720',
+                                color: subCount > 0 ? '#28a745' : '#d39e00',
+                                fontSize: '0.72rem',
+                              }}
+                            >
+                              {subCount} submission{subCount !== 1 ? 's' : ''}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: SUBMISSIONS ── */}
+      {activeTab === 'submissions' && (
+        <div className="card border-0 shadow-sm">
+          <div className="card-header bg-white border-bottom py-3 px-4">
+            <h6 className="fw-semibold text-dark mb-0">Task Submissions</h6>
+            <p className="text-muted small mb-0 mt-1">Review files submitted by students.</p>
+          </div>
+          <div className="card-body p-0">
+            {submissions.length === 0 ? (
+              <div className="text-center py-5 text-muted">
+                <p className="mb-0">No submissions yet for this project.</p>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-hover mb-0" style={{ fontSize: '0.875rem' }}>
+                  <thead style={{ backgroundColor: '#f8f9fa' }}>
+                    <tr>
+                      <th className="px-4 py-3 fw-semibold text-muted border-0 small">#</th>
+                      <th className="px-4 py-3 fw-semibold text-muted border-0 small">TASK</th>
+                      <th className="px-4 py-3 fw-semibold text-muted border-0 small">STUDENT</th>
+                      <th className="px-4 py-3 fw-semibold text-muted border-0 small">FILE</th>
+                      <th className="px-4 py-3 fw-semibold text-muted border-0 small">SUBMITTED</th>
+                      <th className="px-4 py-3 fw-semibold text-muted border-0 small">STATUS</th>
+                      <th className="px-4 py-3 fw-semibold text-muted border-0 small">ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {submissions.map((sub, i) => (
+                      <tr key={sub._id}>
+                        <td className="px-4 py-3 text-muted small">{i + 1}</td>
+                        <td className="px-4 py-3">
+                          <p className="fw-medium text-dark mb-0 small">{sub.taskId?.title || '—'}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="fw-medium text-dark mb-0 small">{sub.submittedBy?.name || '—'}</p>
+                          <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>{sub.submittedBy?.email || ''}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            className="btn btn-link btn-sm p-0 text-primary text-decoration-none small"
+                            onClick={() => window.open(sub.fileUrl, '_blank')}
+                          >
+                            📎 {sub.fileName}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-muted small">{formatDate(sub.submittedAt)}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className="badge rounded-pill px-3"
+                            style={{
+                              backgroundColor: sub.status === 'approved' ? '#28a74520' : sub.status === 'rejected' ? '#dc354520' : '#ffc10720',
+                              color: sub.status === 'approved' ? '#28a745' : sub.status === 'rejected' ? '#dc3545' : '#d39e00',
+                              fontSize: '0.72rem',
+                            }}
+                          >
+                            {sub.status === 'pending' ? 'Pending Review' : sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
+                          </span>
+                          {sub.feedback && (
+                            <p className="text-muted mt-1 mb-0" style={{ fontSize: '0.7rem' }}>"{sub.feedback}"</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {sub.status === 'pending' && (
+                            <div className="d-flex gap-2">
+                              <button className="btn btn-sm btn-success px-2" onClick={() => openReview(sub, 'approved')}>✓</button>
+                              <button className="btn btn-sm btn-danger px-2"  onClick={() => openReview(sub, 'rejected')}>✕</button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── TAB: DOCUMENTS ── */}
       {activeTab === 'documents' && (
         <div className="card shadow-sm border-0">
@@ -548,7 +830,7 @@ const ProjectDetail = () => {
                 <div>
                   <h6 className="fw-semibold text-dark mb-0">Project Proposal</h6>
                   <p className="text-muted small mb-0 mt-1">
-                    Submitted by {proposal.submittedBy?.name || proposal.studentId?.name || '—'} on {formatDate(proposal.submittedAt || proposal.createdAt)}
+                    Submitted by {proposal.submittedBy?.name || '—'} on {formatDate(proposal.submittedAt || proposal.createdAt)}
                   </p>
                 </div>
                 <span
@@ -728,6 +1010,188 @@ const ProjectDetail = () => {
                 <button className="btn btn-outline-secondary px-4" onClick={() => setMilestoneConfirm(null)}>Cancel</button>
                 <button className="btn btn-primary px-4 fw-medium" onClick={handleMarkMilestone}>Yes, Mark Complete</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: Student Detail ── */}
+      {showStudentModal && selectedStudent && (
+        <div
+          className="modal d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}
+          onClick={closeStudentModal}
+        >
+          <div
+            className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-content border-0 shadow">
+              <div className="modal-header border-bottom px-4 py-3">
+                <div className="d-flex align-items-center gap-3">
+                  <Avatar name={selectedStudent.name} photoUrl={selectedStudent.photoUrl} size={40} />
+                  <div>
+                    <h5 className="modal-title fw-semibold text-dark mb-0">{selectedStudent.name}</h5>
+                    <p className="text-muted small mb-0">{selectedStudent.email}</p>
+                  </div>
+                </div>
+                <button className="btn-close" onClick={closeStudentModal} />
+              </div>
+
+              <div className="modal-body px-4 py-4">
+
+                <h6 className="fw-semibold text-dark mb-3">
+                  Task Submissions
+                  <span className="badge bg-secondary ms-2 rounded-pill" style={{ fontSize: '0.7rem' }}>
+                    {studentSubs.length}
+                  </span>
+                </h6>
+                {studentSubs.length === 0 ? (
+                  <p className="text-muted small mb-4">No submissions from this student yet.</p>
+                ) : (
+                  <div className="d-flex flex-column gap-2 mb-4">
+                    {studentSubs.map((sub) => (
+                      <div key={sub._id} className="d-flex align-items-center justify-content-between p-3 border rounded">
+                        <div>
+                          <p className="fw-medium text-dark small mb-0">{sub.taskId?.title || '—'}</p>
+                          <p className="text-muted mb-0" style={{ fontSize: '0.73rem' }}>
+                            Submitted {formatDate(sub.submittedAt)}
+                            {sub.feedback && <> &bull; <em>"{sub.feedback}"</em></>}
+                          </p>
+                        </div>
+                        <div className="d-flex align-items-center gap-2 flex-shrink-0">
+                          {sub.fileUrl && (
+                            <button
+                              className="btn btn-outline-primary btn-sm px-2"
+                              style={{ fontSize: '0.72rem' }}
+                              onClick={() => window.open(sub.fileUrl, '_blank')}
+                            >
+                              📎 File
+                            </button>
+                          )}
+                          <span
+                            className="badge rounded-pill px-2 py-1"
+                            style={{
+                              backgroundColor: sub.status === 'approved' ? '#28a74520' : sub.status === 'rejected' ? '#dc354520' : '#ffc10720',
+                              color: sub.status === 'approved' ? '#28a745' : sub.status === 'rejected' ? '#dc3545' : '#d39e00',
+                              fontSize: '0.7rem',
+                            }}
+                          >
+                            {sub.status === 'pending' ? 'Pending' : sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <hr className="my-3" />
+
+                <h6 className="fw-semibold text-dark mb-3">
+                  Uploaded Documents
+                  <span className="badge bg-secondary ms-2 rounded-pill" style={{ fontSize: '0.7rem' }}>
+                    {studentDocs.length}
+                  </span>
+                </h6>
+                {studentDocs.length === 0 ? (
+                  <p className="text-muted small mb-0">No documents uploaded by this student yet.</p>
+                ) : (
+                  <div className="d-flex flex-column gap-2">
+                    {studentDocs.map((doc) => (
+                      <div key={doc._id} className="d-flex align-items-center justify-content-between p-3 border rounded">
+                        <div className="d-flex align-items-center gap-3">
+                          <div
+                            className="d-flex align-items-center justify-content-center rounded flex-shrink-0"
+                            style={{ width: '36px', height: '36px', backgroundColor: docTypeColors[doc.type] || '#6c757d' }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                              <polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="fw-medium text-dark mb-0 small">{doc.fileName}</p>
+                            <p className="text-muted mb-0" style={{ fontSize: '0.73rem' }}>
+                              {doc.type} &bull; {formatDate(doc.uploadedAt || doc.createdAt)} &bull; {doc.size}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          className="btn btn-outline-primary btn-sm px-3 flex-shrink-0"
+                          style={{ fontSize: '0.72rem' }}
+                          onClick={() => window.open(doc.fileUrl, '_blank')}
+                        >
+                          Download
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+              </div>
+
+              <div className="modal-footer border-top px-4 py-3">
+                <button className="btn btn-outline-secondary px-4" onClick={closeStudentModal}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: Review Submission ── */}
+      {reviewModal && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 3000 }}
+          onClick={() => setReviewModal(false)}
+        >
+          <div
+            className="card border-0 shadow-lg p-4"
+            style={{ width: '100%', maxWidth: '480px', borderRadius: '12px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="d-flex align-items-center justify-content-between mb-3">
+              <h6 className="fw-semibold text-dark mb-0">
+                {reviewDecision === 'approved' ? '✓ Accept Submission' : '✕ Reject Submission'}
+              </h6>
+              <button className="btn btn-sm p-0 border-0" onClick={() => setReviewModal(false)}>
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <path d="M1 1L17 17M17 1L1 17" stroke="#6c757d" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+            <div className="mb-3 p-3 rounded" style={{ backgroundColor: '#f8f9fa' }}>
+              <p className="fw-medium text-dark mb-1 small">{reviewSub?.taskId?.title}</p>
+              <p className="text-muted mb-0" style={{ fontSize: '0.78rem' }}>
+                Submitted by: {reviewSub?.submittedBy?.name}
+              </p>
+              <p className="text-muted mb-0" style={{ fontSize: '0.78rem' }}>
+                File: <span className="text-primary">{reviewSub?.fileName}</span>
+              </p>
+            </div>
+            <div className="mb-4">
+              <label className="form-label fw-medium small">Feedback *</label>
+              <textarea
+                className="form-control"
+                rows={3}
+                placeholder="Enter feedback for the student..."
+                value={reviewFeedback}
+                onChange={(e) => setReviewFeedback(e.target.value)}
+                style={{ fontSize: '0.875rem' }}
+              />
+            </div>
+            <div className="d-flex gap-2">
+              <button
+                className={`btn flex-fill fw-medium ${reviewDecision === 'approved' ? 'btn-success' : 'btn-danger'}`}
+                onClick={submitReview}
+                disabled={reviewing}
+              >
+                {reviewing ? <span className="spinner-border spinner-border-sm me-2" role="status" /> : null}
+                Confirm
+              </button>
+              <button className="btn btn-outline-secondary flex-fill" onClick={() => setReviewModal(false)}>
+                Cancel
+              </button>
             </div>
           </div>
         </div>

@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 
 const CoordinatorMeetingRequests = () => {
-  const [activeTab, setActiveTab] = useState('incoming');
-  const [meetings, setMeetings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('all');
+  const [meetings, setMeetings]   = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(null);
+  const [cancelError, setCancelError] = useState('');
 
   const currentUserId = (() => {
     try { return JSON.parse(sessionStorage.getItem('user'))?._id || ''; }
@@ -39,15 +40,10 @@ const CoordinatorMeetingRequests = () => {
     fetchMeetings();
   }, []);
 
-  const incoming = meetings.filter((m) =>
-    String(m.requestedTo?._id || m.requestedTo) === String(currentUserId)
-  );
-
-  const outgoing = meetings.filter((m) =>
-    String(m.requestedBy?._id || m.requestedBy) === String(currentUserId)
-  );
-
-  const pendingIncomingCount = incoming.filter((m) => m.status === 'pending').length;
+  const pendingCount = meetings.filter((m) => m.status === 'pending').length;
+  const displayedMeetings = activeTab === 'all'
+    ? meetings
+    : meetings.filter((m) => m.status === 'pending');
 
   const openRespond = (meeting, decision) => {
     setRespondMeeting(meeting);
@@ -83,6 +79,19 @@ const CoordinatorMeetingRequests = () => {
       setRespondError(err.message);
     } finally {
       setResponding(false);
+    }
+  };
+
+  const cancelMeeting = async (meetingId) => {
+    if (!window.confirm('Cancel this meeting? This cannot be undone.')) return;
+    setCancelError('');
+    try {
+      const res = await fetch(`/api/meetings/${meetingId}`, { method: 'DELETE', headers });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to cancel meeting');
+      setMeetings((prev) => prev.filter((m) => m._id !== meetingId));
+    } catch (err) {
+      setCancelError(err.message);
     }
   };
 
@@ -127,162 +136,147 @@ const CoordinatorMeetingRequests = () => {
     <>
       <Breadcrumb pageName="Meeting Requests" />
 
+      {cancelError && (
+        <div className="alert alert-danger border-0 mb-3">{cancelError}</div>
+      )}
+
       {/* Tab Navigation */}
       <div className="card shadow-sm border-0 mb-4">
         <div className="card-body p-0">
           <div className="d-flex border-bottom">
             <button
-              onClick={() => setActiveTab('incoming')}
+              onClick={() => setActiveTab('all')}
               className="btn btn-link flex-fill py-3 text-decoration-none fw-medium border-0 rounded-0"
               style={{
-                color: activeTab === 'incoming' ? '#3c50e0' : '#6c757d',
-                borderBottom: activeTab === 'incoming' ? '2px solid #3c50e0' : '2px solid transparent',
+                color: activeTab === 'all' ? '#3c50e0' : '#6c757d',
+                borderBottom: activeTab === 'all' ? '2px solid #3c50e0' : '2px solid transparent',
               }}
             >
-              Incoming Requests
-              {pendingIncomingCount > 0 && (
-                <span className="badge bg-warning text-dark ms-2 rounded-pill" style={{ fontSize: '0.7rem' }}>
-                  {pendingIncomingCount}
-                </span>
-              )}
+              All Meetings ({meetings.length})
             </button>
             <button
-              onClick={() => setActiveTab('outgoing')}
+              onClick={() => setActiveTab('pending')}
               className="btn btn-link flex-fill py-3 text-decoration-none fw-medium border-0 rounded-0"
               style={{
-                color: activeTab === 'outgoing' ? '#3c50e0' : '#6c757d',
-                borderBottom: activeTab === 'outgoing' ? '2px solid #3c50e0' : '2px solid transparent',
+                color: activeTab === 'pending' ? '#3c50e0' : '#6c757d',
+                borderBottom: activeTab === 'pending' ? '2px solid #3c50e0' : '2px solid transparent',
               }}
             >
-              My Requests ({outgoing.length})
+              Pending
+              {pendingCount > 0 && (
+                <span className="badge bg-warning text-dark ms-2 rounded-pill" style={{ fontSize: '0.7rem' }}>
+                  {pendingCount}
+                </span>
+              )}
             </button>
           </div>
         </div>
       </div>
 
-      {/* INCOMING — requests sent TO coordinator */}
-      {activeTab === 'incoming' && (
-        <div className="d-flex flex-column gap-3">
-          {incoming.length === 0 ? (
-            <div className="card shadow-sm border-0">
-              <div className="card-body text-center py-5">
-                <p className="text-muted mb-0">No incoming meeting requests.</p>
-              </div>
+      {/* Meeting cards */}
+      <div className="d-flex flex-column gap-3">
+        {displayedMeetings.length === 0 ? (
+          <div className="card shadow-sm border-0">
+            <div className="card-body text-center py-5">
+              <p className="text-muted mb-0">
+                {activeTab === 'pending' ? 'No pending meeting requests.' : 'No meetings found.'}
+              </p>
             </div>
-          ) : (
-            incoming.map((req) => (
-              <div key={req._id} className="card shadow-sm border-0">
+          </div>
+        ) : (
+          displayedMeetings.map((m) => {
+            const isOutgoing = String(m.requestedBy?._id || m.requestedBy) === String(currentUserId);
+            const otherPerson = isOutgoing ? m.requestedTo : m.requestedBy;
+            const canCancel = m.meetingType === 'scheduled' && isOutgoing;
+            const canRespond = m.status === 'pending' && !isOutgoing;
+
+            return (
+              <div key={m._id} className="card shadow-sm border-0">
                 <div className="card-body p-4">
                   <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
                     <div className="flex-grow-1">
                       <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
-                        {req.requestedBy?.role && (
+                        {otherPerson?.role && (
                           <span
                             className={`badge rounded-pill px-2 small ${
-                              req.requestedBy.role === 'student' ? 'bg-primary' : 'bg-info text-dark'
+                              otherPerson.role === 'student' ? 'bg-primary' :
+                              otherPerson.role === 'supervisor' ? 'bg-info text-dark' : 'bg-secondary'
                             }`}
                           >
-                            {req.requestedBy.role.charAt(0).toUpperCase() + req.requestedBy.role.slice(1)}
+                            {otherPerson.role.charAt(0).toUpperCase() + otherPerson.role.slice(1)}
                           </span>
                         )}
-                        <h6 className="fw-semibold text-dark mb-0">{req.topic}</h6>
+                        {m.meetingType === 'scheduled' && (
+                          <span className="badge bg-light text-dark border rounded-pill px-2 small">Scheduled</span>
+                        )}
+                        <h6 className="fw-semibold text-dark mb-0">{m.topic}</h6>
                       </div>
                       <p className="text-muted small mb-1">
-                        From: <strong className="text-dark">{req.requestedBy?.name || '—'}</strong>
-                        {req.requestedBy?.email && ` (${req.requestedBy.email})`}
+                        {isOutgoing ? 'To' : 'From'}:{' '}
+                        <strong className="text-dark">{otherPerson?.name || '—'}</strong>
+                        {otherPerson?.email && ` (${otherPerson.email})`}
                       </p>
                       <p className="text-muted small mb-1">
-                        Proposed: <strong className="text-dark">{formatDate(req.proposedDate)}</strong> at{' '}
-                        <strong className="text-dark">{req.proposedTime}</strong>
+                        Date: <strong className="text-dark">{formatDate(m.proposedDate)}</strong> at{' '}
+                        <strong className="text-dark">{m.proposedTime}</strong>
                       </p>
-                      {req.projectId?.title && (
+                      {m.location && (
                         <p className="text-muted small mb-1">
-                          Project: <strong className="text-dark">{req.projectId.title}</strong>
+                          Location: <strong className="text-dark">📍 {m.location}</strong>
                         </p>
                       )}
-                      <p className="text-muted small mb-0">Submitted: {formatDate(req.createdAt)}</p>
+                      {m.projectId?.title && (
+                        <p className="text-muted small mb-1">
+                          Project: <strong className="text-dark">{m.projectId.title}</strong>
+                        </p>
+                      )}
                     </div>
-                    <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(req.status)}`}>
-                      {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
+                    <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(m.status)}`}>
+                      {m.status.charAt(0).toUpperCase() + m.status.slice(1)}
                     </span>
                   </div>
 
-                  {req.notes && (
-                    <div className={`alert ${req.status === 'approved' ? 'alert-success' : 'alert-danger'} py-2 px-3 mt-3 mb-2`}>
+                  {m.notes && (
+                    <div className={`alert ${m.status === 'approved' ? 'alert-success' : 'alert-danger'} py-2 px-3 mt-3 mb-2`}>
                       <p className="small mb-0">
-                        <strong>Your Response:</strong> {req.notes}
+                        <strong>Response:</strong> {m.notes}
                       </p>
                     </div>
                   )}
 
-                  {req.status === 'pending' && (
+                  {m.studentReply && (
+                    <div className="alert alert-secondary py-2 px-3 mt-2 mb-2">
+                      <p className="small mb-0">
+                        <strong>Student's reply:</strong> {m.studentReply}
+                      </p>
+                    </div>
+                  )}
+
+                  {(canRespond || canCancel) && (
                     <div className="d-flex gap-2 mt-3">
-                      <button className="btn btn-success btn-sm px-4 fw-medium" onClick={() => openRespond(req, 'approved')}>
-                        ✓ Approve
-                      </button>
-                      <button className="btn btn-danger btn-sm px-4 fw-medium" onClick={() => openRespond(req, 'rejected')}>
-                        ✕ Reject
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* OUTGOING — requests sent BY coordinator */}
-      {activeTab === 'outgoing' && (
-        <div className="d-flex flex-column gap-3">
-          {outgoing.length === 0 ? (
-            <div className="card shadow-sm border-0">
-              <div className="card-body text-center py-5">
-                <p className="text-muted mb-0">No outgoing meeting requests.</p>
-              </div>
-            </div>
-          ) : (
-            outgoing.map((req) => (
-              <div key={req._id} className="card shadow-sm border-0">
-                <div className="card-body p-4">
-                  <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
-                    <div className="flex-grow-1">
-                      <h6 className="fw-semibold text-dark mb-1">{req.topic}</h6>
-                      <p className="text-muted small mb-1">
-                        To: <strong className="text-dark">{req.requestedTo?.name || '—'}</strong>
-                        {req.requestedTo?.role && (
-                          <span className="ms-1 badge bg-secondary rounded-pill" style={{ fontSize: '0.65rem' }}>
-                            {req.requestedTo.role}
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-muted small mb-1">
-                        Proposed: <strong className="text-dark">{formatDate(req.proposedDate)}</strong> at{' '}
-                        <strong className="text-dark">{req.proposedTime}</strong>
-                      </p>
-                      {req.projectId?.title && (
-                        <p className="text-muted small mb-0">
-                          Project: <strong className="text-dark">{req.projectId.title}</strong>
-                        </p>
+                      {canRespond && (
+                        <>
+                          <button className="btn btn-success btn-sm px-4 fw-medium" onClick={() => openRespond(m, 'approved')}>
+                            ✓ Approve
+                          </button>
+                          <button className="btn btn-danger btn-sm px-4 fw-medium" onClick={() => openRespond(m, 'rejected')}>
+                            ✕ Reject
+                          </button>
+                        </>
+                      )}
+                      {canCancel && (
+                        <button className="btn btn-outline-danger btn-sm px-3" onClick={() => cancelMeeting(m._id)}>
+                          Cancel Meeting
+                        </button>
                       )}
                     </div>
-                    <span className={`badge rounded-pill px-3 py-2 ${getStatusBadge(req.status)}`}>
-                      {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
-                    </span>
-                  </div>
-                  {req.notes && (
-                    <div className={`alert ${req.status === 'approved' ? 'alert-success' : 'alert-danger'} py-2 px-3 mt-3 mb-0`}>
-                      <p className="small mb-0">
-                        <strong>Response:</strong> {req.notes}
-                      </p>
-                    </div>
                   )}
                 </div>
               </div>
-            ))
-          )}
-        </div>
-      )}
+            );
+          })
+        )}
+      </div>
 
       {/* Respond Modal */}
       {respondModal && (
@@ -329,7 +323,7 @@ const CoordinatorMeetingRequests = () => {
                 />
                 {respondDecision === 'approved' && (
                   <p className="text-success small mt-2 mb-0">
-                    ✓ This meeting will appear on the calendar automatically.
+                    ✓ This meeting will appear on both calendars automatically.
                   </p>
                 )}
               </div>

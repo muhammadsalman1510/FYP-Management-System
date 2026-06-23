@@ -3,6 +3,8 @@ import Avatar from '../../components/Avatar';
 
 const CoordinatorStudents = () => {
   const [students, setStudents] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [projectsError, setProjectsError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -18,8 +20,8 @@ const CoordinatorStudents = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const emptyForm = {
-    name: '', rollNumber: '', email: '', program: 'BSCS',
-    semester: 7, section: 'A', batch: '', password: '',
+    name: '', rollNumber: '', email: '', program: '',
+    semester: 7, section: '', batch: '', password: '',
   };
   const [form, setForm] = useState(emptyForm);
 
@@ -28,13 +30,29 @@ const CoordinatorStudents = () => {
     'Content-Type': 'application/json',
   });
 
-  const fetchStudents = async () => {
+  const fetchAll = async () => {
     try {
-      const res = await fetch('/api/users?role=student', { headers: getHeaders() });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to load students');
-      // getUsers returns { users: [...] }
-      setStudents(data.users || []);
+      const [studentsRes, projectsRes] = await Promise.all([
+        fetch('/api/users?role=student', { headers: getHeaders() }),
+        fetch('/api/projects', { headers: getHeaders() }),
+      ]);
+
+      const studentsData = await studentsRes.json();
+      if (!studentsRes.ok) throw new Error(studentsData.message || 'Failed to load students');
+      setStudents(studentsData.users || []);
+
+      // Projects fetch is best-effort — failure shows a fallback note but doesn't crash the page
+      if (projectsRes.ok) {
+        const projectsData = await projectsRes.json();
+        if (projectsData.success) {
+          setProjects(projectsData.data || []);
+          setProjectsError(null);
+        } else {
+          setProjectsError('Project status could not be loaded.');
+        }
+      } else {
+        setProjectsError('Project status could not be loaded.');
+      }
     } catch (err) {
       setError(err.message || 'Failed to load students.');
     } finally {
@@ -43,8 +61,20 @@ const CoordinatorStudents = () => {
   };
 
   useEffect(() => {
-    fetchStudents();
+    fetchAll();
   }, []);
+
+  // Build studentId → project lookup from the projects list.
+  // populateProject returns students as { _id, name, email } objects.
+  const studentProjectMap = {};
+  projects.forEach((project) => {
+    (project.students || []).forEach((s) => {
+      const id = s._id ? String(s._id) : String(s);
+      if (!studentProjectMap[id]) {
+        studentProjectMap[id] = { title: project.title, _id: project._id };
+      }
+    });
+  });
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -67,15 +97,14 @@ const CoordinatorStudents = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to load student data');
 
-      // getUserById returns { user: { _id, name, email, rollNumber, program, ... } }
       const u = data.user;
       setForm({
         name:       u.name        || '',
         email:      u.email       || '',
         rollNumber: u.rollNumber  || '',
-        program:    u.program     || 'BSCS',
+        program:    u.program     || '',
         semester:   u.semester    || 7,
-        section:    u.section     || 'A',
+        section:    u.section     || '',
         batch:      u.batch       || '',
         password:   '',
       });
@@ -88,10 +117,12 @@ const CoordinatorStudents = () => {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim()) { setFormError('Full name is required.'); return; }
-    if (!form.email.trim()) { setFormError('Email is required.'); return; }
+    if (!form.name.trim())       { setFormError('Full name is required.'); return; }
+    if (!form.email.trim())      { setFormError('Email is required.'); return; }
     if (!form.rollNumber.trim()) { setFormError('Roll number is required.'); return; }
-    if (!form.batch.trim()) { setFormError('Batch is required.'); return; }
+    if (!form.program.trim())    { setFormError('Program is required.'); return; }
+    if (!form.section.trim())    { setFormError('Section is required.'); return; }
+    if (!form.batch.trim())      { setFormError('Batch is required.'); return; }
     if (!isEditing && !form.password.trim()) { setFormError('Password is required for new students.'); return; }
 
     setFormLoading(true);
@@ -103,10 +134,10 @@ const CoordinatorStudents = () => {
         email:      form.email.trim(),
         role:       'student',
         rollNumber: form.rollNumber.trim(),
-        program:    form.program,
+        program:    form.program.trim(),
         batch:      form.batch.trim(),
         semester:   Number(form.semester),
-        section:    form.section,
+        section:    form.section.trim(),
       };
       if (form.password.trim()) body.password = form.password.trim();
 
@@ -121,14 +152,13 @@ const CoordinatorStudents = () => {
       const data = await res.json();
 
       if (!res.ok) {
-        // Keep modal open and show inline error (e.g. duplicate email or roll number)
         setFormError(data.message || 'Operation failed. Please try again.');
         return;
       }
 
       setShowModal(false);
       setForm(emptyForm);
-      await fetchStudents();
+      await fetchAll();
     } catch (err) {
       setFormError(err.message || 'Something went wrong. Please try again.');
     } finally {
@@ -153,7 +183,7 @@ const CoordinatorStudents = () => {
 
       setShowDeleteConfirm(false);
       setDeletingId(null);
-      await fetchStudents();
+      await fetchAll();
     } catch (err) {
       alert(err.message || 'Something went wrong. Please try again.');
     } finally {
@@ -161,11 +191,16 @@ const CoordinatorStudents = () => {
     }
   };
 
-  const filteredStudents = students.filter((s) =>
-    (s.name       || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (s.rollNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (s.email      || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredStudents = students.filter((s) => {
+    const q = searchQuery.toLowerCase();
+    const project = studentProjectMap[String(s._id)];
+    return (
+      (s.name         || '').toLowerCase().includes(q) ||
+      (s.rollNumber   || '').toLowerCase().includes(q) ||
+      (s.email        || '').toLowerCase().includes(q) ||
+      (project?.title || '').toLowerCase().includes(q)
+    );
+  });
 
   if (loading) {
     return (
@@ -208,12 +243,18 @@ const CoordinatorStudents = () => {
           <input
             type="text"
             className="form-control form-control-sm"
-            placeholder="Search name, roll number, email..."
-            style={{ maxWidth: '300px' }}
+            placeholder="Search by name, roll number, or project..."
+            style={{ maxWidth: '320px' }}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+
+        {projectsError && (
+          <div className="alert alert-warning border-0 rounded-0 mb-0 px-4 py-2 small">
+            {projectsError} Project column may show "Not Assigned" for all students.
+          </div>
+        )}
 
         <div className="card-body p-0">
           <div className="table-responsive">
@@ -226,40 +267,54 @@ const CoordinatorStudents = () => {
                   <th className="px-4 py-3 fw-semibold small text-dark">Email</th>
                   <th className="px-4 py-3 fw-semibold small text-dark">Program</th>
                   <th className="px-4 py-3 fw-semibold small text-dark">Batch</th>
+                  <th className="px-4 py-3 fw-semibold small text-dark">Project</th>
                   <th className="px-4 py-3 fw-semibold small text-dark">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredStudents.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="text-center text-muted py-5">No students found.</td>
+                    <td colSpan="8" className="text-center text-muted py-5">No students found.</td>
                   </tr>
-                ) : filteredStudents.map((student, index) => (
-                  <tr key={student._id}>
-                    <td className="px-4 py-3 text-muted small">{index + 1}</td>
-                    <td className="px-4 py-3">
-                      <div className="d-flex align-items-center gap-2">
-                        <Avatar name={student.name} size={36} />
-                        <div>
-                          <p className="fw-medium text-dark mb-0 small">{student.name}</p>
-                          <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>
-                            Sem {student.semester || '—'} • Sec {student.section || '—'}
-                          </p>
+                ) : filteredStudents.map((student, index) => {
+                  const project = studentProjectMap[String(student._id)];
+                  return (
+                    <tr key={student._id}>
+                      <td className="px-4 py-3 text-muted small">{index + 1}</td>
+                      <td className="px-4 py-3">
+                        <div className="d-flex align-items-center gap-2">
+                          <Avatar name={student.name} photoUrl={student.photoUrl} size={36} />
+                          <div>
+                            <p className="fw-medium text-dark mb-0 small">{student.name}</p>
+                            <p className="text-muted mb-0" style={{ fontSize: '0.72rem' }}>
+                              Sem {student.semester || '—'} • Sec {student.section || '—'}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 small text-dark">{student.rollNumber || '—'}</td>
-                    <td className="px-4 py-3 small text-muted">{student.email}</td>
-                    <td className="px-4 py-3 small text-dark">{student.program || '—'}</td>
-                    <td className="px-4 py-3 small text-dark">{student.batch || '—'}</td>
-                    <td className="px-4 py-3">
-                      <div className="d-flex gap-2">
-                        <button className="btn btn-outline-primary btn-sm px-3" onClick={() => openEditModal(student._id)}>Edit</button>
-                        <button className="btn btn-outline-danger btn-sm px-3" onClick={() => confirmDelete(student._id)}>Delete</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3 small text-dark">{student.rollNumber || '—'}</td>
+                      <td className="px-4 py-3 small text-muted">{student.email}</td>
+                      <td className="px-4 py-3 small text-dark">{student.program || '—'}</td>
+                      <td className="px-4 py-3 small text-dark">{student.batch || '—'}</td>
+                      <td className="px-4 py-3">
+                        {project ? (
+                          <div className="d-flex align-items-center gap-2 flex-wrap">
+                            <span className="badge bg-success rounded-pill">Assigned</span>
+                            <span className="text-dark small">{project.title}</span>
+                          </div>
+                        ) : (
+                          <span className="badge bg-secondary rounded-pill">Not Assigned</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="d-flex gap-2">
+                          <button className="btn btn-outline-primary btn-sm px-3" onClick={() => openEditModal(student._id)}>Edit</button>
+                          <button className="btn btn-outline-danger btn-sm px-3" onClick={() => confirmDelete(student._id)}>Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -284,7 +339,6 @@ const CoordinatorStudents = () => {
               <button className="btn btn-sm btn-light border" onClick={() => setShowModal(false)}>✕</button>
             </div>
 
-            {/* Inline error — shown for duplicate email, roll number, etc. */}
             {formError && (
               <div className="alert alert-danger py-2 px-3 mb-3" style={{ fontSize: '0.875rem' }}>
                 {formError}
@@ -327,25 +381,31 @@ const CoordinatorStudents = () => {
               </div>
               <div className="col-12 col-sm-6">
                 <label className="form-label fw-medium text-dark small">Program *</label>
-                <select name="program" value={form.program} onChange={handleInputChange} className="form-select">
-                  {['BSCS', 'BSSE', 'BSIT', 'BSAI'].map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
+                <input
+                  type="text"
+                  name="program"
+                  value={form.program}
+                  onChange={handleInputChange}
+                  className="form-control"
+                  placeholder="e.g. BSCS, BSSE, BSIT"
+                />
+              </div>
+              <div className="col-12 col-sm-6">
+                <label className="form-label fw-medium text-dark small">Section *</label>
+                <input
+                  type="text"
+                  name="section"
+                  value={form.section}
+                  onChange={handleInputChange}
+                  className="form-control"
+                  placeholder="e.g. A, B, C"
+                />
               </div>
               <div className="col-12 col-sm-6">
                 <label className="form-label fw-medium text-dark small">Semester *</label>
                 <select name="semester" value={form.semester} onChange={handleInputChange} className="form-select">
                   {[7, 8].map((s) => (
                     <option key={s} value={s}>{s}th</option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-12 col-sm-6">
-                <label className="form-label fw-medium text-dark small">Section *</label>
-                <select name="section" value={form.section} onChange={handleInputChange} className="form-select">
-                  {['A', 'B', 'C', 'D'].map((s) => (
-                    <option key={s} value={s}>Section {s}</option>
                   ))}
                 </select>
               </div>

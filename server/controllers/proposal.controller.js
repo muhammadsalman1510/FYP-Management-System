@@ -12,6 +12,39 @@ const DEFAULT_MILESTONES = [
     { id: 5, name: "Final Presentation", description: "Final project presented and signed off.", completed: false, completedAt: null },
 ];
 
+/**
+ * Cross-validates all four group member fields against StudentProfile + User records.
+ * Checks name → section → email in order, returns on the first mismatch.
+ * Returns { userId } on success or { error: string } on any validation failure.
+ */
+const validateAndResolveMember = async (member) => {
+    const roll = (member.rollNumber || '').trim();
+
+    const profile = await StudentProfile.findOne({ rollNumber: roll });
+    if (!profile) {
+        return { error: `No student found with roll number '${roll}'. Please check and try again.` };
+    }
+
+    const user = await User.findById(profile.userId);
+    if (!user) {
+        return { error: `No student found with roll number '${roll}'. Please check and try again.` };
+    }
+
+    if (user.name.trim().toLowerCase() !== (member.name || '').trim().toLowerCase()) {
+        return { error: `The name provided for roll number '${roll}' does not match our records. Please check and try again.` };
+    }
+
+    if ((profile.section || '').trim().toLowerCase() !== (member.section || '').trim().toLowerCase()) {
+        return { error: `The section provided for roll number '${roll}' does not match our records. Please check and try again.` };
+    }
+
+    if (user.email.toLowerCase() !== (member.email || '').trim().toLowerCase()) {
+        return { error: `The email provided for roll number '${roll}' does not match our records. Please check and try again.` };
+    }
+
+    return { userId: profile.userId };
+};
+
 export const createProposal = async (req, res) => {
     try {
         const { title, description, problemStatement, techStack, groupMembers, supervisorName, supervisorEmail } = req.body;
@@ -37,20 +70,21 @@ export const createProposal = async (req, res) => {
             });
         }
 
-        // Validate each groupMember rollNumber exists in StudentProfile — fail fast on first missing
+        // Presence check — all four fields required per member before hitting the database
         for (const member of groupMembers) {
-            if (!member.rollNumber || !member.rollNumber.trim()) {
+            if (!member.name?.trim() || !member.rollNumber?.trim() || !member.section?.trim() || !member.email?.trim()) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Each group member must have a roll number',
+                    message: 'Each group member must have a name, roll number, section, and email',
                 });
             }
-            const profile = await StudentProfile.findOne({ rollNumber: member.rollNumber.trim() });
-            if (!profile) {
-                return res.status(400).json({
-                    success: false,
-                    message: `No student found with roll number '${member.rollNumber}'. Please check and try again.`,
-                });
+        }
+
+        // Full cross-validation: name, rollNumber, section, email must all match StudentProfile + User records
+        for (const member of groupMembers) {
+            const result = await validateAndResolveMember(member);
+            if (result.error) {
+                return res.status(400).json({ success: false, message: result.error });
             }
         }
 
@@ -172,17 +206,14 @@ export const reviewProposal = async (req, res) => {
             });
         }
 
-        // Resolve each groupMember rollNumber → User._id via StudentProfile
+        // Re-validate all four fields and resolve each groupMember → User._id via the shared helper
         const studentIds = [];
         for (const member of proposal.groupMembers) {
-            const profile = await StudentProfile.findOne({ rollNumber: member.rollNumber });
-            if (!profile) {
-                return res.status(400).json({
-                    success: false,
-                    message: `No student found with roll number '${member.rollNumber}'.`,
-                });
+            const result = await validateAndResolveMember(member);
+            if (result.error) {
+                return res.status(400).json({ success: false, message: result.error });
             }
-            studentIds.push(profile.userId);
+            studentIds.push(result.userId);
         }
 
         // Resolve supervisorEmail → User._id

@@ -47,7 +47,6 @@ const MeetingRequests = () => {
         }
         setMeetings(meetingsData.data);
 
-        // 404 = student has no project yet — not a real error
         if (projectRes.status === 404) {
           setProject(null);
         } else if (!projectRes.ok || !projectData.success) {
@@ -84,7 +83,6 @@ const MeetingRequests = () => {
     if (!proposedTime)   { setModalError('Please select a proposed time.'); return; }
     if (!topic.trim())   { setModalError('Please enter a topic or reason.'); return; }
 
-    // Resolve requestedTo to an actual User _id
     let requestedTo = '';
     if (meetWith === 'supervisor') {
       requestedTo = project?.supervisors?.[0]?._id;
@@ -111,7 +109,6 @@ const MeetingRequests = () => {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to submit meeting request');
 
-      // Re-fetch so the new meeting has populated requestedBy/requestedTo names
       const fresh = await loadMeetings();
       setMeetings(fresh);
       closeModal();
@@ -169,7 +166,11 @@ const MeetingRequests = () => {
     );
   }
 
-  // Resolved names shown inline in the dropdown options
+  // Only show meetings the student created (outgoing requests)
+  const myRequests = meetings.filter(
+    (m) => String(m.requestedBy?._id || m.requestedBy) === String(currentUserId)
+  );
+
   const supervisorName  = project?.supervisors?.[0]?.name || '';
   const coordinatorName = project?.coordinator?.name       || '';
 
@@ -181,7 +182,6 @@ const MeetingRequests = () => {
         <div className="col-12">
           <div className="card shadow-sm border-0">
 
-            {/* Card Header */}
             <div className="card-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
               <h5 className="fw-semibold text-dark mb-0">My Meeting Requests</h5>
               <button
@@ -194,7 +194,6 @@ const MeetingRequests = () => {
               </button>
             </div>
 
-            {/* No-project notice */}
             {!project && (
               <div className="alert alert-warning border-0 rounded-0 mb-0 px-4 py-3 small">
                 You need an active project before requesting a meeting. Once your proposal is approved,
@@ -202,17 +201,15 @@ const MeetingRequests = () => {
               </div>
             )}
 
-            {/* Meeting list */}
             <div className="card-body p-4">
-              {meetings.length === 0 ? (
+              {myRequests.length === 0 ? (
                 <div className="text-center py-4">
-                  <p className="text-muted mb-0">No meeting requests yet.</p>
+                  <p className="text-muted mb-0">No meeting requests sent yet.</p>
                 </div>
               ) : (
                 <div className="d-flex flex-column gap-4">
-                  {meetings.map((m) => {
-                    const isOutgoing  = String(m.requestedBy?._id || m.requestedBy) === String(currentUserId);
-                    const otherPerson = isOutgoing ? m.requestedTo : m.requestedBy;
+                  {myRequests.map((m) => {
+                    const otherPerson = m.requestedTo;
                     const otherRole   = otherPerson?.role
                       ? otherPerson.role.charAt(0).toUpperCase() + otherPerson.role.slice(1)
                       : '';
@@ -220,18 +217,14 @@ const MeetingRequests = () => {
                     return (
                       <div key={m._id} className="border rounded p-4">
 
-                        {/* Top row */}
                         <div className="d-flex justify-content-between align-items-start mb-3">
                           <div>
                             <h5 className="fw-semibold text-dark mb-1">{m.topic}</h5>
                             <p className="text-muted mb-1 small">
-                              {isOutgoing ? 'With' : 'From'}:{' '}
+                              With:{' '}
                               <strong className="text-dark">{otherPerson?.name || '—'}</strong>
                               {otherRole && (
-                                <span
-                                  className="ms-1 badge bg-secondary rounded-pill"
-                                  style={{ fontSize: '0.65rem' }}
-                                >
+                                <span className="ms-1 badge bg-secondary rounded-pill" style={{ fontSize: '0.65rem' }}>
                                   {otherRole}
                                 </span>
                               )}
@@ -256,15 +249,10 @@ const MeetingRequests = () => {
                           </span>
                         </div>
 
-                        {/* Response / notes */}
                         {m.notes && (
-                          <div
-                            className={`alert py-2 px-3 mt-2 mb-0 ${m.status === 'approved' ? 'alert-success' : 'alert-danger'}`}
-                          >
+                          <div className={`alert py-2 px-3 mt-2 mb-0 ${m.status === 'approved' ? 'alert-success' : 'alert-danger'}`}>
                             <p className="small mb-0">
-                              <strong>
-                                {m.status === 'approved' ? 'Approval Message' : 'Response'}:
-                              </strong>{' '}
+                              <strong>{m.status === 'approved' ? 'Approval Message' : 'Response'}:</strong>{' '}
                               {m.notes}
                             </p>
                           </div>
@@ -304,7 +292,6 @@ const MeetingRequests = () => {
                   </div>
                 )}
 
-                {/* Meet With */}
                 <div className="mb-3">
                   <label className="form-label fw-medium text-dark small">Meet With *</label>
                   <select
@@ -313,33 +300,26 @@ const MeetingRequests = () => {
                     onChange={(e) => { setMeetWith(e.target.value); setModalError(''); }}
                   >
                     <option value="">— Select —</option>
-                    <option
-                      value="supervisor"
-                      disabled={!project?.supervisors?.length}
-                    >
+                    <option value="supervisor" disabled={!project?.supervisors?.length}>
                       Supervisor{supervisorName ? ` — ${supervisorName}` : ''}
                     </option>
-                    <option
-                      value="coordinator"
-                      disabled={!project?.coordinator}
-                    >
+                    <option value="coordinator" disabled={!project?.coordinator}>
                       Coordinator{coordinatorName ? ` — ${coordinatorName}` : ''}
                     </option>
                   </select>
                 </div>
 
-                {/* Proposed Date */}
                 <div className="mb-3">
                   <label className="form-label fw-medium text-dark small">Proposed Date *</label>
                   <input
                     type="date"
                     className="form-control"
                     value={proposedDate}
+                    min={new Date().toISOString().split('T')[0]}
                     onChange={(e) => setProposedDate(e.target.value)}
                   />
                 </div>
 
-                {/* Proposed Time */}
                 <div className="mb-3">
                   <label className="form-label fw-medium text-dark small">Proposed Time *</label>
                   <input
@@ -350,7 +330,6 @@ const MeetingRequests = () => {
                   />
                 </div>
 
-                {/* Topic */}
                 <div className="mb-0">
                   <label className="form-label fw-medium text-dark small">Topic / Reason *</label>
                   <input

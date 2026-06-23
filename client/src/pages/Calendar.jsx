@@ -9,20 +9,35 @@ const Calendar = () => {
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState(null);
 
+  // Meeting detail popup state
+  const [selectedMeeting, setSelectedMeeting] = useState(null);
+  const [showModal, setShowModal]             = useState(false);
+  const [replyText, setReplyText]             = useState('');
+  const [replySending, setReplySending]       = useState(false);
+  const [replySuccess, setReplySuccess]       = useState(false);
+  const [replyError, setReplyError]           = useState('');
+
   const currentUserId = (() => {
     try { const u = JSON.parse(sessionStorage.getItem('user') || '{}'); return String(u._id || u.id || ''); }
     catch { return ''; }
   })();
 
+  const token   = sessionStorage.getItem('token');
+  const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
   useEffect(() => {
     const load = async () => {
       try {
-        const token   = sessionStorage.getItem('token');
-        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
         const res  = await fetch('/api/meetings', { headers });
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.message || 'Failed to load meetings');
-        setMeetings((data.data || []).filter((m) => m.status === 'approved'));
+        // Student sees only meetings they are requestedTo with status=approved
+        const filtered = (data.data || []).filter(
+          (m) =>
+            m.status === 'approved' &&
+            String(m.requestedTo?._id || m.requestedTo) === currentUserId
+        );
+        setMeetings(filtered);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -47,14 +62,9 @@ const Calendar = () => {
     else setCurrentMonth((m) => m + 1);
   };
 
-  const getOtherParty = (meeting) => {
-    if (String(meeting.requestedBy?._id) === currentUserId) return meeting.requestedTo;
-    return meeting.requestedBy;
-  };
-
   const getMeetingColor = (meeting) => {
-    const other = getOtherParty(meeting);
-    return other?.role === 'supervisor' ? '#3c50e0' : '#28a745';
+    const sender = meeting.requestedBy;
+    return sender?.role === 'supervisor' ? '#3c50e0' : '#28a745';
   };
 
   const getMeetingsForDay = (day) =>
@@ -74,6 +84,59 @@ const Calendar = () => {
   }
   const calRows = [];
   for (let i = 0; i < calDays.length; i += 7) calRows.push(calDays.slice(i, i + 7));
+
+  const openMeetingModal = (meeting) => {
+    setSelectedMeeting(meeting);
+    setReplyText('');
+    setReplySuccess(false);
+    setReplyError('');
+    setShowModal(true);
+  };
+
+  const closeMeetingModal = () => {
+    setShowModal(false);
+    setSelectedMeeting(null);
+  };
+
+  const handleSendReply = async () => {
+    if (!replyText.trim()) { setReplyError('Please enter a reply message.'); return; }
+    setReplySending(true);
+    setReplyError('');
+    try {
+      const res = await fetch(`/api/meetings/${selectedMeeting._id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ studentReply: replyText.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to send reply');
+
+      // Update the meeting in state with the new reply
+      const updatedMeeting = { ...selectedMeeting, studentReply: replyText.trim() };
+      setMeetings((prev) => prev.map((m) => m._id === selectedMeeting._id ? updatedMeeting : m));
+      setSelectedMeeting(updatedMeeting);
+      setReplySuccess(true);
+    } catch (err) {
+      setReplyError(err.message);
+    } finally {
+      setReplySending(false);
+    }
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const getRoleBadge = (role) => {
+    if (!role) return null;
+    const colors = { supervisor: 'bg-info text-dark', coordinator: 'bg-primary' };
+    return (
+      <span className={`badge rounded-pill px-2 ms-1 ${colors[role] || 'bg-secondary'}`} style={{ fontSize: '0.65rem' }}>
+        {role.charAt(0).toUpperCase() + role.slice(1)}
+      </span>
+    );
+  };
 
   return (
     <>
@@ -141,7 +204,8 @@ const Calendar = () => {
                                 </span>
                                 <div className="d-flex flex-column gap-1">
                                   {dayMeetings.map((m) => {
-                                    const other = getOtherParty(m);
+                                    const sender = m.requestedBy;
+                                    const locationStr = m.location ? ` | 📍 ${m.location}` : '';
                                     return (
                                       <div
                                         key={m._id}
@@ -151,9 +215,10 @@ const Calendar = () => {
                                           color: '#fff',
                                           fontSize: '0.72rem',
                                           lineHeight: '1.3',
-                                          cursor: 'default',
+                                          cursor: 'pointer',
                                         }}
-                                        title={`${m.topic} — ${other?.name || '—'} at ${m.proposedTime}`}
+                                        title={`${m.topic} — ${sender?.name || '—'} at ${m.proposedTime}${locationStr}`}
+                                        onClick={() => openMeetingModal(m)}
                                       >
                                         <div className="fw-semibold">{m.topic}</div>
                                         <div style={{ opacity: 0.9 }}>{m.proposedTime}</div>
@@ -178,23 +243,132 @@ const Calendar = () => {
           <div className="d-flex align-items-center gap-4 flex-wrap">
             <span className="small fw-medium text-muted">Legend:</span>
             <div className="d-flex align-items-center gap-2">
-              <span
-                className="rounded"
-                style={{ width: '14px', height: '14px', backgroundColor: '#3c50e0', display: 'inline-block' }}
-              />
+              <span className="rounded" style={{ width: '14px', height: '14px', backgroundColor: '#3c50e0', display: 'inline-block' }} />
               <span className="small text-muted">Meeting with Supervisor</span>
             </div>
             <div className="d-flex align-items-center gap-2">
-              <span
-                className="rounded"
-                style={{ width: '14px', height: '14px', backgroundColor: '#28a745', display: 'inline-block' }}
-              />
+              <span className="rounded" style={{ width: '14px', height: '14px', backgroundColor: '#28a745', display: 'inline-block' }} />
               <span className="small text-muted">Meeting with Coordinator</span>
             </div>
+            <span className="small text-muted ms-auto">Click a meeting to view details and send a reply.</span>
           </div>
         </div>
 
       </div>
+
+      {/* ── Meeting Detail Modal ── */}
+      {showModal && selectedMeeting && (
+        <div
+          className="modal d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeMeetingModal(); }}
+        >
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '500px' }}>
+            <div className="modal-content border-0 shadow">
+
+              <div
+                className="modal-header border-bottom px-4 py-3"
+                style={{ backgroundColor: getMeetingColor(selectedMeeting), color: '#fff' }}
+              >
+                <h5 className="modal-title fw-semibold mb-0">{selectedMeeting.topic}</h5>
+                <button
+                  className="btn-close btn-close-white"
+                  onClick={closeMeetingModal}
+                />
+              </div>
+
+              <div className="modal-body px-4 py-4">
+
+                {/* Meeting details */}
+                <div className="mb-4">
+                  <div className="d-flex flex-column gap-2">
+                    <div className="d-flex gap-2 small">
+                      <span className="text-muted" style={{ minWidth: '70px' }}>From:</span>
+                      <span className="fw-medium text-dark">
+                        {selectedMeeting.requestedBy?.name || '—'}
+                        {getRoleBadge(selectedMeeting.requestedBy?.role)}
+                      </span>
+                    </div>
+                    <div className="d-flex gap-2 small">
+                      <span className="text-muted" style={{ minWidth: '70px' }}>Date:</span>
+                      <span className="fw-medium text-dark">{formatDate(selectedMeeting.proposedDate)}</span>
+                    </div>
+                    <div className="d-flex gap-2 small">
+                      <span className="text-muted" style={{ minWidth: '70px' }}>Time:</span>
+                      <span className="fw-medium text-dark">{selectedMeeting.proposedTime}</span>
+                    </div>
+                    {selectedMeeting.location && (
+                      <div className="d-flex gap-2 small">
+                        <span className="text-muted" style={{ minWidth: '70px' }}>Location:</span>
+                        <span className="fw-medium text-dark">📍 {selectedMeeting.location}</span>
+                      </div>
+                    )}
+                    {selectedMeeting.projectId?.title && (
+                      <div className="d-flex gap-2 small">
+                        <span className="text-muted" style={{ minWidth: '70px' }}>Project:</span>
+                        <span className="fw-medium text-dark">{selectedMeeting.projectId.title}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <hr className="my-3" />
+
+                {/* Reply section */}
+                {selectedMeeting.studentReply ? (
+                  <div>
+                    <p className="fw-medium text-dark small mb-2">Your reply:</p>
+                    <div className="alert alert-success border-0 py-2 px-3 mb-0">
+                      <p className="small mb-0">{selectedMeeting.studentReply}</p>
+                    </div>
+                    {replySuccess && (
+                      <p className="text-success small mt-2 mb-0">✓ Reply sent successfully.</p>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <label className="form-label fw-medium text-dark small">Send a Reply</label>
+                    {replyError && (
+                      <div className="alert alert-danger border-0 py-2 px-3 small mb-2">{replyError}</div>
+                    )}
+                    {replySuccess ? (
+                      <div className="alert alert-success border-0 py-2 px-3 small mb-0">
+                        ✓ Reply sent successfully.
+                      </div>
+                    ) : (
+                      <>
+                        <textarea
+                          className="form-control mb-2"
+                          rows={3}
+                          placeholder="Type your reply here…"
+                          value={replyText}
+                          onChange={(e) => { setReplyText(e.target.value); setReplyError(''); }}
+                        />
+                        <button
+                          className="btn btn-primary btn-sm px-4 fw-medium"
+                          onClick={handleSendReply}
+                          disabled={replySending}
+                        >
+                          {replySending && <span className="spinner-border spinner-border-sm me-2" role="status" />}
+                          Send Reply
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+
+              </div>
+
+              <div className="modal-footer border-top px-4 py-3">
+                <button className="btn btn-outline-secondary px-4" onClick={closeMeetingModal}>
+                  Close
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

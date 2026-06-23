@@ -7,9 +7,17 @@ const Tasks = () => {
   const [submittedTasks, setSubmittedTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [uploadFiles, setUploadFiles] = useState({});
-  const [submitting, setSubmitting] = useState({});
+
+  // Initial submission state
+  const [uploadFiles, setUploadFiles]   = useState({});
+  const [submitting, setSubmitting]     = useState({});
   const [submitErrors, setSubmitErrors] = useState({});
+
+  // Re-upload / replace state (keyed by submission._id)
+  const [replaceMode, setReplaceMode]     = useState({});
+  const [replaceFiles, setReplaceFiles]   = useState({});
+  const [replacing, setReplacing]         = useState({});
+  const [replaceErrors, setReplaceErrors] = useState({});
 
   const token = sessionStorage.getItem('token');
   const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -69,7 +77,6 @@ const Tasks = () => {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Submission failed');
 
-      // Enrich the returned submission with the full task object so the submitted tab renders correctly
       const enrichedSub = { ...data.data, taskId: task };
       setPendingTasks((prev) => prev.filter((t) => t._id !== task._id));
       setSubmittedTasks((prev) => [enrichedSub, ...prev]);
@@ -78,6 +85,55 @@ const Tasks = () => {
       setSubmitErrors((prev) => ({ ...prev, [task._id]: err.message }));
     } finally {
       setSubmitting((prev) => ({ ...prev, [task._id]: false }));
+    }
+  };
+
+  const handleReplaceFileChange = (subId, file) => {
+    setReplaceFiles((prev) => ({ ...prev, [subId]: file }));
+    setReplaceErrors((prev) => ({ ...prev, [subId]: '' }));
+  };
+
+  const handleReplaceSubmit = async (sub) => {
+    const file = replaceFiles[sub._id];
+    if (!file) {
+      setReplaceErrors((prev) => ({ ...prev, [sub._id]: 'Please select a replacement file.' }));
+      return;
+    }
+
+    const taskId = sub.taskId?._id || sub.taskId;
+    if (!taskId) {
+      setReplaceErrors((prev) => ({ ...prev, [sub._id]: 'Cannot determine task ID.' }));
+      return;
+    }
+
+    setReplacing((prev) => ({ ...prev, [sub._id]: true }));
+    setReplaceErrors((prev) => ({ ...prev, [sub._id]: '' }));
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch(`/api/tasks/${taskId}/submit`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Re-upload failed');
+
+      setSubmittedTasks((prev) =>
+        prev.map((s) =>
+          s._id === sub._id
+            ? { ...s, fileUrl: data.data.fileUrl, fileName: data.data.fileName, status: 'pending', feedback: '', submittedAt: data.data.submittedAt }
+            : s
+        )
+      );
+      setReplaceMode((prev) => ({ ...prev, [sub._id]: false }));
+      setReplaceFiles((prev) => { const next = { ...prev }; delete next[sub._id]; return next; });
+    } catch (err) {
+      setReplaceErrors((prev) => ({ ...prev, [sub._id]: err.message }));
+    } finally {
+      setReplacing((prev) => ({ ...prev, [sub._id]: false }));
     }
   };
 
@@ -276,12 +332,14 @@ const Tasks = () => {
                           <th className="px-4 py-3 fw-semibold small text-dark" style={{ width: '120px' }}>Submitted On</th>
                           <th className="px-4 py-3 fw-semibold small text-dark">File</th>
                           <th className="px-4 py-3 fw-semibold small text-dark">Status</th>
+                          <th className="px-4 py-3 fw-semibold small text-dark">Action</th>
                         </tr>
                       </thead>
                       <tbody>
                         {submittedTasks.map((sub, index) => {
                           const task  = sub.taskId || {};
                           const badge = getSubmissionBadge(sub.status);
+                          const isReplacing = replaceMode[sub._id] === true;
                           return (
                             <tr key={sub._id || index}>
                               <td className="px-4 py-3 text-muted small">{index + 1}</td>
@@ -317,6 +375,70 @@ const Tasks = () => {
                                   <p className="text-muted mt-1 mb-0" style={{ fontSize: '0.72rem' }}>
                                     "{sub.feedback}"
                                   </p>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                {!isReplacing ? (
+                                  <button
+                                    className="btn btn-outline-secondary btn-sm px-3"
+                                    style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                                    onClick={() => {
+                                      setReplaceMode((prev) => ({ ...prev, [sub._id]: true }));
+                                      setReplaceErrors((prev) => ({ ...prev, [sub._id]: '' }));
+                                    }}
+                                  >
+                                    Replace File
+                                  </button>
+                                ) : (
+                                  <div className="d-flex flex-column gap-2" style={{ minWidth: '160px' }}>
+                                    <input
+                                      type="file"
+                                      id={`replace-${sub._id}`}
+                                      className="d-none"
+                                      onChange={(e) => handleReplaceFileChange(sub._id, e.target.files[0])}
+                                    />
+                                    <label
+                                      htmlFor={`replace-${sub._id}`}
+                                      className="btn btn-outline-primary btn-sm mb-0"
+                                      style={{ cursor: 'pointer', fontSize: '0.75rem' }}
+                                    >
+                                      Choose File
+                                    </label>
+                                    {replaceFiles[sub._id] && (
+                                      <span className="text-muted" style={{ fontSize: '0.73rem' }}>
+                                        {replaceFiles[sub._id].name}
+                                      </span>
+                                    )}
+                                    {replaceFiles[sub._id] && (
+                                      <button
+                                        className="btn btn-warning btn-sm"
+                                        style={{ fontSize: '0.75rem' }}
+                                        onClick={() => handleReplaceSubmit(sub)}
+                                        disabled={replacing[sub._id]}
+                                      >
+                                        {replacing[sub._id] && (
+                                          <span className="spinner-border spinner-border-sm me-1" role="status" />
+                                        )}
+                                        Submit Replacement
+                                      </button>
+                                    )}
+                                    {replaceErrors[sub._id] && (
+                                      <span className="text-danger" style={{ fontSize: '0.73rem' }}>
+                                        {replaceErrors[sub._id]}
+                                      </span>
+                                    )}
+                                    <button
+                                      className="btn btn-link btn-sm p-0 text-muted text-decoration-none"
+                                      style={{ fontSize: '0.73rem' }}
+                                      onClick={() => {
+                                        setReplaceMode((prev) => ({ ...prev, [sub._id]: false }));
+                                        setReplaceFiles((prev) => { const n = { ...prev }; delete n[sub._id]; return n; });
+                                        setReplaceErrors((prev) => ({ ...prev, [sub._id]: '' }));
+                                      }}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
                                 )}
                               </td>
                             </tr>

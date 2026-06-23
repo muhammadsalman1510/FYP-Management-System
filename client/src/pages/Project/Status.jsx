@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 import Avatar from '../../components/Avatar';
 
 const Status = () => {
   const [project, setProject] = useState(null);
-  const [taskCount, setTaskCount] = useState(0);
+  const [pendingTaskCount, setPendingTaskCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const token = sessionStorage.getItem('token');
@@ -14,9 +16,10 @@ const Status = () => {
 
     const fetchData = async () => {
       try {
-        const [projectRes, tasksRes] = await Promise.all([
+        const [projectRes, tasksRes, subsRes] = await Promise.all([
           fetch('/api/projects/my', { headers }),
           fetch('/api/tasks', { headers }),
+          fetch('/api/tasks/submissions/my', { headers }),
         ]);
 
         const projectData = await projectRes.json();
@@ -26,8 +29,14 @@ const Status = () => {
         setProject(projectData.data);
 
         const tasksData = await tasksRes.json();
-        if (tasksRes.ok && tasksData.success) {
-          setTaskCount(tasksData.data.length);
+        const subsData  = await subsRes.json();
+
+        if (tasksRes.ok && tasksData.success && subsRes.ok && subsData.success) {
+          const submittedIds = new Set(
+            (subsData.data || []).map((s) => String(s.taskId?._id || s.taskId))
+          );
+          const pending = (tasksData.data || []).filter((t) => !submittedIds.has(String(t._id)));
+          setPendingTaskCount(pending.length);
         }
       } catch (err) {
         setError(err.message);
@@ -45,7 +54,6 @@ const Status = () => {
       day: '2-digit', month: 'short', year: 'numeric',
     });
   };
-
 
   if (loading) {
     return (
@@ -94,11 +102,12 @@ const Status = () => {
 
       <div className="d-flex flex-column gap-4">
 
-        {/* Pending Tasks Alert */}
-        {taskCount > 0 && (
+        {/* Pending Tasks Shortcut */}
+        {pendingTaskCount > 0 && (
           <div
             className="d-flex align-items-center justify-content-between p-3 rounded border border-warning"
-            style={{ backgroundColor: '#fff8e1' }}
+            style={{ backgroundColor: '#fff8e1', cursor: 'pointer' }}
+            onClick={() => navigate('/tasks')}
           >
             <div className="d-flex align-items-center gap-3">
               <div
@@ -111,20 +120,16 @@ const Status = () => {
               </div>
               <div>
                 <p className="fw-semibold mb-0 text-dark" style={{ fontSize: '0.9rem' }}>
-                  You have {taskCount} {taskCount === 1 ? 'task' : 'tasks'} assigned
+                  {pendingTaskCount} Pending Task{pendingTaskCount !== 1 ? 's' : ''} →
                 </p>
                 <p className="text-muted mb-0" style={{ fontSize: '0.78rem' }}>
                   Complete your tasks before the deadline.
                 </p>
               </div>
             </div>
-            <a
-              href="/tasks"
-              className="btn btn-warning btn-sm px-3 fw-medium text-white"
-              style={{ whiteSpace: 'nowrap' }}
-            >
+            <span className="btn btn-warning btn-sm px-3 fw-medium text-white" style={{ whiteSpace: 'nowrap' }}>
               View Tasks
-            </a>
+            </span>
           </div>
         )}
 
@@ -269,7 +274,7 @@ const Status = () => {
                 {students.map((member, i) => (
                   <div key={member._id || i} className="col-12 col-md-6">
                     <div className="d-flex align-items-center gap-3 p-3 border rounded">
-                      <Avatar name={member.name} size={40} />
+                      <Avatar name={member.name} photoUrl={member.photoUrl} size={40} />
                       <div>
                         <p className="fw-semibold text-dark mb-0 small">{member.name}</p>
                         <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>{member.email}</p>
@@ -285,7 +290,6 @@ const Status = () => {
         {/* Supervisor + Coordinator Row */}
         <div className="row g-4">
 
-          {/* Supervisor */}
           <div className="col-12 col-md-6">
             <div className="card shadow-sm border-0 h-100">
               <div className="card-header bg-white border-bottom py-3 px-4">
@@ -298,7 +302,7 @@ const Status = () => {
                   supervisors.map((sup, i) => (
                     <div key={sup._id || i} className={i > 0 ? 'mt-3 pt-3 border-top' : 'mb-3'}>
                       <div className="d-flex align-items-center gap-3 mb-2">
-                        <Avatar name={sup.name} size={48} />
+                        <Avatar name={sup.name} photoUrl={sup.photoUrl} size={48} />
                         <div>
                           <p className="fw-semibold text-dark mb-0">{sup.name}</p>
                           <p className="text-muted small mb-0">Supervisor</p>
@@ -317,7 +321,6 @@ const Status = () => {
             </div>
           </div>
 
-          {/* Coordinator */}
           <div className="col-12 col-md-6">
             <div className="card shadow-sm border-0 h-100">
               <div className="card-header bg-white border-bottom py-3 px-4">
@@ -327,7 +330,7 @@ const Status = () => {
                 {coordinator ? (
                   <>
                     <div className="d-flex align-items-center gap-3 mb-3">
-                      <Avatar name={coordinator.name} size={48} />
+                      <Avatar name={coordinator.name} photoUrl={coordinator.photoUrl} size={48} />
                       <div>
                         <p className="fw-semibold text-dark mb-0">{coordinator.name}</p>
                         <p className="text-muted small mb-0">Coordinator</p>

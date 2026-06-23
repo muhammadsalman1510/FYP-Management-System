@@ -32,6 +32,9 @@ const SupervisorProjectDetail = () => {
   const [reviewFeedback, setReviewFeedback] = useState('');
   const [reviewing, setReviewing]           = useState(false);
 
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [showStudentModal, setShowStudentModal] = useState(false);
+
   useEffect(() => {
     const fetchAll = async () => {
       try {
@@ -80,6 +83,16 @@ const SupervisorProjectDetail = () => {
     };
     fetchAll();
   }, [id]);
+
+  const openStudentModal = (student) => {
+    setSelectedStudent(student);
+    setShowStudentModal(true);
+  };
+
+  const closeStudentModal = () => {
+    setShowStudentModal(false);
+    setSelectedStudent(null);
+  };
 
   const openReview = (sub, decision) => {
     setReviewSub(sub);
@@ -152,6 +165,13 @@ const SupervisorProjectDetail = () => {
   const students = project.students || [];
   const coordinator = project.coordinator || null;
   const pendingSubsCount = submissions.filter((s) => s.status === 'pending').length;
+
+  const studentSubs = selectedStudent
+    ? submissions.filter((s) => String(s.submittedBy?._id) === String(selectedStudent._id))
+    : [];
+  const studentDocs = selectedStudent
+    ? documents.filter((d) => String(d.uploadedBy?._id) === String(selectedStudent._id))
+    : [];
 
   const tabs = [
     { key: 'overview',    label: 'Overview' },
@@ -256,6 +276,39 @@ const SupervisorProjectDetail = () => {
       {activeTab === 'overview' && (
         <div className="d-flex flex-column gap-4">
 
+          {/* Task Summary Shortcut */}
+          <div
+            className="card border-0 shadow-sm"
+            style={{ cursor: 'pointer' }}
+            onClick={() => setActiveTab('tasks')}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f8f9fa'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ''; }}
+          >
+            <div className="card-body p-3 d-flex align-items-center justify-content-between">
+              <div className="d-flex align-items-center gap-3">
+                <div
+                  className="d-flex align-items-center justify-content-center rounded-circle"
+                  style={{ width: '40px', height: '40px', minWidth: '40px', backgroundColor: '#3c50e015' }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="#3c50e0">
+                    <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="fw-semibold text-dark mb-0 small">
+                    {tasks.length} Task{tasks.length !== 1 ? 's' : ''} assigned
+                    &nbsp;&bull;&nbsp;
+                    {pendingSubsCount} Submission{pendingSubsCount !== 1 ? 's' : ''} pending review
+                  </p>
+                  <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>Click to view tasks and submissions</p>
+                </div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3c50e0" strokeWidth="2">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </div>
+          </div>
+
           {/* Milestones */}
           <div className="card border-0 shadow-sm">
             <div className="card-header bg-white border-bottom py-3 px-4">
@@ -313,10 +366,11 @@ const SupervisorProjectDetail = () => {
             </div>
           </div>
 
-          {/* Group Members */}
+          {/* Group Members — clickable cards open student detail modal */}
           <div className="card border-0 shadow-sm">
             <div className="card-header bg-white border-bottom py-3 px-4">
               <h6 className="fw-semibold text-dark mb-0">Group Members</h6>
+              <p className="text-muted small mb-0 mt-1">Click a student to view their submissions and documents.</p>
             </div>
             <div className="card-body p-4">
               {students.length === 0 ? (
@@ -325,12 +379,27 @@ const SupervisorProjectDetail = () => {
                 <div className="row g-3">
                   {students.map((student, i) => (
                     <div key={student._id || i} className="col-12 col-md-6">
-                      <div className="d-flex align-items-center gap-3 p-3 border rounded">
-                        <Avatar name={student.name} size={42} />
-                        <div>
+                      <div
+                        className="d-flex align-items-center gap-3 p-3 border rounded"
+                        style={{ cursor: 'pointer', transition: 'background-color 0.15s, border-color 0.15s' }}
+                        onClick={() => openStudentModal(student)}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#f0f4ff';
+                          e.currentTarget.style.borderColor = '#3c50e0';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '';
+                          e.currentTarget.style.borderColor = '';
+                        }}
+                      >
+                        <Avatar name={student.name} photoUrl={student.photoUrl} size={42} />
+                        <div className="flex-grow-1 min-width-0">
                           <p className="fw-semibold text-dark mb-0 small">{student.name}</p>
                           <p className="text-muted mb-0" style={{ fontSize: '0.73rem' }}>{student.email}</p>
                         </div>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#adb5bd" strokeWidth="2" className="flex-shrink-0">
+                          <path d="M9 18l6-6-6-6"/>
+                        </svg>
                       </div>
                     </div>
                   ))}
@@ -347,7 +416,7 @@ const SupervisorProjectDetail = () => {
               </div>
               <div className="card-body p-4">
                 <div className="d-flex align-items-center gap-3">
-                  <Avatar name={coordinator.name} size={48} />
+                  <Avatar name={coordinator.name} photoUrl={coordinator.photoUrl} size={48} />
                   <div>
                     <p className="fw-semibold text-dark mb-0">{coordinator.name}</p>
                     <p className="text-muted small mb-0">Coordinator</p>
@@ -555,6 +624,129 @@ const SupervisorProjectDetail = () => {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── STUDENT DETAIL MODAL ── */}
+      {showStudentModal && selectedStudent && (
+        <div
+          className="modal d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}
+          onClick={closeStudentModal}
+        >
+          <div
+            className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-content border-0 shadow">
+              <div className="modal-header border-bottom px-4 py-3">
+                <div className="d-flex align-items-center gap-3">
+                  <Avatar name={selectedStudent.name} photoUrl={selectedStudent.photoUrl} size={40} />
+                  <div>
+                    <h5 className="modal-title fw-semibold text-dark mb-0">{selectedStudent.name}</h5>
+                    <p className="text-muted small mb-0">{selectedStudent.email}</p>
+                  </div>
+                </div>
+                <button className="btn-close" onClick={closeStudentModal} />
+              </div>
+
+              <div className="modal-body px-4 py-4">
+
+                <h6 className="fw-semibold text-dark mb-3">
+                  Task Submissions
+                  <span className="badge bg-secondary ms-2 rounded-pill" style={{ fontSize: '0.7rem' }}>
+                    {studentSubs.length}
+                  </span>
+                </h6>
+                {studentSubs.length === 0 ? (
+                  <p className="text-muted small mb-4">No submissions from this student yet.</p>
+                ) : (
+                  <div className="d-flex flex-column gap-2 mb-4">
+                    {studentSubs.map((sub) => (
+                      <div key={sub._id} className="d-flex align-items-center justify-content-between p-3 border rounded">
+                        <div>
+                          <p className="fw-medium text-dark small mb-0">{sub.taskId?.title || '—'}</p>
+                          <p className="text-muted mb-0" style={{ fontSize: '0.73rem' }}>
+                            Submitted {formatDate(sub.submittedAt)}
+                            {sub.feedback && <> &bull; <em>"{sub.feedback}"</em></>}
+                          </p>
+                        </div>
+                        <div className="d-flex align-items-center gap-2 flex-shrink-0">
+                          {sub.fileUrl && (
+                            <button
+                              className="btn btn-outline-primary btn-sm px-2"
+                              style={{ fontSize: '0.72rem' }}
+                              onClick={() => window.open(sub.fileUrl, '_blank')}
+                            >
+                              📎 File
+                            </button>
+                          )}
+                          <span
+                            className="badge rounded-pill px-2 py-1"
+                            style={{
+                              backgroundColor: sub.status === 'approved' ? '#28a74520' : sub.status === 'rejected' ? '#dc354520' : '#ffc10720',
+                              color: sub.status === 'approved' ? '#28a745' : sub.status === 'rejected' ? '#dc3545' : '#d39e00',
+                              fontSize: '0.7rem',
+                            }}
+                          >
+                            {sub.status === 'pending' ? 'Pending' : sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <hr className="my-3" />
+
+                <h6 className="fw-semibold text-dark mb-3">
+                  Uploaded Documents
+                  <span className="badge bg-secondary ms-2 rounded-pill" style={{ fontSize: '0.7rem' }}>
+                    {studentDocs.length}
+                  </span>
+                </h6>
+                {studentDocs.length === 0 ? (
+                  <p className="text-muted small mb-0">No documents uploaded by this student yet.</p>
+                ) : (
+                  <div className="d-flex flex-column gap-2">
+                    {studentDocs.map((doc) => (
+                      <div key={doc._id} className="d-flex align-items-center justify-content-between p-3 border rounded">
+                        <div className="d-flex align-items-center gap-3">
+                          <div
+                            className="d-flex align-items-center justify-content-center rounded flex-shrink-0"
+                            style={{ width: '36px', height: '36px', backgroundColor: docTypeColors[doc.type] || '#6c757d' }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                              <polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="fw-medium text-dark mb-0 small">{doc.fileName}</p>
+                            <p className="text-muted mb-0" style={{ fontSize: '0.73rem' }}>
+                              {doc.type} &bull; {formatDate(doc.uploadedAt || doc.createdAt)} &bull; {doc.size}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          className="btn btn-outline-primary btn-sm px-3 flex-shrink-0"
+                          style={{ fontSize: '0.72rem' }}
+                          onClick={() => window.open(doc.fileUrl, '_blank')}
+                        >
+                          Download
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+              </div>
+
+              <div className="modal-footer border-top px-4 py-3">
+                <button className="btn btn-outline-secondary px-4" onClick={closeStudentModal}>Close</button>
+              </div>
+            </div>
           </div>
         </div>
       )}

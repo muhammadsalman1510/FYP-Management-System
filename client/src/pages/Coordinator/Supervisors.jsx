@@ -1,21 +1,7 @@
-// 📁 FILE: src/pages/Coordinator/Supervisors.jsx
-
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 import Avatar from '../../components/Avatar';
-
-/*
-  COORDINATOR — MANAGE SUPERVISORS
-  - View all supervisors
-  - Create new supervisor account
-  - Edit existing supervisor
-  - Delete supervisor
-  TODO (Backend): GET    /api/coordinator/supervisors
-  TODO (Backend): POST   /api/coordinator/supervisors
-  TODO (Backend): PUT    /api/coordinator/supervisors/:id
-  TODO (Backend): DELETE /api/coordinator/supervisors/:id
-*/
 
 const CoordinatorSupervisors = () => {
 
@@ -28,7 +14,7 @@ const CoordinatorSupervisors = () => {
   const [supervisorToDeleteId, setSupervisorToDeleteId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const emptyForm = { name: '', email: '', password: '', department: 'Computer Science', designation: '', maxProjects: '' };
+  const emptyForm = { name: '', email: '', password: '', department: 'Computer Science', maxProjects: '' };
   const [form, setForm] = useState(emptyForm);
 
   const fetchSupervisors = async () => {
@@ -37,12 +23,8 @@ const CoordinatorSupervisors = () => {
       const response = await axios.get(
         "http://localhost:4000/api/users",
         {
-          params: {
-            role: 'supervisor',
-          },
-          headers: {
-            Authorization: `Bearer ${token}`
-          },
+          params: { role: 'supervisor' },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
       setSupervisors(response.data.users);
@@ -64,16 +46,13 @@ const CoordinatorSupervisors = () => {
   const openEditModal = async (id) => {
     try {
       const token = sessionStorage.getItem('token');
-
       const { data } = await axios.get(`http://localhost:4000/api/users/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       setForm({ ...data.user, password: '' });
       setSelectedSupervisorId(id);
       setModalMode('edit');
       setShowModal(true);
-
     } catch (err) {
       console.error('Fetch supervisor error:', err);
       const message = err.response?.data?.message || 'Failed to load supervisor data.';
@@ -92,7 +71,7 @@ const CoordinatorSupervisors = () => {
 
     if (modalMode === 'create') {
       try {
-        const response = await axios.post(
+        await axios.post(
           "http://localhost:4000/api/users",
           {
             name: form.name,
@@ -100,44 +79,30 @@ const CoordinatorSupervisors = () => {
             password: form.password,
             role: 'supervisor',
             department: form.department,
-            designation: form.designation,
             maxProjects: Number(form.maxProjects),
           },
-          {
-            headers: { Authorization: `Bearer ${token}` }
-          }
+          { headers: { Authorization: `Bearer ${token}` } }
         );
-
         fetchSupervisors();
-
       } catch (error) {
         console.error(error);
       }
-
     } else {
       try {
         const body = {
           name: form.name,
           email: form.email,
           department: form.department,
-          designation: form.designation,
           maxProjects: Number(form.maxProjects),
         };
+        if (form.password) body.password = form.password;
 
-        if (form.password) {
-          body.password = form.password;
-        }
-
-        const response = await axios.put(
+        await axios.put(
           `http://localhost:4000/api/users/${selectedSupervisorId}`,
           body,
-          {
-            headers: { Authorization: `Bearer ${token}` }
-          }
+          { headers: { Authorization: `Bearer ${token}` } }
         );
-
         fetchSupervisors();
-
       } catch (error) {
         console.error(error);
       }
@@ -147,25 +112,20 @@ const CoordinatorSupervisors = () => {
     setForm(emptyForm);
   };
 
-  // Just opens the modal
   const openDeleteConfirm = (id) => {
     setSupervisorToDeleteId(id);
     setShowDeleteConfirm(true);
   };
 
-  // Actually deletes
   const handleDelete = async () => {
     try {
       const token = sessionStorage.getItem('token');
-
       await axios.delete(`http://localhost:4000/api/users/${supervisorToDeleteId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       await fetchSupervisors();
       setShowDeleteConfirm(false);
       setSupervisorToDeleteId(null);
-
     } catch (err) {
       console.error('Delete supervisor error:', err);
       const message = err.response?.data?.message || 'Something went wrong. Please try again.';
@@ -185,7 +145,6 @@ const CoordinatorSupervisors = () => {
 
       <div className="card shadow-sm border-0">
 
-        {/* Card Header */}
         <div className="card-header bg-white border-bottom py-3 px-4">
           <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
             <h5 className="fw-semibold text-dark mb-0">
@@ -210,7 +169,6 @@ const CoordinatorSupervisors = () => {
           </div>
         </div>
 
-        {/* Supervisors Table */}
         <div className="card-body p-0">
           <div className="table-responsive">
             <table className="table table-hover align-middle mb-0">
@@ -220,7 +178,6 @@ const CoordinatorSupervisors = () => {
                   <th className="px-4 py-3 fw-semibold small text-dark">Name</th>
                   <th className="px-4 py-3 fw-semibold small text-dark">Email</th>
                   <th className="px-4 py-3 fw-semibold small text-dark">Department</th>
-                  <th className="px-4 py-3 fw-semibold small text-dark">Designation</th>
                   <th className="px-4 py-3 fw-semibold small text-dark">Assigned Projects</th>
                   <th className="px-4 py-3 fw-semibold small text-dark">Actions</th>
                 </tr>
@@ -228,21 +185,20 @@ const CoordinatorSupervisors = () => {
               <tbody>
                 {filteredSupervisors.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="text-center text-muted py-5">No supervisors found.</td>
+                    <td colSpan="6" className="text-center text-muted py-5">No supervisors found.</td>
                   </tr>
                 ) : (
                   filteredSupervisors.map((supervisor, index) => (
-                    <tr key={supervisor.id}>
+                    <tr key={supervisor._id}>
                       <td className="px-4 py-3 text-muted small">{index + 1}</td>
                       <td className="px-4 py-3">
                         <div className="d-flex align-items-center gap-2">
-                          <Avatar name={supervisor.name} size={36} />
+                          <Avatar name={supervisor.name} photoUrl={supervisor.photoUrl} size={36} />
                           <span className="fw-medium text-dark small">{supervisor.name}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-muted small">{supervisor.email}</td>
                       <td className="px-4 py-3 text-muted small">{supervisor.department}</td>
-                      <td className="px-4 py-3 text-muted small">{supervisor.designation}</td>
                       <td className="px-4 py-3">
                         <div className="d-flex align-items-center gap-2">
                           <div className="progress flex-grow-1" style={{ height: '8px' }}>
@@ -253,9 +209,7 @@ const CoordinatorSupervisors = () => {
                                   ? 'bg-warning'
                                   : 'bg-success'
                                 }`}
-                              style={{
-                                width: `${(supervisor.currentProjects / supervisor.maxProjects) * 100}%`
-                              }}
+                              style={{ width: `${(supervisor.currentProjects / supervisor.maxProjects) * 100}%` }}
                             />
                           </div>
                           <small className="text-muted text-nowrap">
@@ -290,60 +244,48 @@ const CoordinatorSupervisors = () => {
                 <button className="btn-close" onClick={() => setShowModal(false)} />
               </div>
               <div className="modal-body px-4 py-4">
-                <form onSubmit={handleSave} id="supervisorForm">
-                  <div className="row g-3">
-                    <div className="col-12 col-md-6">
-                      <label className="form-label fw-medium text-dark small">Full Name *</label>
-                      <input type="text" name="name" value={form.name} onChange={handleFormChange} className="form-control" placeholder="e.g. Mr. Shoaib Ahmed" required />
-                    </div>
-                    <div className="col-12 col-md-6">
-                      <label className="form-label fw-medium text-dark small">University Email *</label>
-                      <input type="email" name="email" value={form.email} onChange={handleFormChange} className="form-control" placeholder="e.g. supervisor@university.edu" required />
-                    </div>
-                    <div className="col-12 col-md-6">
-                      <label className="form-label fw-medium text-dark small">
-                        {modalMode === 'create' ? 'Password *' : 'New Password (leave blank to keep)'}
-                      </label>
-                      <input type="password" name="password" value={form.password} onChange={handleFormChange} className="form-control" placeholder="Enter password" required={modalMode === 'create'} />
-                    </div>
-                    <div className="col-12 col-md-6">
-                      <label className="form-label fw-medium text-dark small">Department *</label>
-                      <select name="department" value={form.department} onChange={handleFormChange} className="form-select" required>
-                        <option>Computer Science</option>
-                        <option>Software Engineering</option>
-                        <option>Information Technology</option>
-                      </select>
-                    </div>
-                    <div className="col-12 col-md-6">
-                      <label className="form-label fw-medium text-dark small">Designation *</label>
-                      <select name="designation" value={form.designation} onChange={handleFormChange} className="form-select" required>
-                        <option value="">Select Designation</option>
-                        <option>Lecturer</option>
-                        <option>Assistant Professor</option>
-                        <option>Associate Professor</option>
-                        <option>Professor</option>
-                      </select>
-                    </div>
-                    <div className="col-12 col-md-6">
-                      <label className="form-label fw-medium text-dark small">Max Projects *</label>
-                      <input
-                        type="number"
-                        name="maxProjects"
-                        value={form.maxProjects}
-                        onChange={handleFormChange}
-                        className="form-control"
-                        placeholder="Between 1 - 4"
-                        min="1"
-                        max="4"
-                        required
-                      />
-                    </div>
+                <div className="row g-3">
+                  <div className="col-12 col-md-6">
+                    <label className="form-label fw-medium text-dark small">Full Name *</label>
+                    <input type="text" name="name" value={form.name} onChange={handleFormChange} className="form-control" placeholder="e.g. Mr. Shoaib Ahmed" required />
                   </div>
-                </form>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label fw-medium text-dark small">University Email *</label>
+                    <input type="email" name="email" value={form.email} onChange={handleFormChange} className="form-control" placeholder="e.g. supervisor@university.edu" required />
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label fw-medium text-dark small">
+                      {modalMode === 'create' ? 'Password *' : 'New Password (leave blank to keep)'}
+                    </label>
+                    <input type="password" name="password" value={form.password} onChange={handleFormChange} className="form-control" placeholder="Enter password" required={modalMode === 'create'} />
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label fw-medium text-dark small">Department *</label>
+                    <select name="department" value={form.department} onChange={handleFormChange} className="form-select" required>
+                      <option>Computer Science</option>
+                      <option>Software Engineering</option>
+                      <option>Information Technology</option>
+                    </select>
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label fw-medium text-dark small">Max Projects *</label>
+                    <input
+                      type="number"
+                      name="maxProjects"
+                      value={form.maxProjects}
+                      onChange={handleFormChange}
+                      className="form-control"
+                      placeholder="Between 1 - 4"
+                      min="1"
+                      max="4"
+                      required
+                    />
+                  </div>
+                </div>
               </div>
               <div className="modal-footer border-top px-4 py-3">
                 <button className="btn btn-outline-secondary px-4" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" form="supervisorForm" className="btn btn-success px-4 fw-medium">
+                <button className="btn btn-success px-4 fw-medium" onClick={handleSave}>
                   {modalMode === 'create' ? 'Create Account' : 'Save Changes'}
                 </button>
               </div>

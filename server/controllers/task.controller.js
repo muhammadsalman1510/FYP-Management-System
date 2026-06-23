@@ -15,13 +15,16 @@ export const createTask = async (req, res) => {
             });
         }
 
+        if (isNaN(new Date(dueDate).getTime())) {
+            return res.status(400).json({ success: false, message: 'Invalid due date provided.' });
+        }
+
         const scope = targetScope || 'project';
         const creatorRole = req.user.role;
 
         // ── targetScope = 'all' ──────────────────────────────────────────────
         if (scope === 'all') {
             if (creatorRole === 'coordinator') {
-                // One task with no project binding
                 const task = await Task.create({
                     title,
                     instructions: instructions || '',
@@ -77,7 +80,6 @@ export const createTask = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Project not found' });
         }
 
-        // Supervisor must be assigned to the project
         if (creatorRole === 'supervisor') {
             const isAssigned = project.supervisors.some(
                 (s) => s.toString() === req.user._id.toString()
@@ -125,7 +127,6 @@ export const getTasks = async (req, res) => {
                 .populate('createdBy', 'name')
                 .sort({ dueDate: 1 });
         } else {
-            // Student — find their project first
             const project = await Project.findOne({
                 students: req.user._id,
             }).select('_id');
@@ -134,7 +135,6 @@ export const getTasks = async (req, res) => {
                 return res.status(200).json({ success: true, data: [] });
             }
 
-            // Tasks for their project + coordinator-wide tasks (projectId=null, scope=all)
             tasks = await Task.find({
                 $or: [
                     { projectId: project._id },
@@ -153,6 +153,62 @@ export const getTasks = async (req, res) => {
     }
 };
 
+// ─── PUT /api/tasks/:id ───────────────────────────────────────────────────────
+export const updateTask = async (req, res) => {
+    try {
+        const { title, instructions, openDate, dueDate } = req.body;
+
+        const task = await Task.findById(req.params.id);
+        if (!task) {
+            return res.status(404).json({ success: false, message: 'Task not found' });
+        }
+
+        if (task.createdBy.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: 'You can only edit tasks you created' });
+        }
+
+        if (dueDate && isNaN(new Date(dueDate).getTime())) {
+            return res.status(400).json({ success: false, message: 'Invalid due date provided.' });
+        }
+
+        if (title) task.title = title.trim();
+        if (instructions !== undefined) task.instructions = instructions;
+        if (openDate) task.openDate = openDate;
+        if (dueDate) task.dueDate = dueDate;
+
+        await task.save();
+
+        const updated = await Task.findById(task._id)
+            .populate('projectId', 'title')
+            .populate('createdBy', 'name');
+
+        return res.status(200).json({ success: true, data: updated });
+    } catch (err) {
+        console.error('updateTask error:', err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// ─── DELETE /api/tasks/:id ────────────────────────────────────────────────────
+export const deleteTask = async (req, res) => {
+    try {
+        const task = await Task.findById(req.params.id);
+        if (!task) {
+            return res.status(404).json({ success: false, message: 'Task not found' });
+        }
+
+        if (task.createdBy.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: 'You can only delete tasks you created' });
+        }
+
+        await Task.findByIdAndDelete(req.params.id);
+        return res.status(200).json({ success: true, data: { message: 'Task deleted.' } });
+    } catch (err) {
+        console.error('deleteTask error:', err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 // ─── POST /api/tasks/:id/submit ───────────────────────────────────────────────
 export const submitTask = async (req, res) => {
     try {
@@ -165,7 +221,6 @@ export const submitTask = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Task not found' });
         }
 
-        // Find student's project
         const project = await Project.findOne({ students: req.user._id }).select('_id');
         if (!project) {
             return res.status(400).json({
@@ -174,7 +229,6 @@ export const submitTask = async (req, res) => {
             });
         }
 
-        // Verify task is relevant to this student
         const isForProject =
             task.projectId && task.projectId.toString() === project._id.toString();
         const isGlobal = !task.projectId && task.targetScope === 'all';
@@ -186,16 +240,20 @@ export const submitTask = async (req, res) => {
             });
         }
 
-        // Prevent duplicate submission
+        // If submission already exists, update it (re-upload)
         const existing = await TaskSubmission.findOne({
             taskId: task._id,
             submittedBy: req.user._id,
         });
+
         if (existing) {
-            return res.status(409).json({
-                success: false,
-                message: 'You have already submitted this task',
-            });
+            existing.fileUrl = '/uploads/' + req.file.filename;
+            existing.fileName = req.file.originalname;
+            existing.status = 'pending';
+            existing.feedback = '';
+            existing.submittedAt = new Date();
+            await existing.save();
+            return res.status(200).json({ success: true, data: existing });
         }
 
         const submission = await TaskSubmission.create({
@@ -226,7 +284,6 @@ export const getSubmissions = async (req, res) => {
                 .populate('projectId', 'title')
                 .sort({ submittedAt: -1 });
         } else {
-            // Supervisor — only submissions for tasks they created
             const theirTasks = await Task.find({ createdBy: req.user._id }).select('_id');
             const taskIds = theirTasks.map((t) => t._id);
 
@@ -282,7 +339,6 @@ export const reviewSubmission = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Submission not found' });
         }
 
-        // Supervisor can only review submissions for tasks they created
         if (req.user.role === 'supervisor') {
             const taskCreator = submission.taskId.createdBy.toString();
             if (taskCreator !== req.user._id.toString()) {

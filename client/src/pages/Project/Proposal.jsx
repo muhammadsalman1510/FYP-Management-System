@@ -16,7 +16,7 @@ const Proposal = () => {
   const [description, setDescription]           = useState('');
   const [problemStatement, setProblemStatement] = useState('');
   const [techStack, setTechStack]               = useState('');
-  const [groupMembers, setGroupMembers]         = useState([{ name: '', rollNumber: '' }]);
+  const [groupMembers, setGroupMembers]         = useState([{ name: '', rollNumber: '', section: '', email: '' }]);
   const [supervisorName, setSupervisorName]     = useState('');
   const [supervisorEmail, setSupervisorEmail]   = useState('');
 
@@ -88,7 +88,7 @@ const Proposal = () => {
   };
 
   const addMember = () => {
-    setGroupMembers((prev) => [...prev, { name: '', rollNumber: '' }]);
+    setGroupMembers((prev) => [...prev, { name: '', rollNumber: '', section: '', email: '' }]);
   };
 
   const removeMember = (index) => {
@@ -114,8 +114,8 @@ const Proposal = () => {
 
     for (let i = 0; i < groupMembers.length; i++) {
       const m = groupMembers[i];
-      if (!m.name.trim() || !m.rollNumber.trim()) {
-        setSubmitError(`Please fill in name and roll number for Group Member ${i + 1}.`);
+      if (!m.name.trim() || !m.rollNumber.trim() || !m.section.trim() || !m.email.trim()) {
+        setSubmitError(`Please fill in all fields (name, roll number, section, and email) for Group Member ${i + 1}.`);
         return;
       }
     }
@@ -387,8 +387,8 @@ const Proposal = () => {
           {/* ── Group Members ── */}
           <h6 className="fw-semibold text-dark mb-1 pb-2 border-bottom">Group Members</h6>
           <p className="text-muted small mb-3">
-            Add all students in your group. Each roll number must exist in the system.
-            Include yourself.
+            Add all students in your group. All four fields per member must exactly match what
+            is registered in the system. Include yourself.
           </p>
 
           <div className="d-flex flex-column gap-3 mb-3">
@@ -429,6 +429,30 @@ const Proposal = () => {
                       placeholder="e.g. F2021001002"
                       value={member.rollNumber}
                       onChange={(e) => updateMember(index, 'rollNumber', e.target.value)}
+                    />
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label fw-medium text-dark small">
+                      Section <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="e.g. A, B, C"
+                      value={member.section}
+                      onChange={(e) => updateMember(index, 'section', e.target.value)}
+                    />
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label fw-medium text-dark small">
+                      Email <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      placeholder="e.g. student@university.edu"
+                      value={member.email}
+                      onChange={(e) => updateMember(index, 'email', e.target.value)}
                     />
                   </div>
                 </div>

@@ -120,12 +120,13 @@ const SupervisorMeetingCalendar = () => {
                                 <div className="d-flex flex-column gap-1">
                                   {dayMeetings.map((m) => {
                                     const other = getOtherParty(m);
+                                    const locationStr = m.location ? ` | 📍 ${m.location}` : '';
                                     return (
                                       <div
                                         key={m._id}
                                         className="rounded px-2 py-1"
                                         style={{ backgroundColor: getMeetingColor(m), color: '#fff', fontSize: '0.7rem', lineHeight: '1.3', cursor: 'pointer' }}
-                                        title={`${m.topic} — ${other?.name || '—'} at ${m.proposedTime}`}
+                                        title={`${m.topic} — ${other?.name || '—'} at ${m.proposedTime}${locationStr}`}
                                       >
                                         <div className="fw-semibold">{m.topic}</div>
                                         <div style={{ opacity: 0.9 }}>{other?.name || '—'}</div>

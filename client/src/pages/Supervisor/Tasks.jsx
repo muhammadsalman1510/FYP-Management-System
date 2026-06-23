@@ -13,10 +13,19 @@ const SupervisorTasks = () => {
   const [taskFilter, setTaskFilter]             = useState('all');
   const [submissionFilter, setSubmissionFilter] = useState('all');
 
+  const today = new Date().toISOString().split('T')[0];
+
   const emptyForm = { title: '', instructions: '', openDate: '', dueDate: '', targetScope: 'project', projectId: '' };
   const [taskForm, setTaskForm]   = useState(emptyForm);
   const [formError, setFormError] = useState('');
   const [creating, setCreating]   = useState(false);
+
+  // edit task modal
+  const [editModal, setEditModal] = useState(false);
+  const [editTask, setEditTask]   = useState(null);
+  const [editForm, setEditForm]   = useState({ title: '', instructions: '', openDate: '', dueDate: '' });
+  const [editError, setEditError] = useState('');
+  const [editing, setEditing]     = useState(false);
 
   const [reviewModal, setReviewModal]         = useState(false);
   const [reviewSub, setReviewSub]             = useState(null);
@@ -96,7 +105,6 @@ const SupervisorTasks = () => {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to create task');
 
-      // data.data may be a single task or array (when targetScope='all')
       const newTasks = Array.isArray(data.data) ? data.data : [data.data];
       setTasks((prev) => [...newTasks, ...prev]);
       setTaskForm(emptyForm);
@@ -105,6 +113,65 @@ const SupervisorTasks = () => {
       setFormError(err.message);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const openEditModal = (task) => {
+    setEditTask(task);
+    setEditForm({
+      title: task.title || '',
+      instructions: task.instructions || '',
+      openDate: task.openDate ? task.openDate.split('T')[0] : '',
+      dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
+    });
+    setEditError('');
+    setEditModal(true);
+  };
+
+  const handleEditTask = async () => {
+    if (!editForm.title.trim()) { setEditError('Task title is required.'); return; }
+    if (!editForm.openDate)     { setEditError('Open date is required.'); return; }
+    if (!editForm.dueDate)      { setEditError('Due date is required.'); return; }
+
+    setEditing(true);
+    setEditError('');
+    try {
+      const token = sessionStorage.getItem('token');
+      const res = await fetch(`/api/tasks/${editTask._id}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editForm.title.trim(),
+          instructions: editForm.instructions,
+          openDate: editForm.openDate,
+          dueDate: editForm.dueDate,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update task');
+
+      setTasks((prev) => prev.map((t) => t._id === editTask._id ? data.data : t));
+      setEditModal(false);
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setEditing(false);
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    if (!window.confirm('Delete this task? This cannot be undone.')) return;
+    try {
+      const token = sessionStorage.getItem('token');
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to delete task');
+      setTasks((prev) => prev.filter((t) => t._id !== taskId));
+    } catch (err) {
+      alert(err.message);
     }
   };
 
@@ -312,6 +379,7 @@ const SupervisorTasks = () => {
                   type="date"
                   className="form-control"
                   value={taskForm.dueDate}
+                  min={today}
                   onChange={(e) => handleFormChange('dueDate', e.target.value)}
                 />
               </div>
@@ -372,6 +440,7 @@ const SupervisorTasks = () => {
                       <th className="px-4 py-3 fw-semibold small text-dark" style={{ width: '110px' }}>Open Date</th>
                       <th className="px-4 py-3 fw-semibold small text-dark" style={{ width: '110px' }}>Due Date</th>
                       <th className="px-4 py-3 fw-semibold small text-dark" style={{ width: '110px' }}>Submissions</th>
+                      <th className="px-4 py-3 fw-semibold small text-dark" style={{ width: '130px' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -400,6 +469,24 @@ const SupervisorTasks = () => {
                           >
                             {getSubsCountForTask(task._id)}
                           </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="d-flex gap-2">
+                            <button
+                              className="btn btn-outline-primary btn-sm px-2"
+                              style={{ fontSize: '0.75rem' }}
+                              onClick={() => openEditModal(task)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="btn btn-outline-danger btn-sm px-2"
+                              style={{ fontSize: '0.75rem' }}
+                              onClick={() => handleDeleteTask(task._id)}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -499,6 +586,79 @@ const SupervisorTasks = () => {
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Task Modal */}
+      {editModal && editTask && (
+        <div
+          className="modal d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}
+          onClick={(e) => { if (e.target === e.currentTarget) setEditModal(false); }}
+        >
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '520px' }}>
+            <div className="modal-content border-0 shadow">
+              <div className="modal-header border-bottom px-4 py-3">
+                <h5 className="modal-title fw-semibold text-dark">Edit Task</h5>
+                <button className="btn-close" onClick={() => setEditModal(false)} />
+              </div>
+              <div className="modal-body px-4 py-4">
+                {editError && (
+                  <div className="alert alert-danger border-0 py-2 px-3 small mb-3">{editError}</div>
+                )}
+                <div className="row g-3">
+                  <div className="col-12">
+                    <label className="form-label fw-medium text-dark small">Task Title *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editForm.title}
+                      onChange={(e) => { setEditForm((p) => ({ ...p, title: e.target.value })); setEditError(''); }}
+                    />
+                  </div>
+                  <div className="col-12">
+                    <label className="form-label fw-medium text-dark small">Instructions</label>
+                    <textarea
+                      className="form-control"
+                      rows={3}
+                      value={editForm.instructions}
+                      onChange={(e) => setEditForm((p) => ({ ...p, instructions: e.target.value }))}
+                    />
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label fw-medium text-dark small">Open Date *</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={editForm.openDate}
+                      onChange={(e) => { setEditForm((p) => ({ ...p, openDate: e.target.value })); setEditError(''); }}
+                    />
+                  </div>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label fw-medium text-dark small">Due Date *</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={editForm.dueDate}
+                      min={today}
+                      onChange={(e) => { setEditForm((p) => ({ ...p, dueDate: e.target.value })); setEditError(''); }}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer border-top px-4 py-3 gap-2">
+                <button className="btn btn-outline-secondary px-4" onClick={() => setEditModal(false)}>Cancel</button>
+                <button
+                  className="btn btn-primary px-4 fw-medium"
+                  onClick={handleEditTask}
+                  disabled={editing}
+                >
+                  {editing && <span className="spinner-border spinner-border-sm me-2" role="status" />}
+                  Save Changes
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -195,7 +195,7 @@ const SupervisorDashboard = () => {
                   {recentSubmissions.map((sub) => (
                     <div key={sub._id} className="d-flex align-items-center justify-content-between border rounded p-3">
                       <div>
-                        <p className="fw-medium text-dark small mb-0">{sub.studentId?.name || '—'}</p>
+                        <p className="fw-medium text-dark small mb-0">{sub.submittedBy?.name || '—'}</p>
                         <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>
                           {sub.taskId?.title || 'Task'} &bull; {formatDate(sub.submittedAt)}
                         </p>
