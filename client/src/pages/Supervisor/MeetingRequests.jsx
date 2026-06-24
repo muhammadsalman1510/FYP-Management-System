@@ -21,6 +21,16 @@ const SupervisorMeetingRequests = () => {
   const token   = sessionStorage.getItem('token');
   const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
+  // Silently re-fetch meetings (used after creating a new meeting so populated data is shown)
+  const loadMeetings = async () => {
+    try {
+      const res = await fetch('/api/meetings', { headers });
+      const data = await res.json();
+      if (!res.ok || !data.success) return;
+      setMeetings(data.data);
+    } catch (_) {}
+  };
+
   // Respond modal
   const [respondModal, setRespondModal]       = useState(false);
   const [respondMeeting, setRespondMeeting]   = useState(null);
@@ -198,8 +208,7 @@ const SupervisorMeetingRequests = () => {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to send meeting request');
 
-      const newData = Array.isArray(data.data) ? data.data : [data.data];
-      setMeetings((prev) => [...newData, ...prev]);
+      await loadMeetings();
       setReqSuccess(true);
       setTimeout(() => {
         setReqSuccess(false);
@@ -321,10 +330,12 @@ const SupervisorMeetingRequests = () => {
           displayedMeetings.map((m) => {
             const isOutgoing        = String(m.requestedBy?._id || m.requestedBy) === String(currentUserId);
             const otherPerson       = isOutgoing ? m.requestedTo : m.requestedBy;
-            // Only student-originated incoming requests get Approve/Reject buttons
-            const canRespond        = m.status === 'pending' && !isOutgoing && m.requestedBy?.role === 'student';
-            // Incoming meeting from coordinator — show reply box instead of approve/reject
-            const isCoordinatorMtg  = !isOutgoing && m.requestedBy?.role === 'coordinator';
+            // Approve/Reject: student requests OR coordinator-requested (meetingType='requested') meetings
+            const canRespond        = m.status === 'pending' && !isOutgoing &&
+                                      (m.requestedBy?.role === 'student' ||
+                                       (m.requestedBy?.role === 'coordinator' && m.meetingType === 'requested'));
+            // Reply-only: coordinator SCHEDULED this meeting directly (already approved, no approval needed)
+            const isCoordinatorMtg  = !isOutgoing && m.requestedBy?.role === 'coordinator' && m.meetingType === 'scheduled';
             // Supervisor can only cancel meetings they created with students
             const canCancel         = isOutgoing &&
                                       m.meetingType === 'scheduled' &&
@@ -355,8 +366,10 @@ const SupervisorMeetingRequests = () => {
                       </div>
                       <p className="text-muted small mb-1">
                         {isOutgoing ? 'To' : 'From'}:{' '}
-                        <strong className="text-dark">{otherPerson?.name || '—'}</strong>
-                        {otherPerson?.email && ` (${otherPerson.email})`}
+                        <strong className="text-dark">
+                          {otherPerson?.name || otherPerson?.email || 'Student'}
+                        </strong>
+                        {otherPerson?.email && otherPerson?.name && ` (${otherPerson.email})`}
                       </p>
                       <p className="text-muted small mb-1">
                         Date: <strong className="text-dark">{formatDate(m.proposedDate)}</strong> at{' '}

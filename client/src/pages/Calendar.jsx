@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../components/Breadcrumbs/Breadcrumb';
 
+// Groups meetings by topic|date|time|projectId into arrays.
+// Non-project meetings are singletons keyed by _id.
+const groupMeetingsByKey = (list) => {
+  const map = {};
+  list.forEach((m) => {
+    const projId = m.projectId?._id || (typeof m.projectId === 'string' ? m.projectId : '') || '';
+    const dateStr = m.proposedDate ? new Date(m.proposedDate).toISOString().split('T')[0] : '';
+    const key = projId ? `${m.topic}|${dateStr}|${m.proposedTime}|${projId}` : m._id;
+    if (!map[key]) map[key] = [];
+    map[key].push(m);
+  });
+  return Object.values(map);
+};
+
 const Calendar = () => {
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -66,11 +80,14 @@ const Calendar = () => {
     return nonStudent?.role === 'supervisor' ? '#3c50e0' : '#28a745';
   };
 
-  const getMeetingsForDay = (day) =>
-    meetings.filter((m) => {
+  // Returns groups of meetings for a given day; each group is deduplicated to one block.
+  const getGroupedMeetingsForDay = (day) => {
+    const dayMeetings = meetings.filter((m) => {
       const d = new Date(m.proposedDate);
       return d.getFullYear() === currentYear && d.getMonth() === currentMonth && d.getDate() === day;
     });
+    return groupMeetingsByKey(dayMeetings);
+  };
 
   const isToday = (day) =>
     day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
@@ -189,7 +206,7 @@ const Calendar = () => {
                   {calRows.map((row, ri) => (
                     <tr key={ri}>
                       {row.map((day, ci) => {
-                        const dayMeetings = day ? getMeetingsForDay(day) : [];
+                        const groups = day ? getGroupedMeetingsForDay(day) : [];
                         return (
                           <td
                             key={ci}
@@ -209,29 +226,36 @@ const Calendar = () => {
                                   {day}
                                 </span>
                                 <div className="d-flex flex-column gap-1">
-                                  {dayMeetings.map((m) => {
-                                    const nonStudentParty = [m.requestedBy, m.requestedTo].find(
+                                  {groups.map((group) => {
+                                    // Prefer the student's own meeting doc so the reply modal works.
+                                    // Fall back to the first doc (groupmate card) if no own doc in this group.
+                                    const rep = group.find((m) =>
+                                      String(m.requestedBy?._id || m.requestedBy) === currentUserId ||
+                                      String(m.requestedTo?._id  || m.requestedTo) === currentUserId
+                                    ) || group[0];
+
+                                    const nonStudentParty = [rep.requestedBy, rep.requestedTo].find(
                                       (p) => p?.role && p.role !== 'student'
                                     );
-                                    const locationStr = m.location ? ` | 📍 ${m.location}` : '';
+                                    const locationStr = rep.location ? ` | 📍 ${rep.location}` : '';
                                     return (
                                       <div
-                                        key={m._id}
+                                        key={rep._id}
                                         className="rounded px-2 py-1"
                                         style={{
-                                          backgroundColor: getMeetingColor(m),
+                                          backgroundColor: getMeetingColor(rep),
                                           color: '#fff',
                                           fontSize: '0.72rem',
                                           lineHeight: '1.3',
                                           cursor: 'pointer',
                                         }}
-                                        title={`${m.topic} — ${nonStudentParty?.name || '—'} at ${m.proposedTime}${locationStr}`}
-                                        onClick={() => openMeetingModal(m)}
+                                        title={`${rep.topic} — ${nonStudentParty?.name || '—'} at ${rep.proposedTime}${locationStr}`}
+                                        onClick={() => openMeetingModal(rep)}
                                       >
-                                        <div className="fw-semibold">{m.topic}</div>
-                                        <div style={{ opacity: 0.9 }}>{m.proposedTime}</div>
-                                        {m.location && (
-                                          <div style={{ opacity: 0.85, fontSize: '0.63rem' }}>📍 {m.location}</div>
+                                        <div className="fw-semibold">{rep.topic}</div>
+                                        <div style={{ opacity: 0.9 }}>{rep.proposedTime}</div>
+                                        {rep.location && (
+                                          <div style={{ opacity: 0.85, fontSize: '0.63rem' }}>📍 {rep.location}</div>
                                         )}
                                       </div>
                                     );

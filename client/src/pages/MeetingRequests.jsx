@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import Breadcrumb from '../components/Breadcrumbs/Breadcrumb';
 
+// Stable dedup key for a meeting: topic|date|time|projectId.
+// Non-project meetings use _id as key (no projectId to group on).
+const meetingKey = (m) => {
+  const projId = m.projectId?._id || (typeof m.projectId === 'string' ? m.projectId : '') || '';
+  const dateStr = m.proposedDate ? new Date(m.proposedDate).toISOString().split('T')[0] : '';
+  return projId ? `${m.topic}|${dateStr}|${m.proposedTime}|${projId}` : m._id;
+};
+
 const MeetingRequests = () => {
   const [project, setProject]   = useState(null);
   const [meetings, setMeetings] = useState([]);
@@ -181,6 +189,10 @@ const MeetingRequests = () => {
   const supervisorName  = project?.supervisors?.[0]?.name || '';
   const coordinatorName = project?.coordinator?.name       || '';
 
+  // Build a set of keys from own meetings so we can suppress groupmate cards
+  // that cover the exact same meeting (same topic + date + time + project).
+  const ownKeys = new Set(meetings.filter(isOwnMeeting).map(meetingKey));
+
   return (
     <>
       <Breadcrumb pageName="My Meetings" />
@@ -219,9 +231,12 @@ const MeetingRequests = () => {
                     const own = isOwnMeeting(m);
 
                     if (!own) {
+                      // Suppress groupmate card if own card already covers the same meeting.
+                      // This happens when coordinator/supervisor schedules a project meeting:
+                      // Doc A (groupmate's) and Doc B (student's own) share the same key.
+                      if (ownKeys.has(meetingKey(m))) return null;
+
                       // ── Groupmate meeting card ──────────────────────────────
-                      // One of requestedBy/requestedTo is the groupmate (student),
-                      // the other is the supervisor/coordinator they met with.
                       const groupmate = m.requestedTo?.role === 'student'
                         ? m.requestedTo
                         : m.requestedBy;

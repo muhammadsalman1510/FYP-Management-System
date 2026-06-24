@@ -70,48 +70,87 @@ Route: PUT /api/proposals/:id/supervisor-review — supervisor only.
 
 There are two fundamentally different types of meetings:
 
-**TYPE 1 — Scheduled meetings** (created BY coordinator or supervisor):
-- meetingType: 'scheduled', status: 'approved' — set immediately on creation
-- Go directly to all recipients' CALENDARS as confirmed events
-- Do NOT appear in recipient's Meeting Requests page
-- Student cannot approve or reject these
-- Student CAN send a text reply from their calendar (stored in meeting.studentReply)
-- Coordinator can cancel/delete any meeting they created (DELETE /api/meetings/:id)
-- Supervisor can cancel/delete meetings they created with students only — NOT meetings they created requesting coordinator
-- Student cannot cancel any meeting
+**TYPE 1 — Scheduled meetings** (coordinator schedules for a project group, OR supervisor schedules for students):
+- meetingType: 'scheduled', status: 'approved' — set immediately on creation, no approval needed
+- Go directly to recipients' CALENDARS as confirmed events
+- Recipient cannot approve or reject — they can only send a text reply
+- Coordinator can cancel any scheduled meeting they created
+- Supervisor can cancel scheduled meetings they created with students only
 
-**TYPE 2 — Requested meetings** (created BY student requesting supervisor/coordinator):
+**TYPE 2 — Requested meetings** (anyone requesting someone else's time — needs approval):
 - meetingType: 'requested', status: 'pending'
 - Go to recipient's Meeting Requests page as pending
 - Recipient approves/rejects with a response note
 - Upon approval, appear on both parties' calendars
 
+TYPE 2 includes ALL of these cases:
+- Student requesting supervisor or coordinator → supervisor/coordinator approves/rejects
+- Supervisor requesting coordinator → coordinator approves/rejects
+- Coordinator requesting supervisor → SUPERVISOR APPROVES/REJECTS (not reply-only)
+
+**CRITICAL — Supervisor approve/reject rules:**
+The supervisor sees Approve/Reject buttons when:
+  m.status === 'pending' AND !isOutgoing AND
+  (requestedBy.role === 'student' OR
+   (requestedBy.role === 'coordinator' AND meetingType === 'requested'))
+
+The supervisor sees reply-only (no Approve/Reject) when:
+  meetingType === 'scheduled' (already confirmed, no approval needed)
+
+DO NOT restrict approve/reject to student-only. Coordinator-requested meetings
+(meetingType: 'requested') also need supervisor approval.
+
+isCoordinatorMtg (reply-only) = !isOutgoing AND requestedBy.role === 'coordinator'
+  AND meetingType === 'scheduled'
+  (NOT all coordinator meetings — only pre-confirmed scheduled ones)
+
 **Coordinator Schedule Meeting form:**
 - "Meet With" options: "Project" or "Supervisor"
-- When "Project" selected: shows project dropdown (GET /api/projects → reads .data). Creates ONE meeting per student in that project, all with status: 'approved', meetingType: 'scheduled'.
-- When "Supervisor" selected: shows supervisor dropdown (GET /api/users?role=supervisor → reads .users). Single meeting, meetingType: 'requested'.
-- Has a Location field (stored in meeting.location, optional).
+- Project → all students get meetingType:'scheduled', status:'approved' immediately
+- Supervisor → single meeting, meetingType:'requested', status:'pending' — needs supervisor approval
 
 **Supervisor "New Meeting" modal:**
-- "Meet With" dropdown: "Student" or "Coordinator"
-- Student meetings: meetingType: 'scheduled', status: 'approved'
-- Coordinator meetings: meetingType: 'requested', status: 'pending'
-- Has a Location field.
-
-**Student Meeting Requests page:**
-- ONLY shows meetings where student is requestedBy (outgoing requests the student created)
-- Does NOT show incoming scheduled meetings (those go to calendar only)
-- Student cannot approve/reject anything on this page
+- "Meet With" dropdown: "Student(s)" or "Coordinator"
+- Student(s) → select project → all students in project get meetingType:'scheduled', status:'approved'
+- Coordinator → meetingType:'requested', status:'pending' — needs coordinator approval
 
 **Student Calendar:**
-- Shows ALL meetings where student is requestedTo AND status === 'approved'
-- Clicking a meeting event shows popup with: topic, date, time, location, who it's from, and a reply text box
-- Student sends reply via PUT /api/meetings/:id with { studentReply: text }
+- Shows all approved meetings student is involved in (own + groupmate)
+- Backend getMeetings for students returns own meetings + groupmates' approved meetings
+- DEDUPLICATION REQUIRED: when coordinator/supervisor creates a project meeting for 2 students,
+  it creates 2 documents. Student A gets Doc A (direct) + Doc B via groupmate path = looks like duplicate.
+  Frontend must deduplicate by grouping on topic+date+time+projectId key before rendering.
+  Show ONE block per group. Student sees their own meeting, not a duplicate groupmate card
+  for the same meeting they're already directly part of.
+- Rule: if a meeting appears in both own-set AND groupmate-set with same topic+date+time+projectId,
+  show it ONLY in own-set. Suppress the groupmate card.
+
+**Student My Meetings page:**
+- Shows ALL meetings student is involved in (own outgoing requests + incoming scheduled)
+- Same deduplication rule as calendar: suppress groupmate card if own card covers same meeting
+- Groupmate cards (purple Group badge) only appear for meetings the student is NOT directly part of
 
 **Meeting Requests pages (Coordinator + Supervisor):**
 - Tab 1: "All Meetings" — all meetings, both directions, all statuses
 - Tab 2: "Pending" — only status === 'pending'
 - "Cancel Meeting" button on meetings they created (calls DELETE /api/meetings/:id)
+
+**getMeetings backend — student role:**
+- Returns own meetings (requestedBy or requestedTo === student)
+- PLUS groupmate approved meetings, BUT excludes meetings where student is already
+  requestedBy or requestedTo (prevents duplicates at source):
+  { $or: [{ requestedTo: {$in: groupmateIds} }, { requestedBy: {$in: groupmateIds} }],
+    requestedTo: {$nin: [req.user._id]},
+    requestedBy: {$nin: [req.user._id]},
+    status: 'approved' }
+
+**Meeting model fields:**
+- location: String (optional, default '')
+- meetingType: String (enum: ['scheduled', 'requested'], default: 'requested')
+- studentReply: String (optional, default '')
+
+**Routes:**
+- DELETE /api/meetings/:id — coordinator (any they created), supervisor (student meetings only)
 
 **Meeting model fields (including new ones):**
 - location: String (optional, default '')

@@ -104,11 +104,22 @@ export const getMeetings = async (req, res) => {
 
             const orConditions = [...ownConditions];
             if (groupmateIds.length > 0) {
-                // Include groupmates' approved meetings so students can see group activity
-                orConditions.push(
-                    { requestedTo: { $in: groupmateIds }, status: 'approved' },
-                    { requestedBy: { $in: groupmateIds }, status: 'approved' },
-                );
+                // Include approved groupmate meetings only when the current student is NOT
+                // already a direct party — prevents the same scheduled meeting from appearing
+                // twice (once as requestedTo, once via the groupmate path for the same doc).
+                orConditions.push({
+                    $and: [
+                        {
+                            $or: [
+                                { requestedTo: { $in: groupmateIds } },
+                                { requestedBy: { $in: groupmateIds } },
+                            ],
+                        },
+                        { requestedTo: { $ne: req.user._id } },
+                        { requestedBy: { $ne: req.user._id } },
+                        { status: 'approved' },
+                    ],
+                });
             }
 
             const meetings = await Meeting.find({ $or: orConditions })
