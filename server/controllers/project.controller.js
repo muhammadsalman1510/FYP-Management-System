@@ -48,15 +48,11 @@ const checkSupervisorCapacity = async (supervisorUserId) => {
     return profile
 }
 
-// ─── helpers ────────────────────────────────────────────────────────────────
-
 const populateProject = (query) =>
     query
         .populate('supervisors', 'name email phone photoUrl')
         .populate('coordinator', 'name email phone photoUrl')
         .populate('students', 'name email photoUrl')
-
-// ─── controllers ────────────────────────────────────────────────────────────
 
 /**
  * POST /api/projects
@@ -339,8 +335,6 @@ export const deleteProject = async (req, res) => {
         return res.status(500).json({ success: false, message: 'Internal server error' })
     }
 }
-
-// ─── Student / Supervisor self-service ──────────────────────────────────────
 
 /**
  * GET /api/projects/my

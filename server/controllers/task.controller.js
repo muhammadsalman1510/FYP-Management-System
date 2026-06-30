@@ -2,7 +2,6 @@ import Task from '../models/task.model.js';
 import TaskSubmission from '../models/tasksubmission.model.js';
 import Project from '../models/project.model.js';
 
-// ─── POST /api/tasks ──────────────────────────────────────────────────────────
 export const createTask = async (req, res) => {
     try {
         const { title, instructions, openDate, dueDate, projectId, targetScope, attachmentUrl } =
@@ -22,7 +21,6 @@ export const createTask = async (req, res) => {
         const scope = targetScope || 'project';
         const creatorRole = req.user.role;
 
-        // ── targetScope = 'all' ──────────────────────────────────────────────
         if (scope === 'all') {
             if (creatorRole === 'coordinator') {
                 const task = await Task.create({
@@ -67,7 +65,6 @@ export const createTask = async (req, res) => {
             return res.status(201).json({ success: true, data: tasks });
         }
 
-        // ── targetScope = 'project' ──────────────────────────────────────────
         if (!projectId) {
             return res.status(400).json({
                 success: false,
@@ -111,7 +108,6 @@ export const createTask = async (req, res) => {
     }
 };
 
-// ─── GET /api/tasks ───────────────────────────────────────────────────────────
 export const getTasks = async (req, res) => {
     try {
         let tasks;
@@ -153,7 +149,6 @@ export const getTasks = async (req, res) => {
     }
 };
 
-// ─── PUT /api/tasks/:id ───────────────────────────────────────────────────────
 export const updateTask = async (req, res) => {
     try {
         const { title, instructions, openDate, dueDate } = req.body;
@@ -189,7 +184,6 @@ export const updateTask = async (req, res) => {
     }
 };
 
-// ─── DELETE /api/tasks/:id ────────────────────────────────────────────────────
 export const deleteTask = async (req, res) => {
     try {
         const task = await Task.findById(req.params.id);
@@ -209,7 +203,6 @@ export const deleteTask = async (req, res) => {
     }
 };
 
-// ─── POST /api/tasks/:id/submit ───────────────────────────────────────────────
 export const submitTask = async (req, res) => {
     try {
         if (!req.file) {
@@ -272,7 +265,6 @@ export const submitTask = async (req, res) => {
     }
 };
 
-// ─── GET /api/tasks/submissions ───────────────────────────────────────────────
 export const getSubmissions = async (req, res) => {
     try {
         let submissions;
@@ -301,7 +293,6 @@ export const getSubmissions = async (req, res) => {
     }
 };
 
-// ─── GET /api/tasks/submissions/my ───────────────────────────────────────────
 export const getMySubmissions = async (req, res) => {
     try {
         const submissions = await TaskSubmission.find({ submittedBy: req.user._id })
@@ -322,7 +313,6 @@ export const getMySubmissions = async (req, res) => {
     }
 };
 
-// ─── PUT /api/tasks/submissions/:id/review ────────────────────────────────────
 export const reviewSubmission = async (req, res) => {
     try {
         const { status, feedback } = req.body;

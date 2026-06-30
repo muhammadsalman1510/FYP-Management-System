@@ -30,7 +30,6 @@ const CoordinatorMeetingRequests = () => {
   const token = sessionStorage.getItem('token');
   const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
-  // Respond modal
   const [respondModal, setRespondModal]       = useState(false);
   const [respondMeeting, setRespondMeeting]   = useState(null);
   const [respondDecision, setRespondDecision] = useState('');
@@ -170,7 +169,6 @@ const CoordinatorMeetingRequests = () => {
         <div className="alert alert-danger border-0 mb-3">{cancelError}</div>
       )}
 
-      {/* Tab Navigation */}
       <div className="card shadow-sm border-0 mb-4">
         <div className="card-body p-0">
           <div className="d-flex border-bottom">
@@ -203,7 +201,6 @@ const CoordinatorMeetingRequests = () => {
         </div>
       </div>
 
-      {/* Meeting cards */}
       <div className="d-flex flex-column gap-3">
         {groupedDisplayed.length === 0 ? (
           <div className="card shadow-sm border-0">
@@ -218,7 +215,7 @@ const CoordinatorMeetingRequests = () => {
             const rep        = group[0];
             const isOutgoing = String(rep.requestedBy?._id || rep.requestedBy) === String(currentUserId);
 
-            // ── Grouped project meeting card (2+ meetings) ──
+            // grouped card for project meetings with multiple students
             if (group.length >= 2) {
               const projTitle    = rep.projectId?.title || '—';
               const studentNames = group.map((m) => {
@@ -288,7 +285,6 @@ const CoordinatorMeetingRequests = () => {
               );
             }
 
-            // ── Single meeting card ──
             const m           = rep;
             const otherPerson = isOutgoing ? m.requestedTo : m.requestedBy;
             const canCancel   = m.meetingType === 'scheduled' && isOutgoing;
@@ -382,7 +378,6 @@ const CoordinatorMeetingRequests = () => {
         )}
       </div>
 
-      {/* Respond Modal */}
       {respondModal && (
         <div
           className="modal d-block"

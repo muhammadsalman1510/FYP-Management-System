@@ -11,7 +11,6 @@ const Proposal = () => {
   const [supervisorRecommendation, setSupervisorRecommendation] = useState('pending');
   const [supervisorFeedback, setSupervisorFeedback]   = useState('');
 
-  // Form fields
   const [title, setTitle]                       = useState('');
   const [description, setDescription]           = useState('');
   const [problemStatement, setProblemStatement] = useState('');
@@ -29,7 +28,6 @@ const Proposal = () => {
         const token = sessionStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
-        // Step 1: check if student already has an active project
         const projectRes  = await fetch('/api/projects/my', { headers });
         const projectJson = await projectRes.json();
 
@@ -43,7 +41,6 @@ const Proposal = () => {
           throw new Error(projectJson.message || 'Failed to load project info');
         }
 
-        // Step 2: no project — check if student has an existing proposal
         const proposalRes  = await fetch('/api/proposals/my', { headers });
         const proposalJson = await proposalRes.json();
 
@@ -163,7 +160,6 @@ const Proposal = () => {
     return <div className="alert alert-danger border-0">{error}</div>;
   }
 
-  // Student already has an active project
   if (hasProject) {
     return (
       <div className="d-flex flex-column gap-4">
@@ -258,7 +254,6 @@ const Proposal = () => {
   return (
     <div className="d-flex flex-column gap-4">
 
-      {/* Rejection feedback banner — only shown when resubmitting after a rejection */}
       {proposalStatus === 'rejected' && (
         <div className="alert alert-danger border-0 shadow-sm">
           <h6 className="fw-semibold mb-3">Your Previous Proposal Was Rejected</h6>
@@ -329,7 +324,6 @@ const Proposal = () => {
             </div>
           )}
 
-          {/* ── Project Details ── */}
           <h6 className="fw-semibold text-dark mb-3 pb-2 border-bottom">Project Details</h6>
 
           <div className="mb-3">
@@ -384,7 +378,6 @@ const Proposal = () => {
             />
           </div>
 
-          {/* ── Group Members ── */}
           <h6 className="fw-semibold text-dark mb-1 pb-2 border-bottom">Group Members</h6>
           <p className="text-muted small mb-3">
             Add all students in your group. All four fields per member must exactly match what
@@ -469,7 +462,6 @@ const Proposal = () => {
             </button>
           )}
 
-          {/* ── Supervisor Info ── */}
           <h6 className="fw-semibold text-dark mb-1 pb-2 border-bottom">Supervisor</h6>
           <p className="text-muted small mb-3">
             Enter your intended supervisor's name and university email exactly as registered in the system.
@@ -505,7 +497,6 @@ const Proposal = () => {
             </div>
           </div>
 
-          {/* ── Submit ── */}
           <div className="d-flex gap-3 mt-2">
             <button
               className="btn btn-primary px-5 fw-medium"

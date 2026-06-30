@@ -4,10 +4,6 @@ const DarkModeSwitcher = () => {
   const [colorMode, setColorMode] = useColorMode();
 
   return (
-    /*
-      li element wrapping the toggle switch
-      d-flex align-items-center: center the switch vertically
-    */
     <li className="d-flex align-items-center list-unstyled">
       <label
         className="position-relative d-block m-0"
@@ -58,7 +54,6 @@ const DarkModeSwitcher = () => {
             transition: 'left 0.2s ease',
           }}
         >
-          {/* Sun icon - visible in light mode */}
           {colorMode !== 'dark' && (
             <svg
               width="16"
@@ -78,7 +73,6 @@ const DarkModeSwitcher = () => {
             </svg>
           )}
 
-          {/* Moon icon - visible in dark mode */}
           {colorMode === 'dark' && (
             <svg
               width="16"

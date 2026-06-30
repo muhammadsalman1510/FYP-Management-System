@@ -71,7 +71,6 @@ const DropdownUser = () => {
   return (
     <ClickOutside onClick={() => setDropdownOpen(false)} className="position-relative">
 
-      {/* Profile Button */}
       <Link
         onClick={() => setDropdownOpen(!dropdownOpen)}
         className="d-flex align-items-center gap-2 text-decoration-none"
@@ -93,19 +92,16 @@ const DropdownUser = () => {
         </svg>
       </Link>
 
-      {/* Dropdown Menu */}
       {dropdownOpen && (
         <div
           className="position-absolute end-0 mt-2 bg-white border border-light rounded shadow"
           style={{ width: '220px', zIndex: 9999 }}
         >
-          {/* User info header */}
           <div className="px-3 pt-3 pb-2 border-bottom">
             <p className="fw-semibold text-dark small mb-0">{name}</p>
             <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>{displayRole}</p>
           </div>
 
-          {/* Menu items */}
           <ul className="list-unstyled border-bottom px-3 py-3 d-flex flex-column gap-3 mb-0">
             <li>
               <Link
@@ -122,7 +118,6 @@ const DropdownUser = () => {
             </li>
           </ul>
 
-          {/* Log Out */}
           <button
             onClick={handleLogout}
             className="d-flex align-items-center gap-2 px-3 py-3 w-100 border-0 bg-transparent text-dark small fw-medium text-start dropdown-item-custom"

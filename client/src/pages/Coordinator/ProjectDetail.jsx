@@ -328,7 +328,6 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      {/* Project Header */}
       <div className="card shadow-sm border-0 mb-4">
         <div className="card-body p-4">
           <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
@@ -370,7 +369,6 @@ const ProjectDetail = () => {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="mb-4" style={{ borderBottom: '2px solid #e9ecef' }}>
         <div className="d-flex gap-1 flex-wrap">
           {tabs.map((tab) => (
@@ -394,11 +392,9 @@ const ProjectDetail = () => {
         </div>
       </div>
 
-      {/* ── TAB: OVERVIEW ── */}
       {activeTab === 'overview' && (
         <div className="d-flex flex-column gap-4">
 
-          {/* Task Summary Shortcut */}
           <div
             className="card border-0 shadow-sm"
             style={{ cursor: 'pointer' }}
@@ -538,7 +534,6 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      {/* ── TAB: MILESTONES ── */}
       {activeTab === 'milestones' && (
         <div className="card shadow-sm border-0">
           <div className="card-header bg-white border-bottom py-3 px-4">
@@ -610,7 +605,6 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      {/* ── TAB: TASKS ── */}
       {activeTab === 'tasks' && (
         <div className="card border-0 shadow-sm">
           <div className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between">
@@ -683,7 +677,6 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      {/* ── TAB: SUBMISSIONS ── */}
       {activeTab === 'submissions' && (
         <div className="card border-0 shadow-sm">
           <div className="card-header bg-white border-bottom py-3 px-4">
@@ -762,7 +755,6 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      {/* ── TAB: DOCUMENTS ── */}
       {activeTab === 'documents' && (
         <div className="card shadow-sm border-0">
           <div className="card-header bg-white border-bottom py-3 px-4">
@@ -817,7 +809,6 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      {/* ── TAB: PROPOSAL ── */}
       {activeTab === 'proposal' && (
         <div className="card shadow-sm border-0">
           {!proposal ? (
@@ -905,7 +896,6 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      {/* ── MODAL: Assign Supervisor ── */}
       {showChangeSupervisor && (
         <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}>
           <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '420px' }}>
@@ -936,7 +926,6 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      {/* ── MODAL: Add Student ── */}
       {showAssignStudent && (
         <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}>
           <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '420px' }}>
@@ -967,7 +956,6 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      {/* ── MODAL: Remove Student Confirm ── */}
       {showRemoveConfirm && (
         <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}>
           <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '400px' }}>
@@ -985,7 +973,6 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      {/* ── MODAL: Mark Milestone Confirm ── */}
       {milestoneConfirm && (
         <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}>
           <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '420px' }}>
@@ -1015,7 +1002,6 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      {/* ── MODAL: Student Detail ── */}
       {showStudentModal && selectedStudent && (
         <div
           className="modal d-block"
@@ -1138,7 +1124,6 @@ const ProjectDetail = () => {
         </div>
       )}
 
-      {/* ── MODAL: Review Submission ── */}
       {reviewModal && (
         <div
           className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"

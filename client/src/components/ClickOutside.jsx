@@ -1,7 +1,5 @@
 import React, { useRef, useEffect } from 'react';
 
-// This component detects clicks outside of it and calls onClick()
-// Used by DropdownUser to close the dropdown when clicking elsewhere
 const ClickOutside = ({ children, exceptionRef, onClick, className }) => {
   const wrapperRef = useRef(null);
 

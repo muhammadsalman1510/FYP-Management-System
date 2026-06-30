@@ -119,10 +119,8 @@ const Dashboard = () => {
 
   return (
     <>
-      {/* top stats row */}
       <div className="row g-4 row-cols-1 row-cols-md-2 row-cols-xl-4 mb-4">
 
-        {/* Project Progress */}
         <div className="col">
           <div
             className="card border-0 h-100"
@@ -150,7 +148,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Pending Tasks */}
         <div className="col">
           <div
             className="card border-0 h-100"
@@ -172,7 +169,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Current Milestone */}
         <div className="col">
           <div
             className="card border-0 h-100"
@@ -196,7 +192,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Upcoming Meetings */}
         <div className="col">
           <div
             className="card border-0 h-100"
@@ -220,10 +215,8 @@ const Dashboard = () => {
 
       </div>
 
-      {/* bottom row */}
       <div className="row g-4">
 
-        {/* milestones progress card */}
         <div className="col-12 col-xl-8">
           <div className="card shadow-sm border-0">
             <div className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between">
@@ -297,7 +290,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* group members + supervisor */}
         <div className="col-12 col-xl-4">
 
           <div className="card shadow-sm border-0 mb-4">
@@ -352,7 +344,6 @@ const Dashboard = () => {
 
         </div>
 
-        {/* quick actions */}
         <div className="col-12 col-xl-6">
           <div className="card shadow-sm border-0">
             <div className="card-header bg-white border-bottom py-3 px-4">
@@ -385,7 +376,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* recent announcements */}
         <div className="col-12 col-xl-6">
           <div className="card shadow-sm border-0">
             <div className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between">

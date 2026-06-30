@@ -7,10 +7,9 @@ const studentProfileSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
             required: [true, "User reference is required"],
-            unique: true, // one profile per student
+            unique: true,
             validate: {
                 validator: async function (userId) {
-                    // Get the session from the calling context
                     const session = this.$session();
                     const user = await User.findById(userId).session(session ?? null);
                     return user && user.role === 'student';

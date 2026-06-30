@@ -40,7 +40,6 @@ const CoordinatorDashboard = () => {
         setStudentCount((studentsData.users || []).length);
         setSupervisorCount((supervisorsData.users || []).length);
 
-        // proposals, submissions, meetings use { success: true, data: [...] }
         const allProposals = proposalsData.data || [];
         setPendingProposalCount(allProposals.filter(p => p.status === 'pending').length);
         setRecentProposals(allProposals.slice(0, 3));
@@ -132,7 +131,6 @@ const CoordinatorDashboard = () => {
         <p className="text-muted small mb-0">Welcome back! Here's what's happening in your FYP system.</p>
       </div>
 
-      {/* ══ STAT CARDS ══ */}
       <div className="row g-4 mb-4 row-cols-1 row-cols-sm-2 row-cols-xl-4">
         {statCards.map((stat, index) => (
           <div key={index} className="col">
@@ -165,10 +163,8 @@ const CoordinatorDashboard = () => {
         ))}
       </div>
 
-      {/* ══ BOTTOM SECTION ══ */}
       <div className="row g-4">
 
-        {/* ── Recent Proposals ── */}
         <div className="col-12 col-xl-7">
           <div className="card shadow-sm border-0 h-100">
             <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3 px-4">
@@ -218,7 +214,6 @@ const CoordinatorDashboard = () => {
           </div>
         </div>
 
-        {/* ── Meeting Requests + Quick Actions ── */}
         <div className="col-12 col-xl-5">
 
           <div className="card shadow-sm border-0 mb-4">

@@ -15,14 +15,12 @@ import {
 
 const router = express.Router();
 
-// ── Self-update routes — all roles, no coordinator restriction ────────────────
-// MUST be declared before /:id to prevent Express treating 'me' as an id param
+// must be before /:id — Express would treat 'me' as an id param otherwise
 router.get('/me', authenticate, getMe);
 router.put('/me/password', authenticate, updatePassword);
 router.put('/me', authenticate, updateMe);
 router.post('/me/photo', authenticate, upload.single('photo'), uploadPhoto);
 
-// ── Coordinator-only routes ───────────────────────────────────────────────────
 router.post('/', authenticate, authorize('coordinator'), createUser);
 router.get('/', authenticate, authorize('coordinator'), getUsers);
 router.get('/:id', authenticate, authorize('coordinator'), getUserById);

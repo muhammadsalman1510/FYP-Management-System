@@ -23,7 +23,6 @@ const MeetingRequests = () => {
   const token   = sessionStorage.getItem('token');
   const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
-  // Modal state
   const [showModal, setShowModal]       = useState(false);
   const [meetWith, setMeetWith]         = useState('');
   const [proposedDate, setProposedDate] = useState('');
@@ -159,7 +158,6 @@ const MeetingRequests = () => {
     return 'bg-secondary';
   };
 
-  // Classify each meeting
   const isOwnMeeting = (m) =>
     String(m.requestedBy?._id || m.requestedBy) === String(currentUserId) ||
     String(m.requestedTo?._id  || m.requestedTo) === String(currentUserId);
@@ -236,7 +234,6 @@ const MeetingRequests = () => {
                       // Doc A (groupmate's) and Doc B (student's own) share the same key.
                       if (ownKeys.has(meetingKey(m))) return null;
 
-                      // ── Groupmate meeting card ──────────────────────────────
                       const groupmate = m.requestedTo?.role === 'student'
                         ? m.requestedTo
                         : m.requestedBy;
@@ -299,7 +296,6 @@ const MeetingRequests = () => {
                       );
                     }
 
-                    // ── Own meeting card ──────────────────────────────────────
                     const isOutgoing  = String(m.requestedBy?._id || m.requestedBy) === String(currentUserId);
                     const otherPerson = isOutgoing ? m.requestedTo : m.requestedBy;
                     const otherRole   = otherPerson?.role || '';
@@ -394,7 +390,6 @@ const MeetingRequests = () => {
         </div>
       </div>
 
-      {/* ── Request a Meeting Modal ── */}
       {showModal && (
         <div
           className="modal d-block"

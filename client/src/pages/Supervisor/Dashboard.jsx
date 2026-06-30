@@ -92,7 +92,6 @@ const SupervisorDashboard = () => {
         <p className="text-muted small mb-0">Welcome back! Here's an overview of your students' progress.</p>
       </div>
 
-      {/* stat cards */}
       <div className="row g-4 mb-4 row-cols-1 row-cols-sm-2 row-cols-xl-4">
         {stats.map((stat, i) => (
           <div key={i} className="col">
@@ -128,10 +127,8 @@ const SupervisorDashboard = () => {
         ))}
       </div>
 
-      {/* bottom section */}
       <div className="row g-4">
 
-        {/* recent proposals */}
         <div className="col-12 col-xl-7">
           <div className="card shadow-sm border-0">
             <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3 px-4">
@@ -177,7 +174,6 @@ const SupervisorDashboard = () => {
           </div>
         </div>
 
-        {/* task submissions + quick actions */}
         <div className="col-12 col-xl-5">
 
           <div className="card shadow-sm border-0 mb-4">

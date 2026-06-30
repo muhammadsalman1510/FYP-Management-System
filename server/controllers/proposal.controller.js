@@ -88,7 +88,6 @@ export const createProposal = async (req, res) => {
             }
         }
 
-        // Validate supervisorEmail exists in User with role='supervisor'
         const supervisorUser = await User.findOne({
             email: supervisorEmail.trim().toLowerCase(),
             role:  'supervisor',
@@ -197,8 +196,6 @@ export const reviewProposal = async (req, res) => {
             return res.status(200).json({ success: true, data: proposal });
         }
 
-        // ── APPROVAL PATH ──────────────────────────────────────────────
-
         if (!proposal.groupMembers || proposal.groupMembers.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -216,7 +213,6 @@ export const reviewProposal = async (req, res) => {
             studentIds.push(result.userId);
         }
 
-        // Resolve supervisorEmail → User._id
         const supervisorUser = await User.findOne({
             email: proposal.supervisorEmail,
             role:  'supervisor',
@@ -237,13 +233,11 @@ export const reviewProposal = async (req, res) => {
             });
         }
 
-        // Build milestones with #1 marked completed
         const now = new Date();
         const milestones = DEFAULT_MILESTONES.map((m) =>
             m.id === 1 ? { ...m, completed: true, completedAt: now } : { ...m }
         );
 
-        // Create the project
         const newProject = await Project.create({
             title:       proposal.title,
             description: proposal.description,
@@ -257,13 +251,11 @@ export const reviewProposal = async (req, res) => {
             proposalId:  proposal._id,
         });
 
-        // Increment supervisor's currentProjects counter
         if (supervisorProfile) {
             supervisorProfile.currentProjects += 1;
             await supervisorProfile.save();
         }
 
-        // Link proposal to the new project and mark approved
         proposal.projectId = newProject._id;
         proposal.status = 'approved';
         proposal.coordinatorFeedback = coordinatorFeedback || '';

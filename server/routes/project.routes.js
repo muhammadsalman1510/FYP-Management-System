@@ -16,11 +16,10 @@ import {
 
 const router = express.Router();
 
-// ── Fixed-path routes FIRST — must come before /:id ──────────────────────────
+// must come before /:id
 router.get('/my', authenticate, authorize('student'), getMyProject);
 router.get('/assigned', authenticate, authorize('supervisor'), getAssignedProjects);
 
-// ── Coordinator-only routes ───────────────────────────────────────────────────
 router.post('/', authenticate, authorize('coordinator'), createProject);
 router.get('/', authenticate, authorize('coordinator'), getProjects);
 router.get('/:id', authenticate, authorize('coordinator'), getProjectById);

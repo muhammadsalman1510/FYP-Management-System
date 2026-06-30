@@ -33,25 +33,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   return (
     <>
       <style>{`
-        /*
-          ════════════════════════════════════════════════
-          SIDEBAR RESPONSIVE BEHAVIOUR
-          ════════════════════════════════════════════════
-
-          LARGE SCREENS (≥992px):
-            - Sidebar is part of normal page layout (sticky)
-            - Always visible — no toggling, no animation
-            - Fixed width of 260px, sits to the left of content
-            - NO X button shown inside sidebar
-
-          SMALL/MEDIUM SCREENS (<992px):
-            - Sidebar floats OVER the page (position: fixed)
-            - Hidden off-screen by default (translateX -100%)
-            - Slides in when hamburger is clicked (translateX 0)
-            - Dark overlay covers page behind it
-            - X button inside sidebar header closes it
-          ════════════════════════════════════════════════
-        */
+        /* large: sticky in layout; small: fixed overlay that slides in from left */
 
         /* ── LARGE SCREENS ── */
         @media (min-width: 992px) {
@@ -92,9 +74,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         }}
       >
 
-        {/* ══════════════════════════════════
-            SIDEBAR HEADER
-            ══════════════════════════════════ */}
         <div
           className="d-flex align-items-center justify-content-between px-4"
           style={{
@@ -103,17 +82,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
             flexShrink: 0,
           }}
         >
-          {/* Brand name */}
           <NavLink to="/dashboard" className="text-decoration-none">
             <span className="fw-bold text-white" style={{ fontSize: '1.05rem', whiteSpace: 'nowrap' }}>
               FYP-Management
             </span>
           </NavLink>
 
-          {/*
-            X close button — ONLY on small/medium screens.
-            d-lg-none = completely hidden on large screens (≥992px).
-          */}
           <button
             onClick={() => setSidebarOpen(false)}
             className="btn p-0 border-0 d-lg-none ms-2"
@@ -125,18 +99,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
             </svg>
           </button>
         </div>
-        {/* ══ END SIDEBAR HEADER ══ */}
-
-        {/* ══════════════════════════════════
-            SIDEBAR MENU (scrollable)
-            ══════════════════════════════════ */}
         <div
           className="flex-grow-1 overflow-auto no-scrollbar"
           style={{ overflowX: 'hidden' }}
         >
           <nav className="mt-3 px-3 pb-4">
 
-            {/* Section label */}
             <p
               className="text-uppercase fw-semibold px-2 mb-3"
               style={{ fontSize: '0.68rem', letterSpacing: '0.1em', color: '#8892a4' }}
@@ -146,7 +114,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
 
             <ul className="list-unstyled d-flex flex-column gap-1 mb-0">
 
-              {/* ── Dashboard ── */}
               <li>
                 <NavLink
                   to="/dashboard"
@@ -163,7 +130,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* ── Project ── */}
               <SidebarLinkGroup activeCondition={pathname.includes('project')}>
                 {(handleClick, open) => (
                   <React.Fragment>
@@ -217,7 +183,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 )}
               </SidebarLinkGroup>
 
-              {/* ── Tasks ── */}
               <li>
                 <NavLink to="/tasks" onClick={handleNavClick}
                   className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link ${pathname === '/tasks' ? 'sidebar-link-active' : ''}`}
@@ -229,7 +194,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* ── Meetings ── */}
               <SidebarLinkGroup activeCondition={pathname.includes('meetings')}>
                 {(handleClick, open) => (
                   <React.Fragment>
@@ -257,7 +221,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 )}
               </SidebarLinkGroup>
 
-              {/* ── Announcements ── */}
               <li>
                 <NavLink to="/announcements" onClick={handleNavClick}
                   className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link ${pathname === '/announcements' ? 'sidebar-link-active' : ''}`}>
@@ -268,7 +231,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* ── Supervisor ── */}
               <li>
                 <NavLink to="/supervisor/view" onClick={handleNavClick}
                   className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link ${pathname === '/supervisor/view' ? 'sidebar-link-active' : ''}`}>
@@ -280,7 +242,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* ── Coordinator ── */}
               <li>
                 <NavLink to="/coordinator/view" onClick={handleNavClick}
                   className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link ${pathname === '/coordinator/view' ? 'sidebar-link-active' : ''}`}>
@@ -292,7 +253,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* ── My Profile ── */}
               <li>
                 <NavLink to="/profile" onClick={handleNavClick}
                   className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link ${pathname === '/profile' ? 'sidebar-link-active' : ''}`}
@@ -308,7 +268,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
             </ul>
           </nav>
         </div>
-        {/* ══ END SIDEBAR MENU ══ */}
 
       </aside>
     </>

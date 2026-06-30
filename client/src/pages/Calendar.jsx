@@ -23,7 +23,6 @@ const Calendar = () => {
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState(null);
 
-  // Meeting detail popup state
   const [selectedMeeting, setSelectedMeeting] = useState(null);
   const [showModal, setShowModal]             = useState(false);
   const [replyText, setReplyText]             = useState('');
@@ -80,7 +79,6 @@ const Calendar = () => {
     return nonStudent?.role === 'supervisor' ? '#3c50e0' : '#28a745';
   };
 
-  // Returns groups of meetings for a given day; each group is deduplicated to one block.
   const getGroupedMeetingsForDay = (day) => {
     const dayMeetings = meetings.filter((m) => {
       const d = new Date(m.proposedDate);
@@ -153,7 +151,6 @@ const Calendar = () => {
     );
   };
 
-  // For the selected meeting modal
   const isOwnSelected = selectedMeeting && (
     String(selectedMeeting.requestedBy?._id || selectedMeeting.requestedBy) === currentUserId ||
     String(selectedMeeting.requestedTo?._id  || selectedMeeting.requestedTo) === currentUserId
@@ -291,7 +288,6 @@ const Calendar = () => {
 
       </div>
 
-      {/* ── Meeting Detail Modal ── */}
       {showModal && selectedMeeting && (
         <div
           className="modal d-block"
@@ -311,7 +307,6 @@ const Calendar = () => {
 
               <div className="modal-body px-4 py-4">
 
-                {/* Group meeting notice */}
                 {!isOwnSelected && (
                   <div className="alert alert-info border-0 py-2 px-3 small mb-3">
                     This is a groupmate's meeting. You can view it but cannot send a reply.
@@ -383,7 +378,6 @@ const Calendar = () => {
                   </div>
                 </div>
 
-                {/* Reply section — own meetings only */}
                 {isOwnSelected && (
                   <>
                     <hr className="my-3" />

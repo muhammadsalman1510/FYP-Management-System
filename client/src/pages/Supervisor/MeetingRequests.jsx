@@ -21,7 +21,7 @@ const SupervisorMeetingRequests = () => {
   const token   = sessionStorage.getItem('token');
   const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
-  // Silently re-fetch meetings (used after creating a new meeting so populated data is shown)
+  // silent refresh — gets populated data after a new meeting is created
   const loadMeetings = async () => {
     try {
       const res = await fetch('/api/meetings', { headers });
@@ -31,7 +31,6 @@ const SupervisorMeetingRequests = () => {
     } catch (_) {}
   };
 
-  // Respond modal
   const [respondModal, setRespondModal]       = useState(false);
   const [respondMeeting, setRespondMeeting]   = useState(null);
   const [respondDecision, setRespondDecision] = useState('');
@@ -39,7 +38,6 @@ const SupervisorMeetingRequests = () => {
   const [responding, setResponding]           = useState(false);
   const [respondError, setRespondError]       = useState('');
 
-  // New meeting modal
   const [requestModal, setRequestModal] = useState(false);
   const [reqForm, setReqForm] = useState({
     meetWith: '', projectId: '',
@@ -79,7 +77,6 @@ const SupervisorMeetingRequests = () => {
   const pendingCount      = meetings.filter((m) => m.status === 'pending').length;
   const displayedMeetings = activeTab === 'all' ? meetings : meetings.filter((m) => m.status === 'pending');
 
-  // ── Reply state helpers ───────────────────────────────────────────────────
   const getRS = (id) =>
     replyStates[String(id)] || { text: '', sending: false, success: false, error: '' };
 
@@ -110,7 +107,6 @@ const SupervisorMeetingRequests = () => {
     }
   };
 
-  // ── Respond to student meeting request ───────────────────────────────────
   const openRespond = (meeting, decision) => {
     setRespondMeeting(meeting);
     setRespondDecision(decision);
@@ -278,7 +274,6 @@ const SupervisorMeetingRequests = () => {
         <div className="alert alert-danger border-0 mb-3">{cancelError}</div>
       )}
 
-      {/* Tab Navigation */}
       <div className="card shadow-sm border-0 mb-4">
         <div className="card-body p-0">
           <div className="d-flex border-bottom">
@@ -311,7 +306,6 @@ const SupervisorMeetingRequests = () => {
         </div>
       </div>
 
-      {/* Meeting Cards */}
       <div className="d-flex flex-column gap-3">
         {displayedMeetings.length === 0 ? (
           <div className="card shadow-sm border-0">
@@ -399,7 +393,6 @@ const SupervisorMeetingRequests = () => {
                     </div>
                   )}
 
-                  {/* Student's reply — shown for student meetings only */}
                   {m.studentReply && !isCoordinatorMtg && (
                     <div className="alert alert-secondary py-2 px-3 mt-2 mb-2">
                       <p className="small mb-0">
@@ -408,7 +401,6 @@ const SupervisorMeetingRequests = () => {
                     </div>
                   )}
 
-                  {/* Reply section for coordinator-originated meetings */}
                   {isCoordinatorMtg && (
                     <div className="mt-3">
                       {m.studentReply ? (
@@ -458,7 +450,6 @@ const SupervisorMeetingRequests = () => {
                     </div>
                   )}
 
-                  {/* Approve/Reject/Cancel buttons — student meetings only */}
                   {(canRespond || canCancel) && (
                     <div className="d-flex gap-2 mt-3">
                       {canRespond && (
@@ -485,7 +476,6 @@ const SupervisorMeetingRequests = () => {
         )}
       </div>
 
-      {/* ── Respond Modal ── */}
       {respondModal && (
         <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}
           onClick={(e) => { if (e.target === e.currentTarget) setRespondModal(false); }}>
@@ -539,7 +529,6 @@ const SupervisorMeetingRequests = () => {
         </div>
       )}
 
-      {/* ── New Meeting Modal ── */}
       {requestModal && (
         <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}
           onClick={(e) => { if (e.target === e.currentTarget) closeRequestModal(); }}>
@@ -560,7 +549,6 @@ const SupervisorMeetingRequests = () => {
                   <div className="alert alert-danger border-0 small py-2 mb-3">{reqError}</div>
                 )}
 
-                {/* Meet With */}
                 <div className="mb-3">
                   <label className="form-label fw-medium text-dark small">Meet With *</label>
                   <select
@@ -598,7 +586,6 @@ const SupervisorMeetingRequests = () => {
                       ))}
                     </select>
 
-                    {/* Preview for student path */}
                     {reqForm.meetWith === 'student' && reqForm.projectId && (() => {
                       const proj = projects.find((p) => p._id === reqForm.projectId);
                       const names = (proj?.students || []).map((s) => s.name).filter(Boolean).join(', ');
@@ -612,7 +599,6 @@ const SupervisorMeetingRequests = () => {
                       );
                     })()}
 
-                    {/* Preview for coordinator path */}
                     {reqForm.meetWith === 'coordinator' && reqForm.projectId && (() => {
                       const proj = projects.find((p) => p._id === reqForm.projectId);
                       return proj?.coordinator ? (

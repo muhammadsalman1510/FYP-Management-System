@@ -8,15 +8,9 @@ const Header = (props) => {
     <header className="sticky-top bg-white shadow-sm" style={{ zIndex: 1038 }}>
       <div className="d-flex align-items-center justify-content-between px-3 px-md-4 py-3">
 
-        {/* LEFT SIDE */}
         <div className="d-flex align-items-center gap-2">
 
-          {/*
-            Hamburger button — ONLY visible on small/medium screens.
-            d-lg-none = disappears on screens ≥992px (large screens).
-            On large screens the sidebar is always visible so no
-            hamburger is needed there.
-          */}
+          {/* hamburger — hidden on large screens where sidebar is always visible */}
           <button
             aria-controls="sidebar"
             aria-label="Toggle sidebar"
@@ -39,17 +33,12 @@ const Header = (props) => {
             )}
           </button>
 
-          {/*
-            Logo — only on small screens where sidebar is hidden.
-            On large screens the sidebar already shows "FYP-Management".
-            d-lg-none = hidden on large screens.
-          */}
+          {/* logo only on small screens — sidebar already shows branding on large */}
           <Link to="/" className="d-flex d-lg-none flex-shrink-0 text-decoration-none">
             <img src={LogoIcon} alt="Logo" height="30" />
           </Link>
         </div>
 
-        {/* RIGHT SIDE: Dark mode + User dropdown */}
         <div className="d-flex align-items-center gap-3">
           <ul className="list-unstyled mb-0 d-flex align-items-center">
             <DarkModeSwitcher />

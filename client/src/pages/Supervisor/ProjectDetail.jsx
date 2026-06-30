@@ -194,7 +194,6 @@ const SupervisorProjectDetail = () => {
         Back to Projects
       </button>
 
-      {/* Project Header Card */}
       <div className="card border-0 shadow-sm mb-4">
         <div className="card-body p-4">
           <div className="d-flex align-items-start justify-content-between flex-wrap gap-3">
@@ -248,7 +247,6 @@ const SupervisorProjectDetail = () => {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="mb-4" style={{ borderBottom: '2px solid #e9ecef' }}>
         <div className="d-flex gap-1 flex-wrap">
           {tabs.map((tab) => (
@@ -272,11 +270,9 @@ const SupervisorProjectDetail = () => {
         </div>
       </div>
 
-      {/* ── OVERVIEW ── */}
       {activeTab === 'overview' && (
         <div className="d-flex flex-column gap-4">
 
-          {/* Task Summary Shortcut */}
           <div
             className="card border-0 shadow-sm"
             style={{ cursor: 'pointer' }}
@@ -309,7 +305,6 @@ const SupervisorProjectDetail = () => {
             </div>
           </div>
 
-          {/* Milestones */}
           <div className="card border-0 shadow-sm">
             <div className="card-header bg-white border-bottom py-3 px-4">
               <h6 className="fw-semibold text-dark mb-0">Milestones</h6>
@@ -366,7 +361,6 @@ const SupervisorProjectDetail = () => {
             </div>
           </div>
 
-          {/* Group Members — clickable cards open student detail modal */}
           <div className="card border-0 shadow-sm">
             <div className="card-header bg-white border-bottom py-3 px-4">
               <h6 className="fw-semibold text-dark mb-0">Group Members</h6>
@@ -408,7 +402,6 @@ const SupervisorProjectDetail = () => {
             </div>
           </div>
 
-          {/* Coordinator */}
           {coordinator && (
             <div className="card border-0 shadow-sm">
               <div className="card-header bg-white border-bottom py-3 px-4">
@@ -430,7 +423,6 @@ const SupervisorProjectDetail = () => {
         </div>
       )}
 
-      {/* ── TASKS ── */}
       {activeTab === 'tasks' && (
         <div className="card border-0 shadow-sm">
           <div className="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between">
@@ -501,7 +493,6 @@ const SupervisorProjectDetail = () => {
         </div>
       )}
 
-      {/* ── SUBMISSIONS ── */}
       {activeTab === 'submissions' && (
         <div className="card border-0 shadow-sm">
           <div className="card-header bg-white border-bottom py-3 px-4">
@@ -580,7 +571,6 @@ const SupervisorProjectDetail = () => {
         </div>
       )}
 
-      {/* ── DOCUMENTS ── */}
       {activeTab === 'documents' && (
         <div className="card border-0 shadow-sm">
           <div className="card-header bg-white border-bottom py-3 px-4">
@@ -628,7 +618,6 @@ const SupervisorProjectDetail = () => {
         </div>
       )}
 
-      {/* ── STUDENT DETAIL MODAL ── */}
       {showStudentModal && selectedStudent && (
         <div
           className="modal d-block"
@@ -751,7 +740,6 @@ const SupervisorProjectDetail = () => {
         </div>
       )}
 
-      {/* Review Modal */}
       {reviewModal && (
         <div
           className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"

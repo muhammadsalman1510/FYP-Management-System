@@ -44,7 +44,6 @@ const CoordinatorTasks = () => {
     load();
   }, []);
 
-  // create task form
   const emptyTask = { title: '', instructions: '', openDate: '', dueDate: '', projectId: '', projectName: '', scope: '' };
   const [taskForm, setTaskForm] = useState(emptyTask);
   const [formError, setFormError] = useState('');

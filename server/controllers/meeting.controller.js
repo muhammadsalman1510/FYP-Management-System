@@ -29,7 +29,6 @@ export const createMeeting = async (req, res) => {
             }
         }
 
-        // ── Coordinator/supervisor scheduling for an entire project ───────────
         if (meetWith === 'project') {
             if (!projectId) {
                 return res.status(400).json({ success: false, message: 'projectId is required for project meetings' });
@@ -58,7 +57,6 @@ export const createMeeting = async (req, res) => {
             return res.status(201).json({ success: true, data: meetings });
         }
 
-        // ── Single meeting ────────────────────────────────────────────────────
         if (!requestedTo) {
             return res.status(400).json({ success: false, message: 'requestedTo is required' });
         }

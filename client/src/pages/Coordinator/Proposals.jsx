@@ -95,7 +95,6 @@ const CoordinatorProposals = () => {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Review failed');
 
-      // Update proposal status in list
       setProposals((prev) =>
         prev.map((p) => p._id === reviewProposal._id
           ? { ...p, status: reviewDecision, coordinatorFeedback: reviewFeedback }
@@ -103,7 +102,6 @@ const CoordinatorProposals = () => {
         )
       );
 
-      // On approval, show the auto-created project details
       if (reviewDecision === 'approved') {
         const project = data.data;
         const supervisorLabel = reviewProposal.supervisorName || reviewProposal.supervisorEmail || 'the named supervisor';
@@ -147,7 +145,6 @@ const CoordinatorProposals = () => {
     <>
       <Breadcrumb pageName="Proposals" />
 
-      {/* Auto-creation success banner */}
       {reviewSuccessMsg && (
         <div className="alert alert-success border-0 shadow-sm mb-4 small d-flex justify-content-between align-items-start gap-2">
           <span><strong>Success:</strong> {reviewSuccessMsg}</span>
@@ -165,7 +162,6 @@ const CoordinatorProposals = () => {
         No manual project creation needed.
       </div>
 
-      {/* Filter tabs */}
       <div className="card shadow-sm border-0 mb-4">
         <div className="card-body p-0">
           <div className="d-flex border-bottom flex-wrap">
@@ -201,7 +197,6 @@ const CoordinatorProposals = () => {
         </div>
       </div>
 
-      {/* Proposals list */}
       <div className="d-flex flex-column gap-3">
         {filtered.length === 0 ? (
           <div className="card shadow-sm border-0">
@@ -216,7 +211,6 @@ const CoordinatorProposals = () => {
               <div key={proposal._id} className="card shadow-sm border-0">
                 <div className="card-body p-4">
 
-                  {/* Top row */}
                   <div className="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                     <div>
                       <h6 className="fw-semibold text-dark mb-1">{proposal.title}</h6>
@@ -244,7 +238,6 @@ const CoordinatorProposals = () => {
                     </span>
                   </div>
 
-                  {/* Expand toggle */}
                   <button
                     className="btn btn-link btn-sm p-0 text-primary text-decoration-none mb-3"
                     onClick={() => setExpandedId(expandedId === proposal._id ? null : proposal._id)}
@@ -252,7 +245,6 @@ const CoordinatorProposals = () => {
                     {expandedId === proposal._id ? '▲ Hide Details' : '▼ View Full Proposal'}
                   </button>
 
-                  {/* Expanded details */}
                   {expandedId === proposal._id && (
                     <div className="border rounded p-3 mb-3 bg-light">
                       <div className="row g-3 mb-3">
@@ -270,7 +262,6 @@ const CoordinatorProposals = () => {
                         </div>
                       </div>
 
-                      {/* Supervisor info */}
                       <div className="mb-3">
                         <p className="fw-semibold text-dark small mb-2">Supervisor</p>
                         <div className="d-flex flex-wrap gap-4">
@@ -285,7 +276,6 @@ const CoordinatorProposals = () => {
                         </div>
                       </div>
 
-                      {/* Group members */}
                       <div className="mb-3">
                         <p className="fw-semibold text-dark small mb-2">
                           Group Members ({(proposal.groupMembers || []).length})
@@ -312,7 +302,6 @@ const CoordinatorProposals = () => {
                         </div>
                       </div>
 
-                      {/* ── Supervisor Recommendation ── */}
                       <div className="pt-3 border-top">
                         <p className="fw-semibold text-dark small mb-2">Supervisor Recommendation</p>
                         <div className="d-flex align-items-center gap-2 mb-2">
@@ -343,7 +332,6 @@ const CoordinatorProposals = () => {
                     </div>
                   )}
 
-                  {/* Coordinator feedback */}
                   {proposal.coordinatorFeedback && (
                     <div className={`alert py-2 px-3 mb-3 ${proposal.status === 'approved' ? 'alert-success' : 'alert-danger'}`}>
                       <p className="small mb-0">
@@ -352,7 +340,6 @@ const CoordinatorProposals = () => {
                     </div>
                   )}
 
-                  {/* Action buttons */}
                   {proposal.status === 'pending' && (
                     <div className="d-flex gap-2">
                       <button className="btn btn-success btn-sm px-4 fw-medium" onClick={() => openReview(proposal, 'approved')}>✓ Approve</button>
@@ -367,7 +354,6 @@ const CoordinatorProposals = () => {
         )}
       </div>
 
-      {/* Review Modal */}
       {reviewModal && (
         <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000 }}>
           <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '520px' }}>

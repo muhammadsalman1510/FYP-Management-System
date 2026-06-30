@@ -7,7 +7,6 @@ const CoordinatorScheduleMeeting = () => {
   const [loadingData, setLoadingData] = useState(true);
   const [dataError, setDataError]     = useState(null);
 
-  // Form state
   const [meetWith, setMeetWith]                   = useState('project');
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [selectedSupervisorId, setSelectedSupervisorId] = useState('');
@@ -37,7 +36,6 @@ const CoordinatorScheduleMeeting = () => {
         if (!projectsRes.ok || !projectsData.success) throw new Error(projectsData.message || 'Failed to load projects');
         if (!supervisorsRes.ok) throw new Error(supervisorsData.message || 'Failed to load supervisors');
 
-        // GET /api/projects returns { success: true, data: [...] }
         setProjects(projectsData.data || []);
         // GET /api/users returns { users: [...] } — not { success, data }
         setSupervisors(supervisorsData.users || []);
@@ -170,7 +168,6 @@ const CoordinatorScheduleMeeting = () => {
     );
   }
 
-  // Derive student names for the selected project preview
   const selectedProject = projects.find((p) => p._id === selectedProjectId);
   const projectStudentNames = (selectedProject?.students || []).map((s) => s.name).filter(Boolean);
 
@@ -197,7 +194,6 @@ const CoordinatorScheduleMeeting = () => {
 
               <div className="row g-4">
 
-                {/* Meet With */}
                 <div className="col-12">
                   <label className="form-label fw-medium text-dark small">Meet With *</label>
                   <div className="d-flex gap-4">
@@ -227,7 +223,6 @@ const CoordinatorScheduleMeeting = () => {
                   </div>
                 </div>
 
-                {/* Project dropdown */}
                 {meetWith === 'project' && (
                   <div className="col-12">
                     <label className="form-label fw-medium text-dark small">Select Project *</label>
@@ -255,7 +250,6 @@ const CoordinatorScheduleMeeting = () => {
                   </div>
                 )}
 
-                {/* Supervisor dropdown */}
                 {meetWith === 'supervisor' && (
                   <div className="col-12">
                     <label className="form-label fw-medium text-dark small">Select Supervisor *</label>
@@ -274,7 +268,6 @@ const CoordinatorScheduleMeeting = () => {
                   </div>
                 )}
 
-                {/* Meeting Topic */}
                 <div className="col-12">
                   <label className="form-label fw-medium text-dark small">Meeting Topic *</label>
                   <input
@@ -286,7 +279,6 @@ const CoordinatorScheduleMeeting = () => {
                   />
                 </div>
 
-                {/* Proposed Date */}
                 <div className="col-12 col-sm-6">
                   <label className="form-label fw-medium text-dark small">Proposed Date *</label>
                   <input
@@ -298,7 +290,6 @@ const CoordinatorScheduleMeeting = () => {
                   />
                 </div>
 
-                {/* Proposed Time */}
                 <div className="col-12 col-sm-6">
                   <label className="form-label fw-medium text-dark small">Proposed Time *</label>
                   <input
@@ -309,7 +300,6 @@ const CoordinatorScheduleMeeting = () => {
                   />
                 </div>
 
-                {/* Location */}
                 <div className="col-12">
                   <label className="form-label fw-medium text-dark small">Location <span className="text-muted">(optional)</span></label>
                   <input
@@ -321,7 +311,6 @@ const CoordinatorScheduleMeeting = () => {
                   />
                 </div>
 
-                {/* Actions */}
                 <div className="col-12">
                   <div className="d-flex justify-content-end gap-3">
                     <a href="/coordinator/meetings/calendar" className="btn btn-outline-secondary px-4">

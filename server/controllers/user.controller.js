@@ -13,7 +13,6 @@ export const createUser = async (req, res) => {
     try {
         const { name, email, password, role, program, batch, semester, section, rollNumber, maxProjects, department, designation } = req.body;
 
-        // 1. Basic validation
         if (!name || !email || !password || !role) {
             return res.status(400).json({
                 success: false,
@@ -28,7 +27,6 @@ export const createUser = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid role. Must be student or supervisor' })
         }
 
-        // 2. Role-specific field validation
         if (role === 'supervisor') {
             if (maxProjects === undefined) {
                 return res.status(400).json({ success: false, message: 'maxProjects is required for supervisors' })
@@ -54,13 +52,11 @@ export const createUser = async (req, res) => {
             }
         }
 
-        // 3. Check email uniqueness
         const existing = await User.findOne({ email: normalizedEmail })
         if (existing) {
             return res.status(400).json({ success: false, message: 'A user with this email already exists.' })
         }
 
-        // 4. Check roll number uniqueness (students only)
         if (role === 'student') {
             const existingProfile = await StudentProfile.findOne({ rollNumber: rollNumber.trim() })
             if (existingProfile) {
@@ -70,7 +66,6 @@ export const createUser = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10)
 
-        // 5. Transaction
         const session = await mongoose.startSession()
         session.startTransaction()
 
@@ -431,8 +426,6 @@ export const deleteUser = async (req, res) => {
         return res.status(500).json({ success: false, message: 'Internal server error' })
     }
 }
-
-// ─── Self-update routes (all roles) ──────────────────────────────────────────
 
 /**
  * GET /api/users/me

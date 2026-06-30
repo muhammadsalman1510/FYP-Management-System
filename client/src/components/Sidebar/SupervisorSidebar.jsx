@@ -60,7 +60,6 @@ const SupervisorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
         className="d-flex flex-column"
         style={{ backgroundColor: '#1e2433', zIndex: 1040, overflowX: 'hidden' }}
       >
-        {/* Header */}
         <div
           className="d-flex align-items-center justify-content-between px-4"
           style={{ borderBottom: '1px solid #2d3748', minHeight: '65px', flexShrink: 0 }}
@@ -81,7 +80,6 @@ const SupervisorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
           </button>
         </div>
 
-        {/* Menu */}
         <div className="flex-grow-1 overflow-auto no-scrollbar" style={{ overflowX: 'hidden' }}>
           <nav className="mt-3 px-3 pb-4">
             <p className="text-uppercase fw-semibold px-2 mb-3"
@@ -91,7 +89,6 @@ const SupervisorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
 
             <ul className="list-unstyled d-flex flex-column gap-1 mb-0">
 
-              {/* Dashboard */}
               <li>
                 <NavLink to="/supervisor/dashboard" onClick={handleNavClick}
                   className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link ${pathname === '/supervisor/dashboard' ? 'sidebar-link-active' : ''}`}>
@@ -105,7 +102,6 @@ const SupervisorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* Projects */}
               <li>
                 <NavLink to="/supervisor/projects" onClick={handleNavClick}
                   className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link ${pathname.includes('/supervisor/projects') ? 'sidebar-link-active' : ''}`}>
@@ -121,7 +117,6 @@ const SupervisorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
               </li>
 
 
-              {/* Proposals */}
               <li>
                 <NavLink to="/supervisor/proposals" onClick={handleNavClick}
                   className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link ${pathname.includes('/supervisor/proposals') ? 'sidebar-link-active' : ''}`}>
@@ -132,7 +127,6 @@ const SupervisorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* Tasks */}
               <li>
                 <NavLink to="/supervisor/tasks" onClick={handleNavClick}
                   className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link ${pathname.includes('/supervisor/tasks') ? 'sidebar-link-active' : ''}`}>
@@ -143,7 +137,6 @@ const SupervisorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* Meetings — button instead of NavLink to prevent navigation */}
               <SidebarLinkGroup activeCondition={pathname.includes('/supervisor/meetings')}>
                 {(handleClick, open) => (
                   <React.Fragment>
@@ -170,7 +163,6 @@ const SupervisorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 )}
               </SidebarLinkGroup>
 
-              {/* Announcements */}
               <li>
                 <NavLink to="/supervisor/announcements" onClick={handleNavClick}
                   className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link ${pathname.includes('/supervisor/announcements') ? 'sidebar-link-active' : ''}`}>
@@ -181,7 +173,6 @@ const SupervisorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* My Profile */}
               <li>
                 <NavLink to="/supervisor/profile" onClick={handleNavClick}
                   className={`d-flex align-items-center gap-2 rounded px-3 py-2 fw-medium text-decoration-none sidebar-link ${pathname === '/supervisor/profile' ? 'sidebar-link-active' : ''}`}>

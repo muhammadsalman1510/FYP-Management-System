@@ -11,7 +11,7 @@ const SupervisorProposals = () => {
   // changingRec tracks which proposal IDs are in "change recommendation" mode
   const [changingRec, setChangingRec] = useState({});
 
-  // Recommendation form state (for whichever proposal is currently expanded)
+  // one set of form state shared across proposals — only one expanded at a time
   const [recFeedback,   setRecFeedback]   = useState('');
   const [recSubmitting, setRecSubmitting] = useState(false);
   const [recError,      setRecError]      = useState(null);
@@ -152,7 +152,6 @@ const SupervisorProposals = () => {
         The coordinator's decision is final — your recommendation is advisory only.
       </div>
 
-      {/* Filter Tabs */}
       <div className="card shadow-sm border-0 mb-4">
         <div className="card-body p-0">
           <div className="d-flex border-bottom flex-wrap">
@@ -188,7 +187,6 @@ const SupervisorProposals = () => {
         </div>
       </div>
 
-      {/* Proposals List */}
       <div className="d-flex flex-column gap-3">
         {filtered.length === 0 ? (
           <div className="card shadow-sm border-0">
@@ -208,7 +206,6 @@ const SupervisorProposals = () => {
               <div key={proposal._id} className="card shadow-sm border-0">
                 <div className="card-body p-4">
 
-                  {/* Top row */}
                   <div className="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-2">
                     <div>
                       <h6 className="fw-semibold text-dark mb-1">{proposal.title}</h6>
@@ -241,7 +238,6 @@ const SupervisorProposals = () => {
                     </div>
                   </div>
 
-                  {/* Expand toggle */}
                   <button
                     className="btn btn-link btn-sm p-0 text-primary text-decoration-none mt-2 mb-3"
                     onClick={() => toggleExpand(proposal._id)}
@@ -249,7 +245,6 @@ const SupervisorProposals = () => {
                     {isExpanded ? '▲ Hide Details' : '▼ View Full Proposal'}
                   </button>
 
-                  {/* Expanded details */}
                   {isExpanded && (
                     <div className="border rounded p-3 mb-3 bg-light">
                       <div className="row g-3 mb-3">
@@ -269,7 +264,6 @@ const SupervisorProposals = () => {
                         )}
                       </div>
 
-                      {/* Named Supervisor */}
                       <div className="mb-3">
                         <p className="fw-semibold text-dark small mb-2">Named Supervisor</p>
                         <div className="d-flex flex-wrap gap-4">
@@ -284,7 +278,6 @@ const SupervisorProposals = () => {
                         </div>
                       </div>
 
-                      {/* Group Members */}
                       {proposal.groupMembers && proposal.groupMembers.length > 0 && (
                         <div className="mb-3">
                           <p className="fw-semibold text-dark small mb-2">
@@ -313,7 +306,6 @@ const SupervisorProposals = () => {
                         </div>
                       )}
 
-                      {/* ── Supervisor Recommendation Section ── */}
                       <div className="pt-3 border-top mt-1">
                         <p className="fw-semibold text-dark small mb-2">Your Recommendation</p>
 
@@ -324,7 +316,6 @@ const SupervisorProposals = () => {
                             No further recommendations can be submitted.
                           </div>
                         ) : hasSubmittedRec && !isChangingThisRec ? (
-                          // Recommendation already submitted — show success view
                           <>
                             <div className="alert alert-success border-0 py-2 px-3 small mb-2">
                               Your recommendation has been saved.
@@ -342,7 +333,6 @@ const SupervisorProposals = () => {
                             </button>
                           </>
                         ) : (
-                          // Show form + buttons
                           <>
                             <p className="text-muted small mb-3" style={{ fontStyle: 'italic' }}>
                               This is a recommendation for the coordinator. The coordinator's decision is final
@@ -397,7 +387,6 @@ const SupervisorProposals = () => {
                     </div>
                   )}
 
-                  {/* Coordinator feedback */}
                   {proposal.coordinatorFeedback && (
                     <div
                       className={`alert py-2 px-3 mb-0 ${proposal.status === 'approved' ? 'alert-success' : 'alert-danger'}`}

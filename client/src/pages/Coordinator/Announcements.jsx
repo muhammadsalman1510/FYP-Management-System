@@ -14,7 +14,6 @@ const CoordinatorAnnouncements = () => {
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState(null);
 
-  // grab whatever's been posted so far
   useEffect(() => {
     const load = async () => {
       try {

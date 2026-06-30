@@ -66,7 +66,6 @@ const CoordinatorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
         style={{ backgroundColor: '#1e2433', zIndex: 1040, overflowX: 'hidden' }}
       >
 
-        {/* ── SIDEBAR HEADER ── */}
         <div
           className="d-flex align-items-center justify-content-between px-4"
           style={{ borderBottom: '1px solid #2d3748', minHeight: '65px', flexShrink: 0 }}
@@ -77,7 +76,6 @@ const CoordinatorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
             </span>
           </NavLink>
 
-          {/* X close button — small screens only */}
           <button
             onClick={() => setSidebarOpen(false)}
             className="btn p-0 border-0 d-lg-none ms-2"
@@ -90,7 +88,6 @@ const CoordinatorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
           </button>
         </div>
 
-        {/* ── SIDEBAR MENU ── */}
         <div className="flex-grow-1 overflow-auto no-scrollbar" style={{ overflowX: 'hidden' }}>
           <nav className="mt-3 px-3 pb-4">
 
@@ -103,7 +100,6 @@ const CoordinatorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
 
             <ul className="list-unstyled d-flex flex-column gap-1 mb-0">
 
-              {/* ── Dashboard ── */}
               <li>
                 <NavLink
                   to="/coordinator/dashboard"
@@ -120,7 +116,7 @@ const CoordinatorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* ── Accounts — button instead of NavLink to prevent navigation ── */}
+              {/* button instead of NavLink so clicking the item only toggles, not navigates */}
               <SidebarLinkGroup activeCondition={pathname.includes('/coordinator/accounts')}>
                 {(handleClick, open) => (
                   <React.Fragment>
@@ -149,7 +145,6 @@ const CoordinatorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 )}
               </SidebarLinkGroup>
 
-              {/* ── Proposals ── */}
               <li>
                 <NavLink
                   to="/coordinator/proposals"
@@ -163,7 +158,6 @@ const CoordinatorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* ── Tasks ── */}
               <li>
                 <NavLink
                   to="/coordinator/tasks"
@@ -177,7 +171,7 @@ const CoordinatorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* ── Meetings — button instead of NavLink to prevent navigation ── */}
+              {/* button instead of NavLink so clicking the item only toggles, not navigates */}
               <SidebarLinkGroup activeCondition={pathname.includes('/coordinator/meetings')}>
                 {(handleClick, open) => (
                   <React.Fragment>
@@ -205,7 +199,6 @@ const CoordinatorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 )}
               </SidebarLinkGroup>
 
-              {/* ── Announcements ── */}
               <li>
                 <NavLink
                   to="/coordinator/announcements"
@@ -219,7 +212,6 @@ const CoordinatorSidebar = ({ sidebarOpen, setSidebarOpen }) => {
                 </NavLink>
               </li>
 
-              {/* ── My Profile ── */}
               <li>
                 <NavLink
                   to="/coordinator/profile"

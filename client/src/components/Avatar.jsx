@@ -42,9 +42,7 @@ const Avatar = ({ name = '', photoUrl = null, size = 44, bgColor, title, classNa
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        {/* Head */}
         <circle cx={cx} cy={headCy} r={headR} fill="#9e9e9e" />
-        {/* Shoulders / body */}
         <path
           d={`M${cx - iconSize * 0.38},${iconSize} Q${cx - iconSize * 0.38},${iconSize * 0.58} ${cx},${iconSize * 0.58} Q${cx + iconSize * 0.38},${iconSize * 0.58} ${cx + iconSize * 0.38},${iconSize}`}
           fill="#9e9e9e"

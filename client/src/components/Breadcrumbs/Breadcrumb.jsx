@@ -4,7 +4,6 @@ const Breadcrumb = ({ pageName }) => {
   return (
     <div className="mb-4 d-flex flex-column flex-sm-row align-items-sm-center justify-content-sm-between gap-2">
 
-      {/* Page title */}
       <h2 className="fs-4 fw-semibold text-dark mb-0">{pageName}</h2>
 
       {/* Breadcrumb navigation — Bootstrap adds the "/" separator via CSS ::before,
